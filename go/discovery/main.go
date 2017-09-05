@@ -1,43 +1,200 @@
-// Copyright 2016 ETH Zurich
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2017 Anapaya Systems
 
 package main
 
 import (
 	"flag"
-	"fmt"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 	"time"
 
-	"github.com/samuel/go-zookeeper/zk"
+	log "github.com/inconshreveable/log15"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/netsec-ethz/scion/go/zkutil"
+	"github.com/netsec-ethz/scion/go/discovery/acl"
+	"github.com/netsec-ethz/scion/go/discovery/dynamic"
+	"github.com/netsec-ethz/scion/go/discovery/metrics"
+	"github.com/netsec-ethz/scion/go/discovery/static"
+	"github.com/netsec-ethz/scion/go/discovery/util"
+	"github.com/netsec-ethz/scion/go/lib/addr"
+	"github.com/netsec-ethz/scion/go/lib/common"
+	liblog "github.com/netsec-ethz/scion/go/lib/log"
 )
 
-var zkHost = flag.String("zk-host", "127.0.0.1", "Zookeeper host")
-var zkPort = flag.Int("zk-port", 2181, "Zookeeper port")
-var zkTimeout = flag.Int("zk-timeout", 2000, "Zookeeper connect timeout (in ms)")
+var (
+	id = flag.String("id", "", "Element ID, e.g. 'ds4-21-9'")
+	ia = flag.String("ia", "", "ISD-AS, e.g. '4-11'")
+
+	topofile = flag.String("static-topo", "", "Static topology file to serve (required)")
+	usefmod  = flag.Bool("usefmod", true, "Use file modification time for static topo timestamp")
+	aclfile  = flag.String("acl", "", "File with ACL entries for full topology (required)")
+
+	zk = flag.String("zk", "",
+		"Comma-separated list (host:port, ...) of Zookeper instances to talk to (required)")
+	zkfreq    = flag.Duration("zkfreq", 5*time.Second, "How often to query Zookeeper")
+	zktimeout = flag.Duration("zktimeout", 10*time.Second, "Timeout for connecting to Zookeeper")
+
+	certfn = flag.String("cert", "", "Certificate file for TLS. If unset, serve plain HTTP")
+	keyfn  = flag.String("key", "", "Key file to use for TLS. If unset, serve plain HTTP")
+
+	laddress = flag.String("listen", "", "Address to serve on (host:port or ip:port or :port)")
+	paddress = flag.String("prom", "", "Address to serve prom/pprof data on. Disabled if empty")
+
+	// Global channel that the SIGHUP handler can listen on
+	sighup chan os.Signal
+)
+
+func init() {
+	// Add a SIGHUP handler as soon as possible on startup, to reduce the
+	// chance that a premature SIGHUP will kill the process. This channel is
+	// used by confSig below.
+	sighup = make(chan os.Signal, 1)
+	signal.Notify(sighup, syscall.SIGHUP)
+}
 
 func main() {
-	flag.Parse()
-	targets := []string{fmt.Sprintf("%v:%v", *zkHost, *zkPort)}
-	c, _, err := zk.Connect(targets, time.Millisecond*(time.Duration(*zkTimeout)))
-	if err != nil {
-		panic(err)
+	isdas, cerr := verifyFlags()
+	if cerr != nil {
+		log.Crit(cerr.Desc, cerr.Ctx...)
+		liblog.Flush()
+		os.Exit(1)
 	}
-	p := zkutil.NewParty(c, 1, 11, "sd1-11-2")
-	err = p.Join()
+	zklist := strings.Split(*zk, ",")
+	liblog.Setup(*id)
+	metrics.Init(*id)
+
+	log.Info("Loading ACLs", "filename", *aclfile)
+	cerr = acl.Load(*aclfile)
+	if cerr != nil {
+		log.Error(cerr.Desc, cerr.Ctx...)
+		liblog.Flush()
+		os.Exit(1)
+	}
+	log.Info("Loading static topology", "filename", *topofile)
+	cerr = static.Load(*topofile, *usefmod)
+	if cerr != nil {
+		log.Error("Could not load static topology file file", "filename", *topofile, "err", cerr)
+		liblog.Flush()
+		os.Exit(1)
+	}
+	dynamic.Setup(isdas, *topofile)
+	setupSignals()
+
+	go func() {
+		log.Debug("Starting topo update loop", "zklist", zklist, "frequency", *zkfreq, "conntimeout", *zktimeout)
+		for {
+			dynamic.UpdateFromZK(zklist, *id, *zktimeout)
+			time.Sleep(*zkfreq)
+		}
+	}()
+
+	http.DefaultServeMux.Handle("/metrics", promhttp.Handler())
+
+	pubMux := http.NewServeMux()
+
+	l := prometheus.Labels{"src": "static", "scope": "endhost"}
+	f := util.MakeHandler(static.TopoLimited, l)
+	pubMux.HandleFunc("/discovery/v1/static/reduced.json", f)
+
+	l = prometheus.Labels{"src": "static", "scope": "infrastructure"}
+	f = util.MakeACLHandler(static.TopoFull, l)
+	pubMux.HandleFunc("/discovery/v1/static/full.json", f)
+
+	l = prometheus.Labels{"src": "dynamic", "scope": "endhost"}
+	f = util.MakeHandler(dynamic.TopoLimited, l)
+	pubMux.HandleFunc("/discovery/v1/dynamic/reduced.json", f)
+
+	l = prometheus.Labels{"src": "dynamic", "scope": "infrastructure"}
+	f = util.MakeACLHandler(dynamic.TopoFull, l)
+	pubMux.HandleFunc("/discovery/v1/dynamic/full.json", f)
+
+	if *paddress != "" {
+		go func() {
+			log.Info("Starting private (prometheus, pprof) server", "addr", *paddress)
+			http.DefaultServeMux.HandleFunc("/", metrics.MakeMainDebugPageHandler())
+			err := runHTTPServer(*paddress, *certfn, *keyfn, http.DefaultServeMux)
+			// If runHTTPServer returns, there will be a non-nil cerr
+			log.Crit("Could not start private HTTP server", "err", err)
+			liblog.Flush()
+			os.Exit(1)
+		}()
+	}
+	log.Info("Starting public server", "addr", *laddress)
+	err := runHTTPServer(*laddress, *certfn, *keyfn, pubMux)
+	log.Crit("Could not start public HTTP server", "err", err)
+	liblog.Flush()
+	os.Exit(1)
+}
+
+func verifyFlags() (*addr.ISD_AS, *common.Error) {
+	flag.Parse()
+	if *id == "" {
+		return nil, common.NewError("No element ID specified")
+	}
+	if *ia == "" {
+		return nil, common.NewError("No ISD-AS specified")
+	}
+	isdas, err := addr.IAFromString(*ia)
 	if err != nil {
-		panic(err)
+		return nil, common.NewError("Could not parse ISD-AS", "isd-as", ia, "err", err)
+	}
+	if *topofile == "" {
+		return nil, common.NewError("No static topology file specified")
+	}
+	if *aclfile == "" {
+		return nil, common.NewError("No ACL file specified")
+	}
+	if *laddress == "" {
+		return nil, common.NewError("No address to listen on specified")
+	}
+	if *zk == "" {
+		return nil, common.NewError("No Zookeeper specified")
+	}
+	return isdas, nil
+}
+
+func setupSignals() {
+	exitsigs := make(chan os.Signal, 2)
+	signal.Notify(exitsigs, os.Interrupt)
+	signal.Notify(exitsigs, syscall.SIGTERM)
+	go func() {
+		// sighup is a global var set up in init()
+		for range sighup {
+			// Reload relevant static configuration files
+			var cerr *common.Error
+			log.Info("Reloading ACL", "filename", *aclfile)
+			cerr = acl.Load(*aclfile)
+			if cerr != nil {
+				log.Error("ACL file reload failed", "err", cerr)
+				// If there was an error, we should not try to reload the topofile
+				continue
+			}
+			log.Info("Reloading static topology file", "filename", *topofile)
+			cerr = static.Load(*topofile, *usefmod)
+			if cerr != nil {
+				log.Error("Static topology file reload failed", "err", cerr)
+			}
+		}
+	}() // End of HUP signal handler
+	go func() {
+		<-exitsigs
+		log.Info("Exiting")
+		liblog.Flush()
+		os.Exit(1)
+	}() // End of SIGINT/SIGTERM handler
+}
+
+func runHTTPServer(address string, certfile, keyfile string, smux *http.ServeMux) error {
+	if certfile != "" && keyfile != "" {
+		log.Info("Starting TLS server", "certfile", certfile, "keyfile", keyfile)
+		return http.ListenAndServeTLS(address, certfile, keyfile, smux)
+	} else {
+		log.Info("Starting plain HTTP server")
+		return http.ListenAndServe(address, smux)
 	}
 }
