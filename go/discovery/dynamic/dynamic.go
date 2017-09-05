@@ -31,6 +31,17 @@ var TopoFull *util.AtomicTopo
 var TopoLimited *util.AtomicTopo
 var isd_as *addr.ISD_AS
 
+const (
+	ERRCONN           = "connect-error"
+	ERRBASETOPOPARSE  = "basetopo-parse-error"
+	ERRSERVICEUPDATE  = "service-update-error"
+	ERRMARSHALFULL    = "marshall-full-error"
+	ERRMARSHALREDUCED = "marshall-reduced-error"
+	ERRFETCH          = "fetch-failure"
+	ERRSERVICEEMPTY   = "service-empty"
+	SUCCESS           = "success"
+)
+
 type wrappedLogger struct{}
 
 func (wrappedLogger) Printf(s string, r ...interface{}) {
@@ -68,7 +79,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 	c, _, err := zk.Connect(zks, sessionTimeout)
 	if err != nil {
 		log.Error("Error connecting to Zookeeper", "err", err)
-		labels["result"] = "connect-error"
+		labels["result"] = ERRCONN
 		goto Out
 	}
 	defer func() { closeZkConn(c) }()
@@ -78,7 +89,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 	// much as is useful.
 	if err := json.Unmarshal(static.DiskTopo, rt); err != nil {
 		log.Error("Could not re-parse topology.", "err", err)
-		labels["result"] = "basetopo-parse-error"
+		labels["result"] = ERRBASETOPOPARSE
 		goto Out
 	}
 	// Check each service and overwrite it with ZK contents iff ZK is non-empty
@@ -87,7 +98,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 		// be used to make a new served topology. Also, while it would be nice
 		// to have per-service-type error counts, it's probably not worth the
 		// extra code here.
-		labels["result"] = "service-update-error"
+		labels["result"] = ERRSERVICEUPDATE
 	}
 	metrics.TotalZkUpdateTime.Add(float64(monotime.Since(start).Seconds()))
 
@@ -97,7 +108,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 
 	if cerr = marshallAndUpdate(rt, TopoFull); cerr != nil {
 		log.Error("Could not marshal full topo", "err", cerr)
-		labels["result"] = "marshall-full-error"
+		labels["result"] = ERRMARSHALFULL
 		goto Out
 	}
 
@@ -106,7 +117,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 
 	if cerr = marshallAndUpdate(rt, TopoLimited); cerr != nil {
 		log.Error("Could not marshal reduced topo", "err", cerr)
-		labels["result"] = "marshall-reduced-error"
+		labels["result"] = ERRMARSHALREDUCED
 		goto Out
 	}
 
@@ -132,19 +143,19 @@ func updateServices(rt *topology.RawTopo, c *zk.Conn) bool {
 
 	rt.BeaconService, ok = fillService(c, isd_as, common.BS, rt.BeaconService)
 	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok, "service": common.BS}).Inc()
-	success := ok == "success"
+	success := ok == SUCCESS
 
 	rt.CertificateService, ok = fillService(c, isd_as, common.CS, rt.CertificateService)
 	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok, "service": common.CS}).Inc()
-	success = success && ok == "success"
+	success = success && ok == SUCCESS
 
 	rt.PathService, ok = fillService(c, isd_as, common.PS, rt.PathService)
 	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok, "service": common.PS}).Inc()
-	success = success && ok == "success"
+	success = success && ok == SUCCESS
 
 	rt.SibraService, ok = fillService(c, isd_as, common.SB, rt.SibraService)
 	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok, "service": common.SB}).Inc()
-	return success && ok == "success"
+	return success && ok == SUCCESS
 	// There currently is no RAINS service anywhere, so this would always fail
 	//rt.RainsService, ok = fillService(c, isd_as, common.RS, rt.RainsService)
 	//metrics.TotalServiceUpdates.With(prometheusLabels{"status": ok, "service": "bs"}).Inc()
@@ -172,13 +183,13 @@ func fillService(c *zk.Conn, isd_as *addr.ISD_AS, servicetype string,
 	if err != nil {
 		log.Warn("Could not fetch service entries from ZK, using fallback",
 			"servicetype", servicetype, "err", err)
-		return fallback, "fetch-failure"
+		return fallback, ERRFETCH
 	}
 	if len(service) == 0 {
 		log.Warn("Service listing is empty on ZK, using fallback", "servicetype", servicetype)
-		return fallback, "service-empty"
+		return fallback, ERRSERVICEEMPTY
 	}
-	return service, "success"
+	return service, SUCCESS
 }
 
 func getZkService(connection *zk.Conn, isdas *addr.ISD_AS,

@@ -21,6 +21,14 @@ var TopoLimited *util.AtomicTopo
 // The on-disk topo as it was the last time we loaded it
 var DiskTopo []byte
 
+const (
+	ERRFILEREAD       = "file-read-error"
+	ERRFILESTAT       = "stat-error"
+	ERRMARSHALFULL    = "marshal-full-error"
+	ERRMARSHALREDUCED = "marshal-reduced-error"
+	SUCCESS           = "success"
+)
+
 func init() {
 	TopoFull = &util.AtomicTopo{}
 	TopoFull.Store([]byte(nil))
@@ -32,7 +40,7 @@ func Load(filename string, usefmod bool) *common.Error {
 	l := prometheus.Labels{"result": ""}
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
-		l["result"] = "file-read-error"
+		l["result"] = ERRFILEREAD
 		metrics.TotalTopoLoads.With(l).Inc()
 		return common.NewError("Could not load topology.", "filename", filename, "err", err)
 	}
@@ -45,7 +53,7 @@ func Load(filename string, usefmod bool) *common.Error {
 		log.Debug("Resetting topology timestamp to file modification time")
 		fi, err := os.Stat(filename)
 		if err != nil {
-			l["result"] = "stat-error"
+			l["result"] = ERRFILESTAT
 			metrics.TotalTopoLoads.With(l).Inc()
 			return common.NewError("Could not stat topo file", "filename", filename, "err", err)
 		}
@@ -56,7 +64,7 @@ func Load(filename string, usefmod bool) *common.Error {
 	topology.StripBind(rt)
 	b, cerr = util.MarshalToJSON(rt)
 	if cerr != nil {
-		l["result"] = "marshal-full-error"
+		l["result"] = ERRMARSHALFULL
 		metrics.TotalTopoLoads.With(l).Inc()
 		return cerr
 	}
@@ -71,7 +79,7 @@ func Load(filename string, usefmod bool) *common.Error {
 		return cerr
 	}
 	TopoLimited.Store(b)
-	l["result"] = "success"
+	l["result"] = SUCCESS
 	metrics.TotalTopoLoads.With(l).Inc()
 	return nil
 }
