@@ -31,11 +31,11 @@ from lib.errors import SCIONSigVerError
 from lib.flagtypes import PathSegFlags as PSF
 from lib.packet.asm_exts import RoutingPolicyExt
 from lib.packet.opaque_field import HopOpaqueField, InfoOpaqueField
-from lib.packet.packet_base import Cerealizable, SCIONPayloadBaseProto
+from lib.packet.packet_base import Cerealizable
 from lib.packet.path import SCIONPath
 from lib.packet.scion_addr import ISD_AS
 from lib.sibra.pcb_ext import SibraPCBExt
-from lib.types import ASMExtType, PayloadClass
+from lib.types import ASMExtType
 from lib.util import iso_timestamp
 
 #: Default value for length (in bytes) of a revocation token.
@@ -162,9 +162,8 @@ class ASMarking(Cerealizable):
         return "\n".join(desc)
 
 
-class PathSegment(SCIONPayloadBaseProto):
+class PathSegment(Cerealizable):
     NAME = "PathSegment"
-    PAYLOAD_CLASS = PayloadClass.PCB
     P_CLS = P.PathSegment
     VER = len(P_CLS.schema.fields) - 1
 
@@ -289,7 +288,8 @@ class PathSegment(SCIONPayloadBaseProto):
         for asm in self.iter_asms():
             pcbm = asm.pcbm(0)
             data.append(asm.isd_as().pack())
-            data.append(struct.pack("!QQ", pcbm.p.inIF, pcbm.p.outIF))
+            hof = pcbm.hof()
+            data.append(struct.pack("!QQ", hof.ingress_if, hof.egress_if))
         data = b"".join(data)
         if hex:
             return crypto_hash(data).hex()

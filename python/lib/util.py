@@ -262,6 +262,10 @@ def recv_all(sock, total_len, flags):
             buf = sock.recv(total_len - len(barr), flags)
         except InterruptedError:
             continue
+        except ConnectionResetError:
+            # Peer closed the connection without reading
+            logging.error("socket closed by peer")
+            return None
         if not buf:
             if not barr:
                 logging.debug("recv returned nil, socket closed")

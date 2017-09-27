@@ -63,7 +63,7 @@ func init() {
 	fullTopoACL.Store([]net.IPNet{})
 }
 
-func Load(filename string) *common.Error {
+func Load(filename string) error {
 	l := prometheus.Labels{"result": ""}
 	defer func() {
 		metrics.TotalACLLoads.With(l).Inc()
@@ -71,12 +71,12 @@ func Load(filename string) *common.Error {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		l["result"] = ERRREADFILE
-		return common.NewError("Could not open ACL file", "filename", filename, "err", err)
+		return common.NewCError("Could not open ACL file", "filename", filename, "err", err)
 	}
-	newacl, cerr := makeACL(string(data))
-	if cerr != nil {
+	newacl, err := makeACL(string(data))
+	if err != nil {
 		l["result"] = ERRPARSEACL
-		return common.NewError("Could not parse ACL file", "filename", filename, "err", cerr)
+		return common.NewCError("Could not parse ACL file", "filename", filename, "err", err)
 	}
 	fullTopoACL.Store(newacl)
 	l["result"] = SUCCESS
@@ -84,7 +84,7 @@ func Load(filename string) *common.Error {
 	return nil
 }
 
-func makeACL(iplist string) ([]net.IPNet, *common.Error) {
+func makeACL(iplist string) ([]net.IPNet, error) {
 	var newacl []net.IPNet
 	lines := strings.Split(iplist, "\n")
 	for i, l := range lines {
@@ -102,7 +102,7 @@ func makeACL(iplist string) ([]net.IPNet, *common.Error) {
 		}
 		_, n, err := net.ParseCIDR(ipnet)
 		if err != nil {
-			return nil, common.NewError(
+			return nil, common.NewCError(
 				"Could not convert string to IP network",
 				"lineno", i+1, "string", ipnet, "err", err)
 		}

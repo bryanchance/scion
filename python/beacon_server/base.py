@@ -35,10 +35,9 @@ from lib.crypto.hash_tree import ConnectedHashTree
 from lib.crypto.symcrypto import kdf
 from lib.defines import (
     BEACON_SERVICE,
+    EXP_TIME_UNIT,
     HASHTREE_EPOCH_TIME,
     HASHTREE_EPOCH_TOLERANCE,
-    HASHTREE_TTL,
-    HASHTREE_UPDATE_WINDOW,
     PATH_POLICY_FILE,
     PATH_SERVICE,
 )
@@ -50,11 +49,15 @@ from lib.errors import (
 )
 from lib.msg_meta import UDPMetadata
 from lib.path_seg_meta import PathSegMeta
+from lib.packet.ctrl_pld import CtrlPayload
+from lib.packet.ifid import IFIDPayload
 from lib.packet.opaque_field import HopOpaqueField, InfoOpaqueField
 from lib.packet.path import SCIONPath
+from lib.packet.path_mgmt.base import PathMgmt
 from lib.packet.path_mgmt.ifstate import (
     IFStateInfo,
     IFStatePayload,
+    IFStateRequest,
 )
 from lib.packet.path_mgmt.rev_info import RevocationInfo
 from lib.packet.pcb import (
@@ -104,8 +107,6 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
             hash-chain for each interface.
     """
     SERVICE_TYPE = BEACON_SERVICE
-    # Amount of time units a HOF is valid (time unit is EXP_TIME_UNIT).
-    HOF_EXP_TIME = 63
     # ZK path for incoming PCBs
     ZK_PCB_CACHE_PATH = "pcb_cache"
     # ZK path for revocations.
@@ -130,6 +131,8 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
         self.hashtree_gen_key = kdf(
                             self.config.master_as_key, b"Derive hashtree Key")
         logging.info(self.config.__dict__)
+        # Amount of time units a HOF is valid (time unit is EXP_TIME_UNIT).
+        self.hof_exp_time = int(self.config.segment_ttl / EXP_TIME_UNIT)
         self._hash_tree = None
         self._hash_tree_lock = Lock()
         self._next_tree = None
@@ -139,8 +142,8 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
             self.ifid_state[ifid] = InterfaceState()
         self.ifid_state_lock = RLock()
         self.CTRL_PLD_CLASS_MAP = {
-            PayloadClass.PCB: {None: self.handle_pcb},
-            PayloadClass.IFID: {None: self.handle_ifid_packet},
+            PayloadClass.PCB: {PayloadClass.PCB: self.handle_pcb},
+            PayloadClass.IFID: {PayloadClass.IFID: self.handle_ifid_packet},
             PayloadClass.CERT: {
                 CertMgmtType.CERT_CHAIN_REQ: self.process_cert_chain_request,
                 CertMgmtType.CERT_CHAIN_REPLY: self.process_cert_chain_reply,
@@ -173,8 +176,8 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
 
     def _init_hash_tree(self):
         ifs = list(self.ifid2br.keys())
-        self._hash_tree = ConnectedHashTree(
-            self.addr.isd_as, ifs, self.hashtree_gen_key, HashType.SHA256)
+        self._hash_tree = ConnectedHashTree(self.addr.isd_as, ifs, self.hashtree_gen_key,
+                                            self.config.revocation_tree_ttl, HashType.SHA256)
 
     def _get_ht_proof(self, if_id):
         with self._hash_tree_lock:
@@ -200,7 +203,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
                 pcb.copy(), intf.isd_as, intf.if_id)
             if not new_pcb:
                 continue
-            self.send_meta(new_pcb, meta)
+            self.send_meta(CtrlPayload(new_pcb), meta)
             propagated_pcbs[(intf.isd_as, intf.if_id)].append(pcb.short_id())
             prop_cnt += 1
         if self._labels:
@@ -221,7 +224,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
     def _create_one_hop_path(self, egress_if):
         ts = int(SCIONTime.get_time())
         info = InfoOpaqueField.from_values(ts, self.addr.isd_as[0], hops=2)
-        hf1 = HopOpaqueField.from_values(self.HOF_EXP_TIME, 0, egress_if)
+        hf1 = HopOpaqueField.from_values(self.hof_exp_time, 0, egress_if)
         hf1.set_mac(self.of_gen_key, ts, None)
         # Return a path where second HF is empty.
         return SCIONPath.from_values(info, [hf1, HopOpaqueField()])
@@ -262,14 +265,16 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
             except SCIONParseError as e:
                 logging.error("Unable to parse raw pcb: %s", e)
                 continue
-            self.handle_pcb(pcb)
+            self.handle_pcb(CtrlPayload(pcb))
         if pcbs:
             logging.debug("Processed %s PCBs from ZK", len(pcbs))
 
-    def handle_pcb(self, pcb, meta=None):
+    def handle_pcb(self, cpld, meta=None):
         """
         Handles pcbs received from the network.
         """
+        pcb = cpld.contents
+        assert isinstance(pcb, PathSegment), type(pcb)
         if meta:
             pcb.p.ifID = meta.path.get_hof().ingress_if
         try:
@@ -373,7 +378,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
         if out_info["remote_ia"].int() and not out_info["remote_if"]:
             return None
         hof = HopOpaqueField.from_values(
-            self.HOF_EXP_TIME, in_if, out_if, xover=xover)
+            self.hof_exp_time, in_if, out_if, xover=xover)
         hof.set_mac(self.of_gen_key, ts, prev_hof)
         return PCBMarking.from_values(
             in_info["remote_ia"], in_info["remote_if"], in_info["mtu"],
@@ -395,13 +400,15 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
         pcb.add_asm(asm)
         return pcb
 
-    def handle_ifid_packet(self, pld, meta):
+    def handle_ifid_packet(self, cpld, meta):
         """
         Update the interface state for the corresponding interface.
 
         :param pld: The IFIDPayload.
         :type pld: IFIDPayload
         """
+        pld = cpld.contents
+        assert isinstance(pld, IFIDPayload), type(pld)
         ifid = pld.p.relayIF
         with self.ifid_state_lock:
             if ifid not in self.ifid_state:
@@ -444,27 +451,28 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
 
     def _create_next_tree(self):
         last_ttl_window = 0
+        ttl = self.config.revocation_tree_ttl
+        update_window = ttl // 3
         while self.run_flag.is_set():
             start = time.time()
-            cur_ttl_window = ConnectedHashTree.get_ttl_window()
-            time_to_sleep = (ConnectedHashTree.get_time_till_next_ttl() -
-                             HASHTREE_UPDATE_WINDOW)
+            cur_ttl_window = ConnectedHashTree.get_ttl_window(ttl)
+            time_to_sleep = ConnectedHashTree.time_until_next_window(ttl) - update_window
             if cur_ttl_window == last_ttl_window:
-                time_to_sleep += HASHTREE_TTL
+                time_to_sleep += ttl
             if time_to_sleep > 0:
                 sleep_interval(start, time_to_sleep, "BS._create_next_tree",
                                self._quiet_startup())
 
-            # at this point, there should be <= HASHTREE_UPDATE_WINDOW
+            # at this point, there should be <= update_window
             # seconds left in current ttl
             logging.info("Started computing hashtree for next TTL window (%d)",
                          cur_ttl_window + 2)
-            last_ttl_window = ConnectedHashTree.get_ttl_window()
+            last_ttl_window = ConnectedHashTree.get_ttl_window(ttl)
 
             ht_start = time.time()
             ifs = list(self.ifid2br.keys())
             tree = ConnectedHashTree.get_next_tree(
-                self.addr.isd_as, ifs, self.hashtree_gen_key, HashType.SHA256)
+                self.addr.isd_as, ifs, self.hashtree_gen_key, ttl, HashType.SHA256)
             ht_end = time.time()
             with self._hash_tree_lock:
                 self._next_tree = tree
@@ -483,7 +491,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
                 logging.critical("Did not create hashtree in time; dying")
                 kill_self()
         logging.info("New Hash Tree TTL window beginning: %s",
-                     ConnectedHashTree.get_ttl_window())
+                     ConnectedHashTree.get_ttl_window(self.config.revocation_tree_ttl))
 
     def worker(self):
         """
@@ -491,7 +499,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
         propagating PCBS/registering paths when master.
         """
         last_propagation = last_registration = 0
-        last_ttl_window = ConnectedHashTree.get_ttl_window()
+        last_ttl_window = ConnectedHashTree.get_ttl_window(self.config.revocation_tree_ttl)
         worker_cycle = 1.0
         start = time.time()
         while self.run_flag.is_set():
@@ -507,7 +515,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
                 self.revobjs_cache.process()
                 self.handle_rev_objs()
 
-                cur_ttl_window = ConnectedHashTree.get_ttl_window()
+                cur_ttl_window = ConnectedHashTree.get_ttl_window(self.config.revocation_tree_ttl)
                 if cur_ttl_window != last_ttl_window:
                     self._maintain_hash_tree()
                     last_ttl_window = cur_ttl_window
@@ -614,7 +622,10 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
         logging.debug("Received revocation via SCMP: %s (from %s)", rev_info.short_desc(), meta)
         self._process_revocation(rev_info)
 
-    def _handle_revocation(self, rev_info, meta):
+    def _handle_revocation(self, cpld, meta):
+        pmgt = cpld.contents
+        rev_info = pmgt.contents
+        assert isinstance(rev_info, RevocationInfo), type(rev_info)
         logging.debug("Received revocation via TCP/UDP: %s (from %s)", rev_info.short_desc(), meta)
         if not self._validate_revocation(rev_info):
             return
@@ -633,7 +644,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
         :param rev_info: The RevocationInfo object
         :type rev_info: RevocationInfo
         """
-        assert isinstance(rev_info, RevocationInfo)
+        assert isinstance(rev_info, RevocationInfo), type(rev_info)
         if_id = rev_info.p.ifID
         if not if_id:
             logging.error("Trying to revoke IF with ID 0.")
@@ -675,7 +686,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
             if cand.id in processed:
                 continue
             processed.add(cand.id)
-            if not ConnectedHashTree.verify_epoch(rev_info.p.epoch):
+            if ConnectedHashTree.verify_epoch(rev_info.p.epoch) != ConnectedHashTree.EPOCH_OK:
                 continue
 
             # If the interface on which we received the PCB is
@@ -717,8 +728,11 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
             sleep_interval(start_time, self.IF_TIMEOUT_INTERVAL,
                            "Handle IF timeouts")
 
-    def _handle_ifstate_request(self, req, meta):
+    def _handle_ifstate_request(self, cpld, meta):
         # Only master replies to ifstate requests.
+        pmgt = cpld.contents
+        req = pmgt.contents
+        assert isinstance(req, IFStateRequest), type(req)
         if not self.zk.have_lock():
             return
         self._send_ifstate_update([meta])
@@ -738,7 +752,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
                 logging.warning("No IF state info to put in IFState update for %s.",
                                 ", ".join([str(m) for m in border_metas + server_metas]))
                 return
-            payload = IFStatePayload.from_values(infos)
+            payload = CtrlPayload(PathMgmt(IFStatePayload.from_values(infos)))
         for meta in border_metas:
             self.send_meta(payload.copy(), meta, (meta.host, meta.port))
         for meta in server_metas:

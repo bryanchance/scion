@@ -22,22 +22,20 @@ import capnp  # noqa
 
 # SCION
 import proto.rev_info_capnp as P
-from lib.packet.path_mgmt.base import PathMgmtPayloadBase
+from lib.packet.packet_base import Cerealizable
 from lib.packet.scion_addr import ISD_AS
-from lib.types import PathMgmtType as PMT
 
 
-class RevocationInfo(PathMgmtPayloadBase):
+class RevocationInfo(Cerealizable):
     """
     Class containing revocation information, i.e., the revocation token.
     """
     NAME = "RevocationInfo"
-    PAYLOAD_TYPE = PMT.REVOCATION
     P_CLS = P.RevInfo
 
     @classmethod
     def from_values(cls, isd_as, if_id, epoch, nonce, siblings, prev_root,
-                    next_root, hash_type):
+                    next_root, hash_type, tree_ttl):
         """
         Returns a RevocationInfo object with the specified values.
 
@@ -48,11 +46,12 @@ class RevocationInfo(PathMgmtPayloadBase):
         :param list[(bool, bytes)] siblings: Positions and hashes of siblings
         :param bytes prev_root: Hash of the tree root at time T-1
         :param bytes next_root: Hash of the tree root at time T+1
-        :param hash_type: The hash function needed to verify the revocation.
+        :param int hash_type: The hash function needed to verify the revocation.
+        :param int tree_ttl: The validity period of the revocation tree.
         """
         # Put the isd_as, if_id, epoch and nonce of the leaf into the proof.
         p = cls.P_CLS.new_message(isdas=int(isd_as), ifID=if_id, epoch=epoch,
-                                  nonce=nonce, hashType=hash_type)
+                                  nonce=nonce, hashType=hash_type, treeTTL=tree_ttl)
         # Put the list of sibling hashes (along with l/r) into the proof.
         sibs = p.init('siblings', len(siblings))
         for i, sibling in enumerate(siblings):
@@ -83,5 +82,5 @@ class RevocationInfo(PathMgmtPayloadBase):
         return hash(self.cmp_str())
 
     def short_desc(self):
-        return "RevInfo: %s IF: %d EPOCH: %d" % (self.isd_as(), self.p.ifID,
-                                                 self.p.epoch)
+        return "RevInfo: %s IF: %d EPOCH: %d TreeTTL: %d" % (
+            self.isd_as(), self.p.ifID, self.p.epoch, self.p.treeTTL)

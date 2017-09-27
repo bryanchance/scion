@@ -21,24 +21,23 @@ import capnp  # noqa
 # SCION
 import proto.sciond_capnp as P
 from lib.packet.path_mgmt.rev_info import RevocationInfo
-from lib.sciond_api.base import SCIONDMsgBase
-from lib.types import SCIONDMsgType as SMT
+from lib.packet.packet_base import Cerealizable
+from lib.types import TypeBase
 
 
-class SCIONDRevNotification(SCIONDMsgBase):
+class SCIONDRevNotification(Cerealizable):
     """Revocation notification message."""
     NAME = "RevNotification"
-    MSG_TYPE = SMT.REVOCATION
     P_CLS = P.RevNotification
 
-    def __init__(self, p, id_):
-        super().__init__(p, id_)
+    def __init__(self, p):
+        super().__init__(p)
         self._rev_info = None
 
     @classmethod
-    def from_values(cls, id_, rev_info):
+    def from_values(cls, rev_info):
         p = cls.P_CLS.new_message(revInfo=rev_info.p)
-        return cls(p, id_)
+        return cls(p)
 
     def rev_info(self):
         if not self._rev_info:
@@ -47,3 +46,36 @@ class SCIONDRevNotification(SCIONDMsgBase):
 
     def short_desc(self):
         return self.rev_info().short_desc()
+
+
+class SCIONDRevReply(Cerealizable):  # pragma: no cover
+    """Revocation reply."""
+    NAME = "RevReply"
+    P_CLS = P.RevReply
+
+    @classmethod
+    def from_values(cls, result):
+        p = cls.P_CLS.new_message(result=result)
+        return cls(p)
+
+    def short_desc(self):
+        return "result=%d" % SCIONDRevReplyStatus.describe(self.result)
+
+
+class SCIONDRevReplyStatus(TypeBase):  # pragma: no cover
+    VALID = 0
+    STALE = 1
+    INVALID = 2
+    UNKNOWN = 3
+
+    @classmethod
+    def describe(cls, code):
+        if code == cls.VALID:
+            return "Revocation is valid."
+        if code == cls.STALE:
+            return "Revocation is stale."
+        if code == cls.INVALID:
+            return "Revocation is invalid."
+        if code == cls.UNKNOWN:
+            return "Revocation state unknown."
+        return "Unknown result code."

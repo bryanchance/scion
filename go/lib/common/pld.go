@@ -21,7 +21,7 @@ import (
 type Payload interface {
 	fmt.Stringer
 	Len() int
-	Copy() (Payload, *Error)
-	// Copies data from payload to b
-	WritePld(RawBytes) (int, *Error)
+	Copy() (Payload, error)
+	// Writes payload to buffer
+	WritePld(RawBytes) (int, error)
 }

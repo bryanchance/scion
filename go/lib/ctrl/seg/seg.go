@@ -18,6 +18,7 @@ package seg
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"strings"
 
@@ -37,24 +38,26 @@ type PathSegment struct {
 	}
 }
 
-func NewFromRaw(b common.RawBytes) (*PathSegment, *common.Error) {
+func NewFromRaw(b common.RawBytes) (*PathSegment, error) {
 	ps := &PathSegment{}
 	return ps, proto.ParseFromRaw(ps, ps.ProtoId(), b)
 }
 
-func (ps *PathSegment) ID() common.RawBytes {
+func (ps *PathSegment) ID() (common.RawBytes, error) {
 	h := sha256.New()
 	for _, as := range ps.ASEntries {
-		data := make([]byte, 20)
-		common.Order.PutUint32(data, as.RawIA)
-		common.Order.PutUint64(data, as.HopEntries[0].InIF)
-		common.Order.PutUint64(data, as.HopEntries[0].OutIF)
-		h.Write(data)
+		binary.Write(h, common.Order, as.RawIA)
+		hopf, err := as.HopEntries[0].HopField()
+		if err != nil {
+			return nil, err
+		}
+		binary.Write(h, common.Order, hopf.Ingress)
+		binary.Write(h, common.Order, hopf.Egress)
 	}
-	return h.Sum(nil)
+	return h.Sum(nil), nil
 }
 
-func (ps *PathSegment) Info() (*spath.InfoField, *common.Error) {
+func (ps *PathSegment) Info() (*spath.InfoField, error) {
 	return spath.InfoFFromRaw(ps.RawInfo)
 }
 
@@ -62,13 +65,23 @@ func (ps *PathSegment) ProtoId() proto.ProtoIdType {
 	return proto.PathSegment_TypeID
 }
 
-func (ps *PathSegment) Write(b common.RawBytes) (int, *common.Error) {
+func (ps *PathSegment) Write(b common.RawBytes) (int, error) {
 	return proto.WriteRoot(ps, b)
 }
 
+func (ps *PathSegment) Pack() (common.RawBytes, error) {
+	return proto.PackRoot(ps)
+}
+
 func (ps *PathSegment) String() string {
+	desc := []string{}
+	if id, err := ps.ID(); err != nil {
+		desc = append(desc, fmt.Sprintf("ID error: %s", err))
+	} else {
+		desc = append(desc, id.String())
+	}
 	info, _ := ps.Info()
-	desc := []string{ps.ID()[:10].String(), info.Timestamp().UTC().Format(common.TimeFmt)}
+	desc = append(desc, info.Timestamp().UTC().Format(common.TimeFmt))
 	hops_desc := []string{}
 	for _, as := range ps.ASEntries {
 		hop := as.HopEntries[0]
@@ -88,23 +101,30 @@ func (ps *PathSegment) String() string {
 }
 
 type Meta struct {
-	Type    uint8
+	Type    Type
 	Segment PathSegment `capnp:"pcb"`
 }
 
 func (m *Meta) String() string {
-	return fmt.Sprintf("Type: %v, Segment: %v", typeToString(m.Type), m.Segment)
+	return fmt.Sprintf("Type: %v, Segment: %v", m.Type, m.Segment)
 }
 
-func typeToString(t uint8) string {
+type Type uint8
+
+const (
+	UpSegment   Type = 0
+	DownSegment Type = 1
+	CoreSegment Type = 2
+)
+
+func (t Type) String() string {
 	switch t {
-	case 0:
+	case UpSegment:
 		return "UP"
-	case 1:
+	case DownSegment:
 		return "DOWN"
-	case 2:
+	case CoreSegment:
 		return "CORE"
-	default:
-		return "UNKNOWN"
 	}
+	return fmt.Sprintf("UNKNOWN (%d)", t)
 }

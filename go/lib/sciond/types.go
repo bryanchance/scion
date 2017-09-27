@@ -58,13 +58,14 @@ type Pld struct {
 	AsInfoReq          ASInfoReq
 	AsInfoReply        ASInfoReply
 	RevNotification    RevNotification
+	RevReply           RevReply
 	IfInfoRequest      IFInfoRequest
 	IfInfoReply        IFInfoReply
 	ServiceInfoRequest ServiceInfoRequest
 	ServiceInfoReply   ServiceInfoReply
 }
 
-func NewPldFromRaw(b common.RawBytes) (*Pld, *common.Error) {
+func NewPldFromRaw(b common.RawBytes) (*Pld, error) {
 	p := &Pld{}
 	return p, proto.ParseFromRaw(p, p.ProtoId(), b)
 }
@@ -74,17 +75,17 @@ func (p *Pld) ProtoId() proto.ProtoIdType {
 }
 
 func (p *Pld) String() string {
-	desc := []string{fmt.Sprintf("Sciond: Id: %d Union0: ", p.Id)}
-	union0, cerr := p.union0()
-	if cerr != nil {
-		desc = append(desc, cerr.String())
+	desc := []string{fmt.Sprintf("Sciond: Id: %d Union1: ", p.Id)}
+	u1, err := p.union1()
+	if err != nil {
+		desc = append(desc, err.Error())
 	} else {
-		desc = append(desc, fmt.Sprintf("%+v", union0))
+		desc = append(desc, fmt.Sprintf("%+v", u1))
 	}
 	return strings.Join(desc, "")
 }
 
-func (p *Pld) union0() (interface{}, *common.Error) {
+func (p *Pld) union1() (interface{}, error) {
 	switch p.Which {
 	case proto.SCIONDMsg_Which_pathReq:
 		return p.PathReq, nil
@@ -96,6 +97,8 @@ func (p *Pld) union0() (interface{}, *common.Error) {
 		return p.AsInfoReply, nil
 	case proto.SCIONDMsg_Which_revNotification:
 		return p.RevNotification, nil
+	case proto.SCIONDMsg_Which_revReply:
+		return p.RevReply, nil
 	case proto.SCIONDMsg_Which_ifInfoRequest:
 		return p.IfInfoRequest, nil
 	case proto.SCIONDMsg_Which_ifInfoReply:
@@ -105,7 +108,7 @@ func (p *Pld) union0() (interface{}, *common.Error) {
 	case proto.SCIONDMsg_Which_serviceInfoReply:
 		return p.ServiceInfoReply, nil
 	}
-	return nil, common.NewError("Unsupported SCIOND union0 type", "type", p.Which)
+	return nil, common.NewCError("Unsupported SCIOND union1 type", "type", p.Which)
 }
 
 type PathReq struct {
@@ -181,6 +184,34 @@ func (entry ASInfoReplyEntry) String() string {
 
 type RevNotification struct {
 	RevInfo *path_mgmt.RevInfo
+}
+
+type RevReply struct {
+	Result RevResult
+}
+
+type RevResult uint16
+
+const (
+	RevValid RevResult = iota
+	RevStale
+	RevInvalid
+	RevUnknown
+)
+
+func (c RevResult) String() string {
+	switch c {
+	case RevValid:
+		return "RevValid"
+	case RevStale:
+		return "RevStale"
+	case RevInvalid:
+		return "RevInvalid"
+	case RevUnknown:
+		return "RevUnknown"
+	default:
+		return fmt.Sprintf("Unknown revocation result (%d)", c)
+	}
 }
 
 type IFInfoRequest struct {

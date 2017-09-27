@@ -36,18 +36,18 @@ func init() {
 	TopoLimited.Store([]byte(nil))
 }
 
-func Load(filename string, usefmod bool) *common.Error {
+func Load(filename string, usefmod bool) error {
 	l := prometheus.Labels{"result": ""}
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
 		l["result"] = ERRFILEREAD
 		metrics.TotalTopoLoads.With(l).Inc()
-		return common.NewError("Could not load topology.", "filename", filename, "err", err)
+		return common.NewCError("Could not load topology.", "filename", filename, "err", err)
 	}
 	DiskTopo = b
-	rt, cerr := topology.LoadRaw(b)
-	if cerr != nil {
-		return cerr
+	rt, err := topology.LoadRaw(b)
+	if err != nil {
+		return err
 	}
 	if usefmod {
 		log.Debug("Resetting topology timestamp to file modification time")
@@ -55,28 +55,28 @@ func Load(filename string, usefmod bool) *common.Error {
 		if err != nil {
 			l["result"] = ERRFILESTAT
 			metrics.TotalTopoLoads.With(l).Inc()
-			return common.NewError("Could not stat topo file", "filename", filename, "err", err)
+			return common.NewCError("Could not stat topo file", "filename", filename, "err", err)
 		}
 		rt.Timestamp = fi.ModTime().Unix()
 		rt.TimestampHuman = fi.ModTime().Format(common.TimeFmt)
 	}
 
 	topology.StripBind(rt)
-	b, cerr = util.MarshalToJSON(rt)
-	if cerr != nil {
+	b, err = util.MarshalToJSON(rt)
+	if err != nil {
 		l["result"] = ERRMARSHALFULL
 		metrics.TotalTopoLoads.With(l).Inc()
-		return cerr
+		return err
 	}
 	TopoFull.Store(b)
 
 	// We can edit the topo since we have a "copy" of it in TopoFull now
 	topology.StripServices(rt)
-	b, cerr = util.MarshalToJSON(rt)
-	if cerr != nil {
+	b, err = util.MarshalToJSON(rt)
+	if err != nil {
 		l["result"] = "marshal-limited-error"
 		metrics.TotalTopoLoads.With(l).Inc()
-		return cerr
+		return err
 	}
 	TopoLimited.Store(b)
 	l["result"] = SUCCESS

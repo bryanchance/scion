@@ -56,17 +56,16 @@ func init() {
 	TopoLimited.Store([]byte{})
 }
 
-func Setup(IA *addr.ISD_AS, basetopofn string) *common.Error {
-	var cerr *common.Error
+func Setup(IA *addr.ISD_AS, basetopofn string) error {
+	var err error
 	isd_as = IA
-	baseTopo, cerr = topology.LoadRawFromFile(basetopofn)
-	return cerr
+	baseTopo, err = topology.LoadRawFromFile(basetopofn)
+	return err
 }
 
 func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 	// We declare a bunch of variables early so we can use goto freely.
 	var c *zk.Conn
-	var cerr *common.Error
 	var wl wrappedLogger
 
 	// These should never be used with their default values
@@ -106,8 +105,8 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 	topology.StripBind(rt)
 	updateTimestamps(rt)
 
-	if cerr = marshallAndUpdate(rt, TopoFull); cerr != nil {
-		log.Error("Could not marshal full topo", "err", cerr)
+	if err = marshallAndUpdate(rt, TopoFull); err != nil {
+		log.Error("Could not marshal full topo", "err", err)
 		labels["result"] = ERRMARSHALFULL
 		goto Out
 	}
@@ -115,8 +114,8 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 	// Trim non-public services
 	topology.StripServices(rt)
 
-	if cerr = marshallAndUpdate(rt, TopoLimited); cerr != nil {
-		log.Error("Could not marshal reduced topo", "err", cerr)
+	if err = marshallAndUpdate(rt, TopoLimited); err != nil {
+		log.Error("Could not marshal reduced topo", "err", err)
 		labels["result"] = ERRMARSHALREDUCED
 		goto Out
 	}
@@ -168,10 +167,10 @@ func updateTimestamps(rt *topology.RawTopo) {
 	rt.TimestampHuman = ts.Format(time.RFC3339)
 }
 
-func marshallAndUpdate(rt *topology.RawTopo, topo *util.AtomicTopo) *common.Error {
-	b, cerr := util.MarshalToJSON(rt)
-	if cerr != nil {
-		return cerr
+func marshallAndUpdate(rt *topology.RawTopo, topo *util.AtomicTopo) error {
+	b, err := util.MarshalToJSON(rt)
+	if err != nil {
+		return err
 	}
 	topo.Store(b)
 	return nil
@@ -209,8 +208,9 @@ func getZkService(connection *zk.Conn, isdas *addr.ISD_AS,
 		if err != nil {
 			return nil, err
 		}
-		sinfo, cerr := decodePartydata(data)
-		if cerr != nil {
+		sinfo, err := decodePartydata(data)
+		if err != nil {
+			cerr := err.(*common.CError)
 			log.Error(cerr.Desc, cerr.Ctx...)
 			return nil, err
 		}
@@ -243,20 +243,20 @@ func getZkService(connection *zk.Conn, isdas *addr.ISD_AS,
 	return services, nil
 }
 
-func decodePartydata(b []byte) (*proto.ZkId, *common.Error) {
+func decodePartydata(b []byte) (*proto.ZkId, error) {
 	// FIXME(klausman): switch to use Cerealizable
 	decoded := make([]byte, len(b))
 	length, err := base64.StdEncoding.Decode(decoded, b)
 	if err != nil {
-		return nil, common.NewError("Could not base64-decode party data", "err", err)
+		return nil, common.NewCError("Could not base64-decode party data", "err", err)
 	}
 	msg, err := capnp.NewPackedDecoder(bytes.NewBuffer(decoded[:length])).Decode()
 	if err != nil {
-		return nil, common.NewError("Could not decode party data", "err", err)
+		return nil, common.NewCError("Could not decode party data", "err", err)
 	}
 	zkid, err := proto.ReadRootZkId(msg)
 	if err != nil {
-		return nil, common.NewError("Could not read root ZkId from party data", "err", err)
+		return nil, common.NewCError("Could not read root ZkId from party data", "err", err)
 	}
 	return &zkid, nil
 }
