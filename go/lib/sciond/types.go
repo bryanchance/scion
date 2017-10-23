@@ -112,8 +112,8 @@ func (p *Pld) union() (interface{}, error) {
 }
 
 type PathReq struct {
-	Dst      uint32
-	Src      uint32
+	Dst      addr.IAInt
+	Src      addr.IAInt
 	MaxPaths uint16
 	Flags    PathReqFlags
 }
@@ -141,27 +141,52 @@ type HostInfo struct {
 	}
 }
 
+func HostInfoFromHostAddr(host addr.HostAddr, port uint16) *HostInfo {
+	h := &HostInfo{Port: port}
+	if host.Type() == addr.HostTypeIPv4 {
+		h.Addrs.Ipv4 = host.IP()
+	} else {
+		h.Addrs.Ipv6 = host.IP()
+	}
+	return h
+}
+
+func (h *HostInfo) Host() addr.HostAddr {
+	if len(h.Addrs.Ipv4) > 0 {
+		return addr.HostIPv4(h.Addrs.Ipv4)
+	}
+	return addr.HostIPv6(h.Addrs.Ipv6)
+}
+
 type FwdPathMeta struct {
 	FwdPath    []byte
 	Mtu        uint16
 	Interfaces []PathInterface
 }
 
+func (fpm FwdPathMeta) String() string {
+	var hops []string
+	for _, intf := range fpm.Interfaces {
+		hops = append(hops, intf.String())
+	}
+	return fmt.Sprintf("Hops: %s Mtu: %d", strings.Join(hops, ">"), fpm.Mtu)
+}
+
 type PathInterface struct {
-	RawIsdas uint32 `capnp:"isdas"`
+	RawIsdas addr.IAInt `capnp:"isdas"`
 	IfID     uint64
 }
 
 func (iface *PathInterface) ISD_AS() *addr.ISD_AS {
-	return addr.IAFromInt(int(iface.RawIsdas))
+	return iface.RawIsdas.IA()
 }
 
 func (iface PathInterface) String() string {
-	return fmt.Sprintf("%v.%v", iface.ISD_AS(), iface.IfID)
+	return fmt.Sprintf("%v#%v", iface.ISD_AS(), iface.IfID)
 }
 
 type ASInfoReq struct {
-	Isdas uint32
+	Isdas addr.IAInt
 }
 
 type ASInfoReply struct {
@@ -169,13 +194,13 @@ type ASInfoReply struct {
 }
 
 type ASInfoReplyEntry struct {
-	RawIsdas uint32 `capnp:"isdas"`
+	RawIsdas addr.IAInt `capnp:"isdas"`
 	Mtu      uint16
 	IsCore   bool
 }
 
 func (entry *ASInfoReplyEntry) ISD_AS() *addr.ISD_AS {
-	return addr.IAFromInt(int(entry.RawIsdas))
+	return entry.RawIsdas.IA()
 }
 
 func (entry ASInfoReplyEntry) String() string {

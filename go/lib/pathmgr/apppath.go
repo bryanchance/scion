@@ -28,8 +28,8 @@ type AppPathSet map[PathKey]*AppPath
 // NewAppPathSet creates a new set of paths from a SCIOND path reply.
 func NewAppPathSet(reply *sciond.PathReply) AppPathSet {
 	aps := make(AppPathSet)
-	for _, entry := range reply.Entries {
-		aps.addChildAppPath(&entry)
+	for i := range reply.Entries {
+		aps.addChildAppPath(&reply.Entries[i])
 	}
 	return aps
 }
@@ -64,10 +64,24 @@ type AppPath struct {
 func (ap *AppPath) Key() PathKey {
 	h := sha256.New()
 	for _, iface := range ap.Entry.Path.Interfaces {
-		binary.Write(h, common.Order, iface.ISD_AS().Uint32())
+		binary.Write(h, common.Order, iface.ISD_AS().IAInt())
 		binary.Write(h, common.Order, iface.IfID)
 	}
 	return PathKey(h.Sum(nil))
+}
+
+// duplicateIn adds a shallow copy of ap to aps without setting the parent link.
+// FIXME(scrye): The pathmgr revocation mechanism currently uses parent links to
+// efficiently revoke paths. However, filtered path sets are updated by (1)
+// iterating through the list of revoked paths, (2) grabbing the source and
+// destination IA of each revoked path, (3) retrieving the set of available
+// paths for the src-dst pair and (4) updating the set of filtered paths to
+// match the remaining ones. Parent links are not needed in this case. The path
+// manager will be refactored to use a similar approach for all paths, thus
+// making parent links no longer needed throughout the path manager.
+func (ap *AppPath) duplicateIn(aps AppPathSet) {
+	newAP := &AppPath{Entry: ap.Entry}
+	aps[ap.Key()] = newAP
 }
 
 // revoke removes ap from its parent path set.

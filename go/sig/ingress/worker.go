@@ -15,16 +15,17 @@
 package ingress
 
 import (
-	"fmt"
 	"time"
 
 	log "github.com/inconshreveable/log15"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/netsec-ethz/scion/go/lib/common"
+	liblog "github.com/netsec-ethz/scion/go/lib/log"
 	"github.com/netsec-ethz/scion/go/lib/ringbuf"
 	"github.com/netsec-ethz/scion/go/lib/snet"
 	"github.com/netsec-ethz/scion/go/sig/metrics"
+	"github.com/netsec-ethz/scion/go/sig/sigcmn"
 )
 
 const (
@@ -37,18 +38,23 @@ const (
 // Worker handles decapsulation of SIG frames.
 type Worker struct {
 	Remote           *snet.Addr
-	Session          int
+	SessId           sigcmn.SessionType
 	Ring             *ringbuf.Ring
 	reassemblyLists  map[int]*ReassemblyList
 	running          bool
 	markedForCleanup bool
 }
 
-func NewWorker(remote *snet.Addr, session int) *Worker {
-	ringLabels := prometheus.Labels{"ringId": fmt.Sprintf("%s:%d", remote.String(), session)}
+func NewWorker(remote *snet.Addr, sessId sigcmn.SessionType) *Worker {
+	// FIXME(kormat): these labels don't allow us to identify traffic from a
+	// specific remote sig, but adding the remote sig addr would cause a label
+	// explosion :/
+	ringLabels := prometheus.Labels{
+		"ringId": remote.IA.String(), "sessId": sessId.String(),
+	}
 	worker := &Worker{
 		Remote:          remote,
-		Session:         session,
+		SessId:          sessId,
 		Ring:            ringbuf.New(64, nil, "ingress", ringLabels),
 		reassemblyLists: make(map[int]*ReassemblyList),
 	}
@@ -64,13 +70,14 @@ func (w *Worker) Start() {
 
 func (w *Worker) Stop() {
 	if w.running {
-		log.Debug("IngressWorker stopping", "remote", w.Remote.String(), "session", w.Session)
+		log.Info("IngressWorker stopping", "remote", w.Remote.String(), "sessId", w.SessId)
 		w.Ring.Close()
 		w.running = false
 	}
 }
 
 func (w *Worker) run() {
+	defer liblog.LogPanicAndExit()
 	frames := make(ringbuf.EntryList, 64)
 	lastCleanup := time.Now()
 	for {
@@ -97,9 +104,9 @@ func (w *Worker) run() {
 // packets to the wire and then adding the frame to the corresponding reassembly
 // list if needed.
 func (w *Worker) processFrame(frame *FrameBuf) {
-	seqNr := int(common.Order.Uint32(frame.raw[:4]))
-	index := int(common.Order.Uint16(frame.raw[4:6]))
-	epoch := int(common.Order.Uint16(frame.raw[6:8]))
+	epoch := int(common.Order.Uint16(frame.raw[1:3]))
+	seqNr := int(common.Order.Uint32(frame.raw[2:6]) & 0x00FFFFFF)
+	index := int(common.Order.Uint16(frame.raw[6:8]))
 	frame.seqNr = seqNr
 	frame.index = index
 	//log.Debug("Received Frame", "seqNr", seqNr, "index", index, "epoch", epoch,
@@ -142,12 +149,12 @@ func (w *Worker) cleanup() {
 }
 
 func send(packet common.RawBytes) error {
-	bytesWritten, err := internalIngress.Write(packet)
+	bytesWritten, err := tunIO.Write(packet)
 	if err != nil {
 		return common.NewCError("Unable to write to internal ingress", "err", err,
 			"length", len(packet))
 	}
-	metrics.PktsSent.WithLabelValues(internalIngressName).Inc()
-	metrics.PktBytesSent.WithLabelValues(internalIngressName).Add(float64(bytesWritten))
+	metrics.PktsSent.WithLabelValues(tunDevName).Inc()
+	metrics.PktBytesSent.WithLabelValues(tunDevName).Add(float64(bytesWritten))
 	return nil
 }

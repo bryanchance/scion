@@ -58,7 +58,6 @@ from lib.errors import (
 )
 from lib.log import log_exception
 from lib.msg_meta import (
-    MetadataBase,
     SCMPMetadata,
     SockOnlyMetadata,
     TCPMetadata,
@@ -858,7 +857,6 @@ class SCIONElement(object):
         return self._udp_sock.send(packet.pack(), (dst, dst_port))
 
     def send_meta(self, msg, meta, next_hop_port=None):
-        assert isinstance(meta, MetadataBase), type(meta)
         if isinstance(meta, TCPMetadata):
             assert not next_hop_port, next_hop_port
             return self._send_meta_tcp(msg, meta)
@@ -1184,20 +1182,6 @@ class SCIONElement(object):
             if not verify_all:
                 break
         return False
-
-    def _validate_revocation(self, rev_info):
-        """
-        Validates a revocation.
-
-        :param rev_info: The RevocationInfo object.
-        :returns: True, if the revocation should be processed further, False
-            otherwise.
-        """
-        if rev_info.p.ifID == 0:
-            logging.warning("Received revocation for ifID 0. Ignoring. %s" %
-                            rev_info.short_desc())
-            return False
-        return True
 
     def _build_meta(self, ia=None, host=None, path=None, port=0, reuse=False,
                     one_hop=False):

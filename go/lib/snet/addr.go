@@ -22,6 +22,7 @@ import (
 
 	"github.com/netsec-ethz/scion/go/lib/addr"
 	"github.com/netsec-ethz/scion/go/lib/common"
+	"github.com/netsec-ethz/scion/go/lib/spath"
 )
 
 var _ net.Addr = (*Addr)(nil)
@@ -29,9 +30,12 @@ var _ net.Addr = (*Addr)(nil)
 var addrRegexp = regexp.MustCompile(`^(?P<ia>\d+-\d+),\[(?P<host>[^\]]+)\]:(?P<port>\d+)$`)
 
 type Addr struct {
-	IA     *addr.ISD_AS
-	Host   addr.HostAddr
-	L4Port uint16
+	IA          *addr.ISD_AS
+	Host        addr.HostAddr
+	L4Port      uint16
+	Path        *spath.Path
+	NextHopHost addr.HostAddr
+	NextHopPort uint16
 }
 
 func (a *Addr) Network() string {
@@ -42,17 +46,49 @@ func (a *Addr) String() string {
 	if a == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("%s,[%s]:%d", a.IA, a.Host, a.L4Port)
+	s := fmt.Sprintf("%s,[%s]:%d", a.IA, a.Host, a.L4Port)
+	return s
+}
+
+func (a *Addr) Desc() string {
+	if a == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("%s Path: %t NextHop: [%v]:%d",
+		a, a.Path != nil, a.NextHopHost, a.NextHopPort)
+}
+
+// EqAddr compares the IA/Host/L4port values with the supplied Addr
+func (a *Addr) EqAddr(o *Addr) bool {
+	if a == nil || o == nil {
+		return a == o
+	}
+	if !a.IA.Eq(o.IA) {
+		return false
+	}
+	if !addr.HostEq(a.Host, o.Host) {
+		return false
+	}
+	return a.L4Port == o.L4Port
 }
 
 func (a *Addr) Copy() *Addr {
 	if a == nil {
 		return nil
 	}
-	return &Addr{
-		IA:     a.IA.Copy(),
-		Host:   a.Host.Copy(),
-		L4Port: a.L4Port}
+	newA := &Addr{
+		IA:          a.IA.Copy(),
+		Host:        a.Host.Copy(),
+		L4Port:      a.L4Port,
+		NextHopPort: a.NextHopPort,
+	}
+	if a.Path != nil {
+		newA.Path = a.Path.Copy()
+	}
+	if a.NextHopHost != nil {
+		newA.NextHopHost = a.NextHopHost.Copy()
+	}
+	return newA
 }
 
 // AddrFromString converts an address string of format isd-as,[ipaddr]:port
