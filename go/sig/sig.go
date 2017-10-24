@@ -27,6 +27,8 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/addr"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	liblog "github.com/netsec-ethz/scion/go/lib/log"
+	"github.com/netsec-ethz/scion/go/lib/pathmgr"
+	"github.com/netsec-ethz/scion/go/lib/pktcls"
 	"github.com/netsec-ethz/scion/go/sig/base"
 	"github.com/netsec-ethz/scion/go/sig/config"
 	"github.com/netsec-ethz/scion/go/sig/disp"
@@ -138,6 +140,46 @@ func loadConfig(path string) bool {
 				success = false
 				continue
 			}
+		}
+		if !loadSessions(ae, cfg.Actions, cfgEntry.Sessions) {
+			success = false
+			continue
+		}
+		if !loadPktPols(ae, cfg.Classes, cfgEntry.PktPolicies) {
+			success = false
+			continue
+		}
+	}
+	return success
+}
+
+func loadSessions(ae *base.ASEntry, actions pktcls.ActionMap, cfgSessMap config.SessionMap) bool {
+	success := true
+	for sessId, actName := range cfgSessMap {
+		act := actions[actName]
+		var pred *pathmgr.PathPredicate
+		if afp, ok := act.(*pktcls.ActionFilterPaths); ok {
+			pred = afp.Contains
+		}
+		if err := ae.AddSession(sessId, actName, pred); err != nil {
+			cerr := err.(*common.CError)
+			log.Error(cerr.Desc, cerr.Ctx...)
+			success = false
+			continue
+		}
+	}
+	return success
+}
+
+func loadPktPols(ae *base.ASEntry, classes pktcls.ClassMap, cfgPktPols []*config.PktPolicy) bool {
+	success := true
+	for _, pol := range cfgPktPols {
+		cls := classes[pol.ClassName]
+		if err := ae.AddPktPolicy(pol.ClassName, cls, pol.SessIds); err != nil {
+			cerr := err.(*common.CError)
+			log.Error(cerr.Desc, cerr.Ctx...)
+			success = false
+			continue
 		}
 	}
 	return success

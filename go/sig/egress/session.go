@@ -29,12 +29,31 @@ import (
 	"github.com/netsec-ethz/scion/go/sig/siginfo"
 )
 
+type SyncSession struct {
+	atomic.Value
+}
+
+func NewSyncSession() *SyncSession {
+	ss := &SyncSession{}
+	ss.Store(([]*Session)(nil))
+	return ss
+}
+
+func (ss *SyncSession) Load() []*Session {
+	return ss.Value.Load().([]*Session)
+}
+
 // Session contains a pool of paths to the remote AS, metrics about those paths,
 // as well as maintaining the currently favoured path and remote SIG to use.
+// The Anapaya version uses packet classification and path predicates to all
+// configurable routing.
 type Session struct {
 	log.Logger
-	IA     *addr.ISD_AS
-	SessId sigcmn.SessionType
+	IA      *addr.ISD_AS
+	SessId  sigcmn.SessionType
+	PolName string
+	// used by pathmgr to filter the paths in the pool
+	policy *pathmgr.PathPredicate
 	// pool of paths, managed by pathmgr
 	pool *pathmgr.SyncPaths
 	// function pointer to return SigMap from parent ASEntry.
@@ -51,15 +70,23 @@ type Session struct {
 }
 
 func NewSession(dstIA *addr.ISD_AS, sessId sigcmn.SessionType,
-	sigMapF func() siginfo.SigMap, logger log.Logger) (*Session, error) {
+	sigMapF func() siginfo.SigMap, logger log.Logger,
+	polName string, policy *pathmgr.PathPredicate) (*Session, error) {
 	var err error
 	s := &Session{
-		Logger:  logger.New("sessId", sessId),
+		Logger:  logger.New("sessId", sessId, "policy", polName),
 		IA:      dstIA,
 		SessId:  sessId,
+		PolName: polName,
+		policy:  policy,
 		sigMapF: sigMapF,
 	}
-	if s.pool, err = sigcmn.PathMgr.Register(sigcmn.IA, s.IA); err != nil {
+	if polName == "" {
+		s.pool, err = sigcmn.PathMgr.Register(sigcmn.IA, s.IA)
+	} else {
+		s.pool, err = sigcmn.PathMgr.RegisterFilter(sigcmn.IA, s.IA, s.policy)
+	}
+	if err != nil {
 		return nil, err
 	}
 	s.currRemote.Store((*RemoteInfo)(nil))

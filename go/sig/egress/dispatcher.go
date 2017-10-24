@@ -22,6 +22,7 @@ import (
 
 	"github.com/netsec-ethz/scion/go/lib/common"
 	liblog "github.com/netsec-ethz/scion/go/lib/log"
+	"github.com/netsec-ethz/scion/go/lib/pktcls"
 	"github.com/netsec-ethz/scion/go/lib/ringbuf"
 	"github.com/netsec-ethz/scion/go/sig/metrics"
 )
@@ -44,17 +45,17 @@ func Init() {
 
 type egressDispatcher struct {
 	log.Logger
-	devName string
-	devIO   io.ReadWriteCloser
-	sess    *Session
+	devName     string
+	devIO       io.ReadWriteCloser
+	syncPktPols *SyncPktPols
 }
 
-func NewDispatcher(devName string, devIO io.ReadWriteCloser, sess *Session) *egressDispatcher {
+func NewDispatcher(devName string, devIO io.ReadWriteCloser, spp *SyncPktPols) *egressDispatcher {
 	return &egressDispatcher{
-		Logger:  log.New("dev", devName),
-		devName: devName,
-		devIO:   devIO,
-		sess:    sess,
+		Logger:      log.New("dev", devName),
+		devName:     devName,
+		devIO:       devIO,
+		syncPktPols: spp,
 	}
 }
 
@@ -94,5 +95,19 @@ func (ed *egressDispatcher) Run() {
 }
 
 func (ed *egressDispatcher) chooseSess(b common.RawBytes) *Session {
-	return ed.sess
+	var sess *Session
+	ppols := ed.syncPktPols.Load()
+	clsPkt := pktcls.NewPacket(b)
+	for _, ppol := range ppols {
+		if ppol.Class.Eval(clsPkt) {
+			for _, sess = range ppol.Sessions {
+				if sess.Healthy() {
+					return sess
+				}
+				// XXX(kormat): If all sessions are unhealthy, the last
+				// one will be chosen.
+			}
+		}
+	}
+	return sess
 }

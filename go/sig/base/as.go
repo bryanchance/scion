@@ -27,6 +27,8 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/addr"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	liblog "github.com/netsec-ethz/scion/go/lib/log"
+	"github.com/netsec-ethz/scion/go/lib/pathmgr"
+	"github.com/netsec-ethz/scion/go/lib/pktcls"
 	"github.com/netsec-ethz/scion/go/sig/egress"
 	"github.com/netsec-ethz/scion/go/sig/sigcmn"
 	"github.com/netsec-ethz/scion/go/sig/siginfo"
@@ -39,30 +41,29 @@ const sigMgrTick = 10 * time.Second
 type ASEntry struct {
 	sync.RWMutex
 	log.Logger
-	IA         *addr.ISD_AS
-	IAString   string
-	Nets       map[string]*NetEntry
-	Sigs       siginfo.SigMap
-	Session    *egress.Session
-	DevName    string
-	tunLink    netlink.Link
-	tunIO      io.ReadWriteCloser
-	sigMgrStop chan struct{}
+	IA          *addr.ISD_AS
+	IAString    string
+	Nets        map[string]*NetEntry
+	Sigs        siginfo.SigMap
+	PktPolicies *egress.SyncPktPols
+	Sessions    *egress.SyncSession
+	DevName     string
+	tunLink     netlink.Link
+	tunIO       io.ReadWriteCloser
+	sigMgrStop  chan struct{}
 }
 
 func newASEntry(ia *addr.ISD_AS) (*ASEntry, error) {
 	ae := &ASEntry{
-		Logger:     log.New("ia", ia),
-		IA:         ia,
-		IAString:   ia.String(),
-		Nets:       make(map[string]*NetEntry),
-		Sigs:       make(siginfo.SigMap),
-		DevName:    fmt.Sprintf("scion-%s", ia),
-		sigMgrStop: make(chan struct{}),
-	}
-	var err error
-	if ae.Session, err = egress.NewSession(ia, 0, ae.SigMap, ae.Logger); err != nil {
-		return nil, err
+		Logger:      log.New("ia", ia),
+		IA:          ia,
+		IAString:    ia.String(),
+		Nets:        make(map[string]*NetEntry),
+		Sigs:        make(siginfo.SigMap),
+		PktPolicies: egress.NewSyncPktPols(),
+		Sessions:    egress.NewSyncSession(),
+		DevName:     fmt.Sprintf("scion-%s", ia),
+		sigMgrStop:  make(chan struct{}),
 	}
 	return ae, nil
 }
@@ -74,9 +75,6 @@ func (ae *ASEntry) setupNet() error {
 		return err
 	}
 	ae.Info("Network setup done")
-	go egress.NewDispatcher(ae.DevName, ae.tunIO, ae.Session).Run()
-	go ae.sigMgr()
-	ae.Session.Start()
 	return nil
 }
 
@@ -171,6 +169,53 @@ func (ae *ASEntry) SigMap() siginfo.SigMap {
 	return smap
 }
 
+func (ae *ASEntry) AddSession(sessId sigcmn.SessionType, polName string,
+	pathPred *pathmgr.PathPredicate) error {
+	ae.Lock()
+	defer ae.Unlock()
+	ss := ae.Sessions.Load()
+	for _, s := range ss {
+		if s.SessId == sessId {
+			// FIXME(kormat): support updating sessions.
+			return nil
+		}
+	}
+	s, err := egress.NewSession(ae.IA, sessId, ae.SigMap, ae.Logger, polName, pathPred)
+	if err != nil {
+		return err
+	}
+	ss = append(ss, s)
+	ae.Sessions.Store(ss)
+	if len(ss) == 1 {
+		go egress.NewDispatcher(ae.DevName, ae.tunIO, ae.PktPolicies).Run()
+		go ae.sigMgr()
+	}
+	s.Start()
+	return nil
+}
+
+// TODO(kormat): add DelSession, and close the tun device if there's no sessions left.
+
+func (ae *ASEntry) AddPktPolicy(name string, cls *pktcls.Class,
+	sessIds []sigcmn.SessionType) error {
+	ae.Lock()
+	defer ae.Unlock()
+	ppols := ae.PktPolicies.Load()
+	for _, p := range ppols {
+		// FIXME(kormat): support updating classes.
+		if p.ClassName == name {
+			return nil
+		}
+	}
+	p, err := egress.NewPktPolicy(name, cls, sessIds, ae.Sessions.Load())
+	if err != nil {
+		return err
+	}
+	ppols = append(ppols, p)
+	ae.PktPolicies.Store(ppols)
+	return nil
+}
+
 // manage the Sig map
 func (ae *ASEntry) sigMgr() {
 	defer liblog.LogPanicAndExit()
@@ -216,7 +261,10 @@ func (ae *ASEntry) Cleanup() error {
 }
 
 func (ae *ASEntry) cleanSessions() {
-	if err := ae.Session.Cleanup(); err != nil {
-		ae.Session.Error("Error cleaning up session", "err", err)
+	ss := ae.Sessions.Load()
+	for _, s := range ss {
+		if err := s.Cleanup(); err != nil {
+			s.Error("Error cleaning up session", "err", err)
+		}
 	}
 }
