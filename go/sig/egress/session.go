@@ -81,12 +81,7 @@ func NewSession(dstIA *addr.ISD_AS, sessId sigcmn.SessionType,
 		policy:  policy,
 		sigMapF: sigMapF,
 	}
-	if polName == "" {
-		s.pool, err = sigcmn.PathMgr.Register(sigcmn.IA, s.IA)
-	} else {
-		s.pool, err = sigcmn.PathMgr.RegisterFilter(sigcmn.IA, s.IA, s.policy)
-	}
-	if err != nil {
+	if s.pool, err = sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, s.policy); err != nil {
 		return nil, err
 	}
 	s.currRemote.Store((*RemoteInfo)(nil))
