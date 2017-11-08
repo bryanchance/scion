@@ -114,10 +114,10 @@ func (sm *sessMonitor) updateRemote() {
 			currSig.Fail()
 		}
 		if currSessPath != nil {
+			// FIXME(kormat): these debug statements should be converted to prom metrics.
+			sm.Debug("Timeout", "remote", currRemote, "duration", since)
 			currSessPath.fail()
 		}
-		// FIXME(kormat): these debug statements should be converted to prom metrics.
-		sm.Debug("Timeout", "remote", currRemote, "duration", since)
 		currSig = sm.getNewSig(currSig)
 		currSessPath = sm.getNewPath(currSessPath)
 		sm.needUpdate = true
@@ -185,14 +185,14 @@ func (sm *sessMonitor) sendReq() {
 		sm.Error("sessMonitor: Error creating SIGCtrl payload", "err", err)
 		return
 	}
-	cpld, err := ctrl.NewPld(spld)
+	scpld, err := ctrl.NewSignedPldFromUnion(spld)
 	if err != nil {
 		sm.Error("sessMonitor: Error creating Ctrl payload", "err", err)
 		return
 	}
-	raw, err := cpld.PackPld()
+	raw, err := scpld.PackPld()
 	if err != nil {
-		sm.Error("sessMonitor: Error packing Ctrl payload", "err", err)
+		sm.Error("sessMonitor: Error packing signed Ctrl payload", "err", err)
 		return
 	}
 	raddr := sm.smRemote.Sig.CtrlSnetAddr()
@@ -207,7 +207,7 @@ func (sm *sessMonitor) sendReq() {
 	// goroutines write to it.
 	_, err = sm.sess.conn.WriteToSCION(raw, raddr)
 	if err != nil {
-		sm.Error("sessMonitor: Error sending Ctrl payload", "err", err)
+		sm.Error("sessMonitor: Error sending signed Ctrl payload", "err", err)
 	}
 }
 

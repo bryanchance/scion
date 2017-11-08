@@ -221,11 +221,13 @@ func (ae *ASEntry) sigMgr() {
 	defer liblog.LogPanicAndExit()
 	ticker := time.NewTicker(sigMgrTick)
 	defer ticker.Stop()
+	log.Info("sigMgr starting")
+Top:
 	for {
 		// TODO(kormat): handle adding new SIGs from discovery, and updating existing ones.
 		select {
 		case <-ae.sigMgrStop:
-			break
+			break Top
 		case <-ticker.C:
 			smap := ae.SigMap()
 			for _, sig := range smap {
@@ -233,6 +235,7 @@ func (ae *ASEntry) sigMgr() {
 			}
 		}
 	}
+	log.Info("sigMgr stopping")
 }
 
 func (ae *ASEntry) Cleanup() error {
