@@ -27,8 +27,6 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/addr"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	liblog "github.com/netsec-ethz/scion/go/lib/log"
-	"github.com/netsec-ethz/scion/go/lib/pathmgr"
-	"github.com/netsec-ethz/scion/go/lib/pktcls"
 	"github.com/netsec-ethz/scion/go/sig/base"
 	"github.com/netsec-ethz/scion/go/sig/config"
 	"github.com/netsec-ethz/scion/go/sig/disp"
@@ -37,6 +35,13 @@ import (
 	"github.com/netsec-ethz/scion/go/sig/metrics"
 	"github.com/netsec-ethz/scion/go/sig/sigcmn"
 )
+
+var sighup chan os.Signal
+
+func init() {
+	sighup = make(chan os.Signal, 1)
+	signal.Notify(sighup, syscall.SIGHUP)
+}
 
 var (
 	id      = flag.String("id", "", "Element ID (Required. E.g. 'sig4-21-9')")
@@ -76,10 +81,12 @@ func main() {
 	egress.Init()
 	disp.Init(sigcmn.CtrlConn)
 	go base.PollReqHdlr()
+
 	// Parse config
 	if loadConfig(*cfgPath) != true {
 		fatal("Unable to load config on startup")
 	}
+	go reloadOnSIGHUP(*cfgPath)
 
 	// Spawn ingress Dispatcher.
 	if err := ingress.Init(); err != nil {
@@ -99,6 +106,18 @@ func setupSignals() {
 	}()
 }
 
+func reloadOnSIGHUP(path string) {
+	defer liblog.LogPanicAndExit()
+	log.Info("reloadOnSIGHUP: started")
+	for range sighup {
+		log.Info("reloadOnSIGHUP: reloading...")
+		success := loadConfig(path)
+		// Errors already logged in loadConfig
+		log.Info("reloadOnSIGHUP: reload done", "success", success)
+	}
+	log.Info("reloadOnSIGHUP: stopped")
+}
+
 func loadConfig(path string) bool {
 	cfg, err := config.LoadFromFile(path)
 	if err != nil {
@@ -106,83 +125,7 @@ func loadConfig(path string) bool {
 		log.Error(cerr.Desc, cerr.Ctx...)
 		return false
 	}
-	success := true
-	for iaVal, cfgEntry := range cfg.ASes {
-		ia := &iaVal
-		ae, err := base.Map.AddIA(ia)
-		if err != nil {
-			cerr := err.(*common.CError)
-			log.Error(cerr.Desc, cerr.Ctx...)
-			success = false
-			continue
-		}
-		// Add sigs before networks, so there's somewhere for packets to go.
-		for id, sig := range cfgEntry.Sigs {
-			ctrlPort := int(sig.CtrlPort)
-			if ctrlPort == 0 {
-				ctrlPort = sigcmn.DefaultCtrlPort
-			}
-			encapPort := int(sig.EncapPort)
-			if encapPort == 0 {
-				encapPort = sigcmn.DefaultEncapPort
-			}
-			if err := ae.AddSig(id, sig.Addr, ctrlPort, encapPort, true); err != nil {
-				cerr := err.(*common.CError)
-				log.Error(cerr.Desc, cerr.Ctx...)
-				success = false
-				continue
-			}
-		}
-		for _, netw := range cfgEntry.Nets {
-			if err := ae.AddNet(netw.IPNet()); err != nil {
-				cerr := err.(*common.CError)
-				log.Error(cerr.Desc, cerr.Ctx...)
-				success = false
-				continue
-			}
-		}
-		if !loadSessions(ae, cfg.Actions, cfgEntry.Sessions) {
-			success = false
-			continue
-		}
-		if !loadPktPols(ae, cfg.Classes, cfgEntry.PktPolicies) {
-			success = false
-			continue
-		}
-	}
-	return success
-}
-
-func loadSessions(ae *base.ASEntry, actions pktcls.ActionMap, cfgSessMap config.SessionMap) bool {
-	success := true
-	for sessId, actName := range cfgSessMap {
-		act := actions[actName]
-		var pred *pathmgr.PathPredicate
-		if afp, ok := act.(*pktcls.ActionFilterPaths); ok {
-			pred = afp.Contains
-		}
-		if err := ae.AddSession(sessId, actName, pred); err != nil {
-			cerr := err.(*common.CError)
-			log.Error(cerr.Desc, cerr.Ctx...)
-			success = false
-			continue
-		}
-	}
-	return success
-}
-
-func loadPktPols(ae *base.ASEntry, classes pktcls.ClassMap, cfgPktPols []*config.PktPolicy) bool {
-	success := true
-	for _, pol := range cfgPktPols {
-		cls := classes[pol.ClassName]
-		if err := ae.AddPktPolicy(pol.ClassName, cls, pol.SessIds); err != nil {
-			cerr := err.(*common.CError)
-			log.Error(cerr.Desc, cerr.Ctx...)
-			success = false
-			continue
-		}
-	}
-	return success
+	return base.Map.ReloadConfig(cfg)
 }
 
 func fatal(msg string, args ...interface{}) {

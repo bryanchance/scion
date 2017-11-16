@@ -21,8 +21,6 @@ import (
 	"io/ioutil"
 	"net"
 
-	//log "github.com/inconshreveable/log15"
-
 	"github.com/netsec-ethz/scion/go/lib/addr"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/pktcls"
@@ -82,6 +80,13 @@ func Parse(b common.RawBytes) (*Cfg, error) {
 	if err := json.Unmarshal(b, cfg); err != nil {
 		return nil, common.NewCError("Unable to parse SIG config", "err", err)
 	}
+	// Populate IDs
+	for _, as := range cfg.ASes {
+		for id := range as.Sigs {
+			sig := as.Sigs[id]
+			sig.Id = id
+		}
+	}
 	return cfg, nil
 }
 
@@ -89,7 +94,7 @@ type SessionMap map[sigcmn.SessionType]string
 
 type ASEntry struct {
 	Nets        []*IPNet
-	Sigs        map[siginfo.SigIdType]*SIG
+	Sigs        SIGSet
 	Sessions    SessionMap
 	PktPolicies []*PktPolicy
 }
@@ -121,6 +126,8 @@ type SIG struct {
 	CtrlPort  uint16
 	EncapPort uint16
 }
+
+type SIGSet map[siginfo.SigIdType]*SIG
 
 type PktPolicy struct {
 	SessionId sigcmn.SessionType
