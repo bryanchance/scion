@@ -21,7 +21,7 @@ import (
 
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/pktcls"
-	"github.com/netsec-ethz/scion/go/sig/sigcmn"
+	"github.com/netsec-ethz/scion/go/sig/mgmt"
 )
 
 type SyncPktPols struct {
@@ -44,7 +44,7 @@ type PktPolicy struct {
 	Sessions  []*Session
 }
 
-func NewPktPolicy(name string, cls *pktcls.Class, sessIds []sigcmn.SessionType,
+func NewPktPolicy(name string, cls *pktcls.Class, sessIds []mgmt.SessionType,
 	currSessions []*Session) (*PktPolicy, error) {
 	ppol := &PktPolicy{ClassName: name, Class: cls, Sessions: make([]*Session, len(sessIds))}
 Top:

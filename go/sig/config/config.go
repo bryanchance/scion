@@ -24,7 +24,7 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/addr"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/pktcls"
-	"github.com/netsec-ethz/scion/go/sig/sigcmn"
+	"github.com/netsec-ethz/scion/go/sig/mgmt"
 	"github.com/netsec-ethz/scion/go/sig/siginfo"
 )
 
@@ -90,7 +90,7 @@ func Parse(b common.RawBytes) (*Cfg, error) {
 	return cfg, nil
 }
 
-type SessionMap map[sigcmn.SessionType]string
+type SessionMap map[mgmt.SessionType]string
 
 type ASEntry struct {
 	Nets        []*IPNet
@@ -130,7 +130,7 @@ type SIG struct {
 type SIGSet map[siginfo.SigIdType]*SIG
 
 type PktPolicy struct {
-	SessionId sigcmn.SessionType
+	SessionId mgmt.SessionType
 	ClassName string
-	SessIds   []sigcmn.SessionType
+	SessIds   []mgmt.SessionType
 }

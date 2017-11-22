@@ -31,6 +31,7 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/pktcls"
 	"github.com/netsec-ethz/scion/go/sig/config"
 	"github.com/netsec-ethz/scion/go/sig/egress"
+	"github.com/netsec-ethz/scion/go/sig/mgmt"
 	"github.com/netsec-ethz/scion/go/sig/sigcmn"
 	"github.com/netsec-ethz/scion/go/sig/siginfo"
 	"github.com/netsec-ethz/scion/go/sig/xnet"
@@ -277,14 +278,14 @@ func (ae *ASEntry) DelSig(id siginfo.SigIdType) error {
 	return se.Cleanup()
 }
 
-func (ae *ASEntry) AddSession(sessId sigcmn.SessionType, polName string,
+func (ae *ASEntry) AddSession(sessId mgmt.SessionType, polName string,
 	pathPred *pathmgr.PathPredicate) error {
 	ae.Lock()
 	defer ae.Unlock()
 	return ae.addSession(sessId, polName, pathPred)
 }
 
-func (ae *ASEntry) addSession(sessId sigcmn.SessionType, polName string,
+func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 	pathPred *pathmgr.PathPredicate) error {
 	ss := ae.Sessions.Load()
 	for _, s := range ss {
@@ -310,14 +311,14 @@ func (ae *ASEntry) addSession(sessId sigcmn.SessionType, polName string,
 // TODO(kormat): add DelSession, and close the tun device if there's no sessions left.
 
 func (ae *ASEntry) AddPktPolicy(name string, cls *pktcls.Class,
-	sessIds []sigcmn.SessionType) error {
+	sessIds []mgmt.SessionType) error {
 	ae.Lock()
 	defer ae.Unlock()
 	return ae.addPktPolicy(name, cls, sessIds)
 }
 
 func (ae *ASEntry) addPktPolicy(name string, cls *pktcls.Class,
-	sessIds []sigcmn.SessionType) error {
+	sessIds []mgmt.SessionType) error {
 	ppols := ae.PktPolicies.Load()
 	for _, p := range ppols {
 		// FIXME(kormat): support updating classes.

@@ -27,6 +27,7 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/pktdisp"
 	"github.com/netsec-ethz/scion/go/lib/ringbuf"
 	"github.com/netsec-ethz/scion/go/lib/snet"
+	"github.com/netsec-ethz/scion/go/sig/mgmt"
 	"github.com/netsec-ethz/scion/go/sig/sigcmn"
 	"github.com/netsec-ethz/scion/go/sig/siginfo"
 )
@@ -52,7 +53,7 @@ func (ss *SyncSession) Load() []*Session {
 type Session struct {
 	log.Logger
 	IA      *addr.ISD_AS
-	SessId  sigcmn.SessionType
+	SessId  mgmt.SessionType
 	PolName string
 	// used by pathmgr to filter the paths in the pool
 	policy *pathmgr.PathPredicate
@@ -71,7 +72,7 @@ type Session struct {
 	workerStopped  chan struct{}
 }
 
-func NewSession(dstIA *addr.ISD_AS, sessId sigcmn.SessionType,
+func NewSession(dstIA *addr.ISD_AS, sessId mgmt.SessionType,
 	sigMap *siginfo.SigMap, logger log.Logger,
 	polName string, policy *pathmgr.PathPredicate) (*Session, error) {
 	var err error

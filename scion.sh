@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 export PYTHONPATH=python/:.
 
@@ -102,7 +102,7 @@ cmd_lint() {
 
 py_lint() {
     local ret=0
-    for i in python python/mininet sub/web; do
+    for i in python python/mininet; do
       [ -d "$i" ] || continue
       echo "Linting $i"
       local cmd="flake8"
@@ -149,7 +149,7 @@ cmd_sciond() {
     GENDIR=gen/ISD${ISD}/AS${AS}/endhost
     [ -d "$GENDIR" ] || { echo "Topology directory for $ISD-$AS doesn't exist: $GENDIR"; exit 1; }
     APIADDR="/run/shm/sciond/${ISD}-${AS}.sock"
-    PYTHONPATH=python/:. bin/sciond --addr $ADDR --api-addr $APIADDR sd${ISD}-${AS} $GENDIR &
+    PYTHONPATH=python/:. python/bin/sciond --addr $ADDR --api-addr $APIADDR sd${ISD}-${AS} $GENDIR &
     echo "Sciond running for $ISD-$AS (pid $!)"
     wait
     exit $?
