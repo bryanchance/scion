@@ -20,6 +20,7 @@ var RootTypes = []string{
 	"RevInfo",
 	"SCIONDMsg",
 	"SignedCtrlPld",
+	"PushACL",
 }
 
 func main() {

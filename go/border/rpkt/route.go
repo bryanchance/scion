@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math/rand"
 
-	//log "github.com/inconshreveable/log15"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/netsec-ethz/scion/go/border/metrics"

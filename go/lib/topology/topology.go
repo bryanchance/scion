@@ -139,7 +139,6 @@ func (t *Topo) populateBR(raw *RawTopo) error {
 			}
 			ifinfo.MTU = rawIntf.MTU
 			t.IFInfoMap[ifid] = ifinfo
-
 		}
 		t.BR[name] = brInfo
 		t.BRNames = append(t.BRNames, name)

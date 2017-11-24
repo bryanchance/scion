@@ -69,6 +69,7 @@ func NewRouter(id, confDir string) (*Router, error) {
 // processing as well as various other router functions.
 func (r *Router) Run() error {
 	go r.SyncInterface()
+	go r.PeriodicPushACL()
 	go r.IFStateUpdate()
 	go r.RevInfoFwd()
 	go r.confSig()
@@ -140,10 +141,16 @@ func (r *Router) processPacket(rp *rpkt.RtrPkt) {
 		r.handlePktError(rp, err, "Error parsing packet")
 		return
 	}
+	// Add ACL verification hook to all packets
+	rp.RegisterACLHook()
 	// Validation looks for errors in the packet that didn't break basic
 	// parsing.
-	if err := rp.Validate(); err != nil {
+	valid, err := rp.Validate()
+	if err != nil {
 		r.handlePktError(rp, err, "Error validating packet")
+		return
+	}
+	if !valid {
 		return
 	}
 	// Check if the packet needs to be processed locally, and if so register

@@ -97,6 +97,21 @@ func Load(id, confDir string) (*Conf, error) {
 	if conf.Net, err = netconf.FromTopo(conf.BR.IFIDs, conf.Topo.IFInfoMap); err != nil {
 		return nil, err
 	}
+
+	// Load ExtnConfig
+	extraPath := filepath.Join(conf.Dir, ExtnCfgName)
+	ec, err := ExtnLoadFromFile(extraPath)
+	if err != nil {
+		return nil, err
+	}
+	for ifid := range ec.IFCfg {
+		intf, ok := conf.Net.IFs[ifid]
+		if !ok {
+			return nil, common.NewCError("Unable to find IFID for extra config", "ifid", ifid)
+		}
+		intf.PushACL = ec.IFCfg[ifid]
+	}
+
 	// Save config
 	return conf, nil
 }

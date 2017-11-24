@@ -143,6 +143,8 @@ type Interface struct {
 	// AS and the remote AS.
 	// TODO(kormat): switch to a non-string type.
 	Type topology.LinkType
+	// Source AS filters to push to neighboring BR
+	PushACL []*addr.ISD_AS
 }
 
 // intfFromTopoIF is a constructor to create a new Interface instance from a

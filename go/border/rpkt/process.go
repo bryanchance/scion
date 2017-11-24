@@ -27,6 +27,7 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/addr"
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/ctrl"
+	"github.com/netsec-ethz/scion/go/lib/ctrl/extn"
 	"github.com/netsec-ethz/scion/go/lib/ctrl/ifid"
 	"github.com/netsec-ethz/scion/go/lib/ctrl/path_mgmt"
 	"github.com/netsec-ethz/scion/go/lib/l4"
@@ -149,6 +150,8 @@ func (rp *RtrPkt) processDestSelf() (HookResult, error) {
 		return rp.processIFID(pld)
 	case *path_mgmt.Pld:
 		return rp.processPathMgmtSelf(pld)
+	case *extn.CtrlExtnDataList:
+		return rp.processExtnList(pld)
 	default:
 		rp.Error("Unsupported destination payload", "type", common.TypeOf(pld))
 		return HookError, nil

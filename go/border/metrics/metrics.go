@@ -61,6 +61,9 @@ var (
 
 	// Misc
 	IFState *prometheus.GaugeVec
+
+	// ACL related
+	ACLDroppedPkts *prometheus.CounterVec
 )
 
 // Ensure all metrics are registered.
@@ -128,6 +131,11 @@ func Init(elem string) {
 	BRLabels := newG("base_labels", "Border base labels.")
 	BRLabels.Set(1)
 	IFState = newGVec("interface_active", "Interface is active.", sockLabels)
+
+	// Initialize ACL metrics.
+	ACLDroppedPkts = newCVec(
+		"acl_dropped_pkts_total",
+		"Total number of packets dropped due to ACL rules", []string{"ifid"})
 
 	// Initialize ringbuf metrics.
 	ringbuf.InitMetrics("border", constLabels, []string{"ringId"})
