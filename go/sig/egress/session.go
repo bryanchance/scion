@@ -16,6 +16,7 @@ package egress
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	log "github.com/inconshreveable/log15"
@@ -32,19 +33,7 @@ import (
 	"github.com/netsec-ethz/scion/go/sig/siginfo"
 )
 
-type SyncSession struct {
-	atomic.Value
-}
-
-func NewSyncSession() *SyncSession {
-	ss := &SyncSession{}
-	ss.Store(([]*Session)(nil))
-	return ss
-}
-
-func (ss *SyncSession) Load() []*Session {
-	return ss.Value.Load().([]*Session)
-}
+type SessionSet map[mgmt.SessionType]*Session
 
 // Session contains a pool of paths to the remote AS, metrics about those paths,
 // as well as maintaining the currently favoured path and remote SIG to use.
@@ -52,13 +41,17 @@ func (ss *SyncSession) Load() []*Session {
 // configurable routing.
 type Session struct {
 	log.Logger
-	IA      *addr.ISD_AS
-	SessId  mgmt.SessionType
-	PolName string
+	IA     *addr.ISD_AS
+	SessId mgmt.SessionType
+
+	// used when updating the path policy or its name
+	policyLock sync.Mutex
 	// used by pathmgr to filter the paths in the pool
-	policy *pathmgr.PathPredicate
+	policy  *pathmgr.PathPredicate
+	polName string
+
 	// pool of paths, managed by pathmgr
-	pool *pathmgr.SyncPaths
+	pool *AtomicSP
 	// remote SIGs
 	sigMap *siginfo.SigMap
 	// *RemoteInfo
@@ -77,16 +70,19 @@ func NewSession(dstIA *addr.ISD_AS, sessId mgmt.SessionType,
 	polName string, policy *pathmgr.PathPredicate) (*Session, error) {
 	var err error
 	s := &Session{
-		Logger:  logger.New("sessId", sessId, "policy", polName),
+		Logger:  logger.New("sessId", sessId),
 		IA:      dstIA,
 		SessId:  sessId,
-		PolName: polName,
+		polName: polName,
 		policy:  policy,
+		pool:    NewAtomicSP(),
 		sigMap:  sigMap,
 	}
-	if s.pool, err = sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, s.policy); err != nil {
+	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, s.policy)
+	if err != nil {
 		return nil, err
 	}
+	s.pool.UpdateSP(pool)
 	s.currRemote.Store((*RemoteInfo)(nil))
 	s.healthy.Store(false)
 	s.ring = ringbuf.New(64, nil, "egress",
@@ -131,6 +127,25 @@ func (s *Session) Remote() *RemoteInfo {
 func (s *Session) Healthy() bool {
 	// FIxME(kormat): export as metric.
 	return s.healthy.Load().(bool)
+}
+
+func (s *Session) UpdatePolicy(name string, pred *pathmgr.PathPredicate) error {
+	s.policyLock.Lock()
+	defer s.policyLock.Unlock()
+
+	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, pred)
+	if err != nil {
+		return common.NewCError("Unable to register watch", "err", err)
+	}
+	// Store old predicate so we can unwatch it later
+	oldPred := s.policy
+	s.polName = name
+	s.policy = pred
+	s.pool.UpdateSP(pool)
+	if err := sigcmn.PathMgr.UnwatchFilter(sigcmn.IA, s.IA, oldPred); err != nil {
+		return common.NewCError("Unable to unregister watch", "err", err)
+	}
+	return nil
 }
 
 type RemoteInfo struct {

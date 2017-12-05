@@ -22,7 +22,6 @@ import (
 	"github.com/netsec-ethz/scion/go/lib/common"
 	"github.com/netsec-ethz/scion/go/lib/ctrl"
 	liblog "github.com/netsec-ethz/scion/go/lib/log"
-	"github.com/netsec-ethz/scion/go/lib/pathmgr"
 	"github.com/netsec-ethz/scion/go/lib/spath"
 	"github.com/netsec-ethz/scion/go/sig/disp"
 	"github.com/netsec-ethz/scion/go/sig/mgmt"
@@ -43,7 +42,7 @@ type sessMonitor struct {
 	// the Session this instance is monitoring.
 	sess *Session
 	// the (filtered) pool of paths to the remote AS, maintained by pathmgr.
-	pool *pathmgr.SyncPaths
+	pool *AtomicSP
 	// the pool of paths this session is currently using, frequently refreshed from pool.
 	sessPathPool sessPathPool
 	// the remote Info (remote SIG, and path) used for sending polls. This
@@ -86,7 +85,7 @@ Top:
 			break Top
 		case <-reqTick.C:
 			// Update paths and sigs
-			sm.sessPathPool.update(sm.pool.Load().APS)
+			sm.sessPathPool.update(sm.pool.GetSPD().APS)
 			sm.updateRemote()
 			sm.sendReq()
 		case rpld := <-regc:

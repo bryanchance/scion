@@ -45,7 +45,7 @@ type PktPolicy struct {
 }
 
 func NewPktPolicy(name string, cls *pktcls.Class, sessIds []mgmt.SessionType,
-	currSessions []*Session) (*PktPolicy, error) {
+	currSessions SessionSet) (*PktPolicy, error) {
 	ppol := &PktPolicy{ClassName: name, Class: cls, Sessions: make([]*Session, len(sessIds))}
 Top:
 	for i, sessId := range sessIds {

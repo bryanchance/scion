@@ -47,7 +47,7 @@ type ASEntry struct {
 	IA          *addr.ISD_AS
 	IAString    string
 	PktPolicies *egress.SyncPktPols
-	Sessions    *egress.SyncSession
+	Sessions    egress.SessionSet
 	DevName     string
 	tunLink     netlink.Link
 	tunIO       io.ReadWriteCloser
@@ -63,7 +63,7 @@ func newASEntry(ia *addr.ISD_AS) (*ASEntry, error) {
 		Nets:        make(map[string]*NetEntry),
 		Sigs:        &siginfo.SigMap{},
 		PktPolicies: egress.NewSyncPktPols(),
-		Sessions:    egress.NewSyncSession(),
+		Sessions:    make(egress.SessionSet),
 		DevName:     fmt.Sprintf("scion-%s", ia),
 		sigMgrStop:  make(chan struct{}),
 	}
@@ -79,41 +79,23 @@ func (ae *ASEntry) ReloadConfig(cfg *config.ASEntry, classes pktcls.ClassMap,
 	s = ae.delOldSIGS(cfg.Sigs) && s
 	s = ae.addNewNets(cfg.Nets) && s
 	s = ae.delOldNets(cfg.Nets) && s
-	s = ae.loadSessions(cfg, actions) && s
-	s = ae.loadPktPols(cfg, classes) && s
+
+	sessionCfgs, err := config.BuildSessions(cfg.Sessions, actions)
+	if err != nil {
+		ae.Error("Unable to update sessions", "err", err)
+		s = false
+	}
+	s = ae.addNewSessions(sessionCfgs) && s
+	deletedSessions := ae.delOldSessions(sessionCfgs)
+	// Build new packet policies on top of the updated sessions list, and then
+	// completely overwrite the old policies.
+	newPktPolicies := ae.buildNewPktPolicies(cfg.PktPolicies, classes)
+	ae.PktPolicies.Store(newPktPolicies)
+	// Clean up old sessions
+	for _, session := range deletedSessions {
+		session.Cleanup()
+	}
 	return s
-}
-
-func (ae *ASEntry) loadSessions(cfg *config.ASEntry, actions pktcls.ActionMap) bool {
-	success := true
-	for sessId, actName := range cfg.Sessions {
-		act := actions[actName]
-		var pred *pathmgr.PathPredicate
-		if afp, ok := act.(*pktcls.ActionFilterPaths); ok {
-			pred = afp.Contains
-		}
-		if err := ae.addSession(sessId, actName, pred); err != nil {
-			cerr := err.(*common.CError)
-			ae.Error(cerr.Desc, cerr.Ctx...)
-			success = false
-			continue
-		}
-	}
-	return success
-}
-
-func (ae *ASEntry) loadPktPols(cfg *config.ASEntry, classes pktcls.ClassMap) bool {
-	success := true
-	for _, pol := range cfg.PktPolicies {
-		cls := classes[pol.ClassName]
-		if err := ae.addPktPolicy(pol.ClassName, cls, pol.SessIds); err != nil {
-			cerr := err.(*common.CError)
-			ae.Error(cerr.Desc, cerr.Ctx...)
-			success = false
-			continue
-		}
-	}
-	return success
 }
 
 // addNewNets adds the networks in ipnets that are not currently configured.
@@ -278,6 +260,42 @@ func (ae *ASEntry) DelSig(id siginfo.SigIdType) error {
 	return se.Cleanup()
 }
 
+// addNewSessions adds the sessions in cfgs that are not currently configured.
+// If a session is already configured, its state is updated to reflect the new
+// config.
+func (ae *ASEntry) addNewSessions(cfgs config.SessionSet) bool {
+	s := true
+	for _, cfg := range cfgs {
+		if err := ae.addSession(cfg.ID, cfg.PolName, cfg.Pred); err != nil {
+			ae.Error("Unable to add session", "id", cfg.ID, "err", err)
+			s = false
+			// Continue without rollback
+			continue
+		}
+	}
+	return s
+}
+
+// DelOldSessions removes every session whose session ID is not present in
+// cfgs. A map containing the deleted sessions is returned. No cleanup is
+// performed on deleted sessions.
+func (ae *ASEntry) delOldSessions(cfgs config.SessionSet) egress.SessionSet {
+	deleted := make(egress.SessionSet)
+	// Destroy existing session IDs that are no longer in the config
+	for _, sess := range ae.Sessions {
+		// We're also walking newly added sessions that are surely in the
+		// config, but since the number of sessions will usually be small
+		// we don't need to optimize this yet.
+		if _, ok := cfgs[sess.SessId]; !ok {
+			session := ae.Sessions[sess.SessId]
+			delete(ae.Sessions, sess.SessId)
+			deleted[session.SessId] = session
+		}
+	}
+	return deleted
+}
+
+// AddSession idempotently adds a Session for the remote IA.
 func (ae *ASEntry) AddSession(sessId mgmt.SessionType, polName string,
 	pathPred *pathmgr.PathPredicate) error {
 	ae.Lock()
@@ -287,28 +305,42 @@ func (ae *ASEntry) AddSession(sessId mgmt.SessionType, polName string,
 
 func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 	pathPred *pathmgr.PathPredicate) error {
-	ss := ae.Sessions.Load()
-	for _, s := range ss {
-		if s.SessId == sessId {
-			// FIXME(kormat): support updating sessions.
-			return nil
+	if s, ok := ae.Sessions[sessId]; !ok {
+		// Session does not exist, so we create a new one
+		s, err := egress.NewSession(ae.IA, sessId, ae.Sigs, ae.Logger, polName, pathPred)
+		if err != nil {
+			return err
+		}
+		ae.Sessions[s.SessId] = s
+		s.Start()
+	} else {
+		// Session exists, update its information
+		if err := s.UpdatePolicy(polName, pathPred); err != nil {
+			return err
 		}
 	}
-	s, err := egress.NewSession(ae.IA, sessId, ae.Sigs, ae.Logger, polName, pathPred)
-	if err != nil {
-		return err
-	}
-	ss = append(ss, s)
-	ae.Sessions.Store(ss)
-	if len(ss) == 1 {
+	if len(ae.Sessions) == 1 {
 		go egress.NewDispatcher(ae.DevName, ae.tunIO, ae.PktPolicies).Run()
 		go ae.sigMgr()
 	}
-	s.Start()
 	return nil
 }
 
-// TODO(kormat): add DelSession, and close the tun device if there's no sessions left.
+// TODO(kormat): add DelSession, and set tun device down there's no sessions left.
+
+func (ae *ASEntry) buildNewPktPolicies(cfgPktPols []*config.PktPolicy, classes pktcls.ClassMap) []*egress.PktPolicy {
+	var newPktPolicies []*egress.PktPolicy
+	for _, pol := range cfgPktPols {
+		cls := classes[pol.ClassName]
+		// Packet policies are stateless, so we construct new ones
+		pp, err := egress.NewPktPolicy(pol.ClassName, cls, pol.SessIds, ae.Sessions)
+		if err != nil {
+			log.Error("Unable to create packet policy", "policy", pol, "err", err)
+		}
+		newPktPolicies = append(newPktPolicies, pp)
+	}
+	return newPktPolicies
+}
 
 func (ae *ASEntry) AddPktPolicy(name string, cls *pktcls.Class,
 	sessIds []mgmt.SessionType) error {
@@ -326,7 +358,7 @@ func (ae *ASEntry) addPktPolicy(name string, cls *pktcls.Class,
 			return nil
 		}
 	}
-	p, err := egress.NewPktPolicy(name, cls, sessIds, ae.Sessions.Load())
+	p, err := egress.NewPktPolicy(name, cls, sessIds, ae.Sessions)
 	if err != nil {
 		return err
 	}
@@ -379,8 +411,7 @@ func (ae *ASEntry) Cleanup() error {
 }
 
 func (ae *ASEntry) cleanSessions() {
-	ss := ae.Sessions.Load()
-	for _, s := range ss {
+	for _, s := range ae.Sessions {
 		if err := s.Cleanup(); err != nil {
 			s.Error("Error cleaning up session", "err", err)
 		}

@@ -23,6 +23,7 @@ import (
 
 	"github.com/netsec-ethz/scion/go/lib/addr"
 	"github.com/netsec-ethz/scion/go/lib/common"
+	"github.com/netsec-ethz/scion/go/lib/pathmgr"
 	"github.com/netsec-ethz/scion/go/lib/pktcls"
 	"github.com/netsec-ethz/scion/go/sig/mgmt"
 	"github.com/netsec-ethz/scion/go/sig/siginfo"
@@ -133,4 +134,34 @@ type PktPolicy struct {
 	SessionId mgmt.SessionType
 	ClassName string
 	SessIds   []mgmt.SessionType
+}
+
+type Session struct {
+	ID      mgmt.SessionType
+	PolName string
+	Pred    *pathmgr.PathPredicate
+}
+
+type SessionSet map[mgmt.SessionType]*Session
+
+func BuildSessions(cfgSessMap SessionMap, actions pktcls.ActionMap) (SessionSet, error) {
+	set := make(SessionSet)
+	for sessId, actName := range cfgSessMap {
+		act := actions[actName]
+		var pred *pathmgr.PathPredicate
+		if afp, ok := act.(*pktcls.ActionFilterPaths); ok {
+			pred = afp.Contains
+		}
+		if actName != "" && pred == nil {
+			// Unable to find the Action the session is referencing
+			return nil, common.NewCError("Unable to find referenced Action", "sessionID", sessId,
+				"action", actName)
+		}
+		set[sessId] = &Session{
+			ID:      sessId,
+			PolName: actName,
+			Pred:    pred,
+		}
+	}
+	return set, nil
 }
