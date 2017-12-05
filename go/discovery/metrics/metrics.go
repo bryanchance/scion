@@ -7,7 +7,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/netsec-ethz/scion/go/lib/prom"
+	"github.com/scionproto/scion/go/lib/prom"
 )
 
 var (

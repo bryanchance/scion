@@ -17,7 +17,7 @@ package egress
 import (
 	"sync/atomic"
 
-	"github.com/netsec-ethz/scion/go/lib/pathmgr"
+	"github.com/scionproto/scion/go/lib/pathmgr"
 )
 
 // AtomicSP contains a pointer to a SyncPaths object; the pointer itself can be

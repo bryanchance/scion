@@ -17,13 +17,13 @@ import (
 	"github.com/samuel/go-zookeeper/zk"
 	"zombiezen.com/go/capnproto2"
 
-	"github.com/netsec-ethz/scion/go/discovery/metrics"
-	"github.com/netsec-ethz/scion/go/discovery/static"
-	"github.com/netsec-ethz/scion/go/discovery/util"
-	"github.com/netsec-ethz/scion/go/lib/addr"
-	"github.com/netsec-ethz/scion/go/lib/common"
-	"github.com/netsec-ethz/scion/go/lib/topology"
-	"github.com/netsec-ethz/scion/go/proto"
+	"github.com/scionproto/scion/go/discovery/metrics"
+	"github.com/scionproto/scion/go/discovery/static"
+	"github.com/scionproto/scion/go/discovery/util"
+	"github.com/scionproto/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/topology"
+	"github.com/scionproto/scion/go/proto"
 )
 
 var baseTopo *topology.RawTopo

@@ -35,8 +35,8 @@ import (
 	log "github.com/inconshreveable/log15"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/netsec-ethz/scion/go/discovery/metrics"
-	"github.com/netsec-ethz/scion/go/lib/common"
+	"github.com/scionproto/scion/go/discovery/metrics"
+	"github.com/scionproto/scion/go/lib/common"
 )
 
 const (

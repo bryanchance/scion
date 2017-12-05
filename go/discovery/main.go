@@ -16,14 +16,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/netsec-ethz/scion/go/discovery/acl"
-	"github.com/netsec-ethz/scion/go/discovery/dynamic"
-	"github.com/netsec-ethz/scion/go/discovery/metrics"
-	"github.com/netsec-ethz/scion/go/discovery/static"
-	"github.com/netsec-ethz/scion/go/discovery/util"
-	"github.com/netsec-ethz/scion/go/lib/addr"
-	"github.com/netsec-ethz/scion/go/lib/common"
-	liblog "github.com/netsec-ethz/scion/go/lib/log"
+	"github.com/scionproto/scion/go/discovery/acl"
+	"github.com/scionproto/scion/go/discovery/dynamic"
+	"github.com/scionproto/scion/go/discovery/metrics"
+	"github.com/scionproto/scion/go/discovery/static"
+	"github.com/scionproto/scion/go/discovery/util"
+	"github.com/scionproto/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/common"
+	liblog "github.com/scionproto/scion/go/lib/log"
 )
 
 var (

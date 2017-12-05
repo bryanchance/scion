@@ -11,10 +11,10 @@ import (
 	"github.com/gavv/monotime"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/netsec-ethz/scion/go/discovery/acl"
-	"github.com/netsec-ethz/scion/go/discovery/metrics"
-	"github.com/netsec-ethz/scion/go/lib/common"
-	"github.com/netsec-ethz/scion/go/lib/topology"
+	"github.com/scionproto/scion/go/discovery/acl"
+	"github.com/scionproto/scion/go/discovery/metrics"
+	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/topology"
 )
 
 type AtomicTopo struct {

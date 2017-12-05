@@ -19,9 +19,9 @@ import (
 
 	//log "github.com/inconshreveable/log15"
 
-	"github.com/netsec-ethz/scion/go/lib/common"
-	"github.com/netsec-ethz/scion/go/lib/pktcls"
-	"github.com/netsec-ethz/scion/go/sig/mgmt"
+	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/pktcls"
+	"github.com/scionproto/scion/go/sig/mgmt"
 )
 
 type SyncPktPols struct {
