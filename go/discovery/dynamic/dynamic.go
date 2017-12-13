@@ -11,7 +11,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/gavv/monotime"
 	log "github.com/inconshreveable/log15"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samuel/go-zookeeper/zk"
@@ -72,7 +71,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 	labels := prometheus.Labels{"result": "unknown"}
 	rt := &topology.RawTopo{}
 
-	start := monotime.Now()
+	start := time.Now()
 
 	// Make ZK connection and set logger
 	c, _, err := zk.Connect(zks, sessionTimeout)
@@ -99,7 +98,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 		// extra code here.
 		labels["result"] = ERRSERVICEUPDATE
 	}
-	metrics.TotalZkUpdateTime.Add(float64(monotime.Since(start).Seconds()))
+	metrics.TotalZkUpdateTime.Add(float64(time.Since(start).Seconds()))
 
 	// Make sure Bind info is removed from the Topo and update timestamp
 	topology.StripBind(rt)
@@ -123,7 +122,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 	// We only want to update these if the update was successful, so the Out
 	// label has to be below
 	metrics.ZKLastUpdate.Set(float64(time.Now().Unix()))
-	metrics.TotalDynamicUpdateTime.Add(float64(monotime.Since(start).Seconds()))
+	metrics.TotalDynamicUpdateTime.Add(float64(time.Since(start).Seconds()))
 
 Out:
 	// Update Prometheus metrics

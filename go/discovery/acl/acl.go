@@ -29,8 +29,7 @@ import (
 	"net"
 	"strings"
 	"sync/atomic"
-
-	"github.com/gavv/monotime"
+	"time"
 
 	log "github.com/inconshreveable/log15"
 	"github.com/prometheus/client_golang/prometheus"
@@ -113,18 +112,18 @@ func makeACL(iplist string) ([]net.IPNet, error) {
 
 func IsAllowed(address net.IP) bool {
 	l := prometheus.Labels{"result": ""}
-	start := monotime.Now()
+	start := time.Now()
 	curracl := fullTopoACL.Load()
 	for _, n := range curracl {
 		if n.Contains(address) {
 			l["result"] = RESALLOWED
 			metrics.TotalACLChecks.With(l).Inc()
-			metrics.TotalACLCheckTime.With(l).Add(monotime.Since(start).Seconds())
+			metrics.TotalACLCheckTime.With(l).Add(time.Since(start).Seconds())
 			return true
 		}
 	}
 	l["result"] = RESDENIED
 	metrics.TotalACLChecks.With(l).Inc()
-	metrics.TotalACLCheckTime.With(l).Add(monotime.Since(start).Seconds())
+	metrics.TotalACLCheckTime.With(l).Add(time.Since(start).Seconds())
 	return false
 }

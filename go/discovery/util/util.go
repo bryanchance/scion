@@ -7,8 +7,8 @@ import (
 	"net"
 	"net/http"
 	"sync/atomic"
+	"time"
 
-	"github.com/gavv/monotime"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/scionproto/scion/go/discovery/acl"
@@ -39,10 +39,10 @@ func MakeHandler(topo *AtomicTopo, promLabels prometheus.Labels) func(http.Respo
 	totalBytes := metrics.TotalBytes.With(promLabels)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		start := monotime.Now()
+		start := time.Now()
 		body := topo.Load()
 		w.Write(body)
-		reqProcessTime.Add(monotime.Since(start).Seconds())
+		reqProcessTime.Add(time.Since(start).Seconds())
 		totalReqs.Inc()
 		totalBytes.Add(float64(len(body)))
 	}
@@ -55,7 +55,7 @@ func MakeACLHandler(topo *AtomicTopo, promLabels prometheus.Labels) func(http.Re
 	totalBytes := metrics.TotalBytes.With(promLabels)
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		start := monotime.Now()
+		start := time.Now()
 		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 		if !acl.IsAllowed(net.ParseIP(ip)) {
 			deniedReqs.Inc()
@@ -65,7 +65,7 @@ func MakeACLHandler(topo *AtomicTopo, promLabels prometheus.Labels) func(http.Re
 			w.Write(body)
 			totalBytes.Add(float64(len(body)))
 		}
-		reqProcessTime.Add(monotime.Since(start).Seconds())
+		reqProcessTime.Add(time.Since(start).Seconds())
 		totalReqs.Inc()
 	}
 }

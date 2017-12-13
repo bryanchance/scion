@@ -39,11 +39,16 @@ func NewChainHandler(conn *snet.Conn) *ChainHandler {
 	return &ChainHandler{conn: conn}
 }
 
-// HandleReq handles certificate chain requests. Non-local or cache-only requests are dropped,
-// if the certificate chain is not present.
+// HandleReq handles certificate chain requests. If the certificate chain is not already cached
+// and the cache-only flag is set or the requester is from a remote AS, the request is dropped.
 func (h *ChainHandler) HandleReq(addr *snet.Addr, req *cert_mgmt.ChainReq) {
 	log.Info("Received certificate chain request", "addr", addr, "req", req)
-	chain := store.GetChain(req.IA(), req.Version)
+	var chain *cert.Chain
+	if req.Version == cert_mgmt.NewestVersion {
+		chain = store.GetNewestChain(req.IA())
+	} else {
+		chain = store.GetChain(req.IA(), req.Version)
+	}
 	srcLocal := public.IA.Eq(addr.IA)
 	if chain != nil {
 		if err := h.sendChainRep(addr, chain); err != nil {
@@ -66,7 +71,7 @@ func (h *ChainHandler) sendChainRep(addr *snet.Addr, chain *cert.Chain) error {
 	if err != nil {
 		return err
 	}
-	cpld, err := ctrl.NewCertMgmtPld(&cert_mgmt.ChainRep{RawChain: raw})
+	cpld, err := ctrl.NewCertMgmtPld(&cert_mgmt.Chain{RawChain: raw})
 	if err != nil {
 		return err
 	}
@@ -97,8 +102,8 @@ func (h *ChainHandler) sendChainReq(req *cert_mgmt.ChainReq) error {
 	return SendPayload(h.conn, cpld, a)
 }
 
-// HandleChainRep handles certificate chain replies. Pending requests are answered and removed.
-func (h *ChainHandler) HandleRep(addr *snet.Addr, rep *cert_mgmt.ChainRep) {
+// HandleRep handles certificate chain replies. Pending requests are answered and removed.
+func (h *ChainHandler) HandleRep(addr *snet.Addr, rep *cert_mgmt.Chain) {
 	log.Info("Received certificate chain reply", "addr", addr, "rep", rep)
 	chain, err := rep.Chain()
 	if err != nil {
@@ -108,20 +113,31 @@ func (h *ChainHandler) HandleRep(addr *snet.Addr, rep *cert_mgmt.ChainRep) {
 		log.Error("Unable to store certificate chain", "key", chain.Key(), "err", err)
 		return
 	}
-	reqs := chainReqCache.Pop(chain.Key().String())
-	if reqs == nil { // No pending requests
+	key := chain.Key()
+	reqVer := chainReqCache.Pop(key.String())
+	key.Ver = cert_mgmt.NewestVersion
+	reqNew := chainReqCache.Pop(key.String())
+	key.Ver = chain.Leaf.Version
+	if reqVer == nil && reqNew == nil { // No pending requests
 		return
 	}
 	cpld, err := ctrl.NewCertMgmtPld(rep)
 	if err != nil {
-		log.Error("Unable to create certificate chain reply", "key", chain.Key(),
-			"err", err)
+		log.Error("Unable to create certificate chain reply", "key", key, "err", err)
+		return
+	}
+	h.answerReqs(reqVer, cpld, key)
+	h.answerReqs(reqNew, cpld, key)
+}
+
+// answerReqs responds to pending requests.
+func (h *ChainHandler) answerReqs(reqs *AddrSet, cpld *ctrl.Pld, key *cert.Key) {
+	if reqs == nil {
 		return
 	}
 	for _, dst := range reqs.Addrs {
 		if err := SendPayload(h.conn, cpld, dst); err != nil {
-			log.Error("Unable to write certificate chain reply", "key", chain.Key(),
-				"err", err)
+			log.Error("Unable to write certificate chain reply", "key", key, "err", err)
 			continue
 		}
 	}

@@ -66,7 +66,8 @@ class TestCertClient(TestClientBase):
     def _create_payload(self, _):
         if not self.cert:
             return CtrlPayload(CertMgmt(CertChainRequest.from_values(self.dst_ia, 0)))
-        return CtrlPayload(CertMgmt(TRCRequest.from_values(self.dst_ia, 0)))
+        return CtrlPayload(
+            CertMgmt(TRCRequest.from_values(self.dst_ia[0], 0)))
 
     def _handle_response(self, spkt):
         cpld = spkt.parse_payload()
