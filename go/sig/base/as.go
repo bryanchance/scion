@@ -170,7 +170,7 @@ func (ae *ASEntry) delNet(ipnet *net.IPNet) error {
 	ne, ok := ae.Nets[key]
 	if !ok {
 		ae.Unlock()
-		return common.NewCError("DelNet: no network found", "ia", ae.IA, "net", ipnet)
+		return common.NewBasicError("DelNet: no network found", nil, "ia", ae.IA, "net", ipnet)
 	}
 	delete(ae.Nets, key)
 	ae.Info("Removed network", "net", ipnet)
@@ -222,18 +222,18 @@ func (ae *ASEntry) AddSig(id siginfo.SigIdType, ip net.IP, ctrlPort, encapPort i
 	static bool) error {
 	// ae.Sigs is thread safe, no master lock needed
 	if len(id) == 0 {
-		return common.NewCError("AddSig: SIG id empty", "ia", ae.IA)
+		return common.NewBasicError("AddSig: SIG id empty", nil, "ia", ae.IA)
 	}
 	if ip == nil {
-		return common.NewCError("AddSig: SIG address empty", "ia", ae.IA)
+		return common.NewBasicError("AddSig: SIG address empty", nil, "ia", ae.IA)
 	}
 	if err := sigcmn.ValidatePort("remote ctrl", ctrlPort); err != nil {
-		cerr := err.(*common.CError)
-		return cerr.AddCtx(cerr.Ctx, "ia", ae.IA, "id", id)
+		return common.NewBasicError("Remote ctrl port validation failed", err,
+			"ia", ae.IA, "id", id)
 	}
 	if err := sigcmn.ValidatePort("remote encap", encapPort); err != nil {
-		cerr := err.(*common.CError)
-		return cerr.AddCtx(cerr.Ctx, "ia", ae.IA, "id", id)
+		return common.NewBasicError("Remote encap port validation failed", err,
+			"ia", ae.IA, "id", id)
 	}
 	if sig, ok := ae.Sigs.Load(id); ok {
 		sig.Host = addr.HostFromIP(ip)
@@ -253,7 +253,7 @@ func (ae *ASEntry) DelSig(id siginfo.SigIdType) error {
 	// ae.Sigs is thread safe, no master lock needed
 	se, ok := ae.Sigs.Load(id)
 	if !ok {
-		return common.NewCError("DelSig: no SIG found", "ia", ae.IA, "id", id)
+		return common.NewBasicError("DelSig: no SIG found", nil, "ia", ae.IA, "id", id)
 	}
 	ae.Sigs.Delete(id)
 	ae.Info("Removed SIG", "id", id)
@@ -404,8 +404,8 @@ func (ae *ASEntry) Cleanup() error {
 	// The operating system also removes the routes when deleting the link.
 	if err := netlink.LinkDel(ae.tunLink); err != nil {
 		// Only return this error, as it's the only critical one.
-		return common.NewCError("Error removing TUN link",
-			"ia", ae.IA, "dev", ae.DevName, "err", err)
+		return common.NewBasicError("Error removing TUN link", err,
+			"ia", ae.IA, "dev", ae.DevName)
 	}
 	return nil
 }

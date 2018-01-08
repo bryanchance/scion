@@ -111,11 +111,10 @@ func (s *Session) Cleanup() error {
 	<-s.sessMonStopped
 	s.Debug("egress.Session Cleanup: closing conn")
 	if err := s.conn.Close(); err != nil {
-		return common.NewCError("Unable to close conn", "err", err)
+		return common.NewBasicError("Unable to close conn", err)
 	}
 	if err := sigcmn.PathMgr.Unwatch(sigcmn.IA, s.IA); err != nil {
-		return common.NewCError("Unable to unwatch src-dst", "src", sigcmn.IA, "dst", s.IA,
-			"err", err)
+		return common.NewBasicError("Unable to unwatch src-dst", err, "src", sigcmn.IA, "dst", s.IA)
 	}
 	return nil
 }
@@ -135,7 +134,7 @@ func (s *Session) UpdatePolicy(name string, pred *pathmgr.PathPredicate) error {
 
 	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, pred)
 	if err != nil {
-		return common.NewCError("Unable to register watch", "err", err)
+		return common.NewBasicError("Unable to register watch", err)
 	}
 	// Store old predicate so we can unwatch it later
 	oldPred := s.policy
@@ -143,7 +142,7 @@ func (s *Session) UpdatePolicy(name string, pred *pathmgr.PathPredicate) error {
 	s.policy = pred
 	s.pool.UpdateSP(pool)
 	if err := sigcmn.PathMgr.UnwatchFilter(sigcmn.IA, s.IA, oldPred); err != nil {
-		return common.NewCError("Unable to unregister watch", "err", err)
+		return common.NewBasicError("Unable to unregister watch", err)
 	}
 	return nil
 }

@@ -40,14 +40,14 @@ type Cfg struct {
 func LoadFromFile(path string) (*Cfg, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, common.NewCError("Unable to open SIG config", "err", err)
+		return nil, common.NewBasicError("Unable to open SIG config", err)
 	}
 	cfg, err := Parse(b)
 	if err != nil {
 		return nil, err
 	}
 	if len(cfg.ASes) == 0 {
-		return nil, common.NewCError("Empty ASTable in config")
+		return nil, common.NewBasicError("Empty ASTable in config", nil)
 	}
 	for ia, ae := range cfg.ASes {
 		for sessId, actName := range ae.Sessions {
@@ -55,19 +55,19 @@ func LoadFromFile(path string) (*Cfg, error) {
 				continue
 			}
 			if _, ok := cfg.Actions[actName]; !ok {
-				return nil, common.NewCError("Unknown action name", "ia", ia, "sessId", sessId,
-					"action", actName)
+				return nil, common.NewBasicError("Unknown action name", nil,
+					"ia", ia, "sessId", sessId, "action", actName)
 			}
 		}
 		for i, pol := range ae.PktPolicies {
 			if _, ok := cfg.Classes[pol.ClassName]; !ok {
-				return nil, common.NewCError("Unknown class name", "ia", ia, "polIdx", i,
-					"class", pol.ClassName)
+				return nil, common.NewBasicError("Unknown class name", nil,
+					"ia", ia, "polIdx", i, "class", pol.ClassName)
 			}
 			for _, sessId := range pol.SessIds {
 				if _, ok := ae.Sessions[sessId]; !ok {
-					return nil, common.NewCError("Unknown session id", "ia", ia, "polIdx", i,
-						"class", pol.ClassName, "sessId", sessId)
+					return nil, common.NewBasicError("Unknown session id", nil,
+						"ia", ia, "polIdx", i, "class", pol.ClassName, "sessId", sessId)
 				}
 			}
 		}
@@ -79,7 +79,7 @@ func LoadFromFile(path string) (*Cfg, error) {
 func Parse(b common.RawBytes) (*Cfg, error) {
 	cfg := &Cfg{}
 	if err := json.Unmarshal(b, cfg); err != nil {
-		return nil, common.NewCError("Unable to parse SIG config", "err", err)
+		return nil, common.NewBasicError("Unable to parse SIG config", err)
 	}
 	// Populate IDs
 	for _, as := range cfg.ASes {
@@ -106,11 +106,11 @@ type IPNet net.IPNet
 func (in *IPNet) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
-		return common.NewCError("Unable to unmarshal IPnet from JSON", "raw", b, "err", err)
+		return common.NewBasicError("Unable to unmarshal IPnet from JSON", err, "raw", b)
 	}
 	_, ipnet, err := net.ParseCIDR(s)
 	if err != nil {
-		return common.NewCError("Unable to parse IPnet string", "raw", s, "err", err)
+		return common.NewBasicError("Unable to parse IPnet string", err, "raw", s)
 	}
 	*in = IPNet(*ipnet)
 	return nil
@@ -154,8 +154,8 @@ func BuildSessions(cfgSessMap SessionMap, actions pktcls.ActionMap) (SessionSet,
 		}
 		if actName != "" && pred == nil {
 			// Unable to find the Action the session is referencing
-			return nil, common.NewCError("Unable to find referenced Action", "sessionID", sessId,
-				"action", actName)
+			return nil, common.NewBasicError("Unable to find referenced Action", nil,
+				"sessionID", sessId, "action", actName)
 		}
 		set[sessId] = &Session{
 			ID:      sessId,

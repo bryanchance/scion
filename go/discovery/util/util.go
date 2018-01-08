@@ -28,7 +28,7 @@ func (a *AtomicTopo) Load() []byte {
 func MarshalToJSON(rt *topology.RawTopo) ([]byte, error) {
 	b, err := json.MarshalIndent(rt, "", "  ")
 	if err != nil {
-		return nil, common.NewCError("Could not re-marshal topology", "err", err)
+		return nil, common.NewBasicError("Could not re-marshal topology", err)
 	}
 	return b, nil
 }

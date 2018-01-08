@@ -23,10 +23,10 @@ func ExtnLoadFromFile(path string) (*ExtnConf, error) {
 			// Not having the extra config file is ok, we just don't load it
 			return ec, nil
 		}
-		return nil, common.NewCError("Unable to read extn config file", "err", err)
+		return nil, common.NewBasicError("Unable to read extn config file", err)
 	}
 	if err := json.Unmarshal(b, ec); err != nil {
-		return nil, common.NewCError("Unable to parse extn config file", "err", err)
+		return nil, common.NewBasicError("Unable to parse extn config file", err)
 	}
 	return ec, nil
 }

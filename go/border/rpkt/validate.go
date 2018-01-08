@@ -36,27 +36,26 @@ const (
 func (rp *RtrPkt) Validate() (bool, error) {
 	intf, ok := rp.Ctx.Conf.Net.IFs[*rp.ifCurr]
 	if !ok {
-		return false, common.NewCError(errCurrIntfInvalid, "ifid", *rp.ifCurr)
+		return false, common.NewBasicError(errCurrIntfInvalid, nil, "ifid", *rp.ifCurr)
 	}
 	// XXX(kormat): the rest of the common header is checked by the parsing phase.
 	if !addr.HostTypeCheck(rp.CmnHdr.DstType) {
-		sdata := scmp.NewErrData(scmp.C_CmnHdr, scmp.T_C_BadDstType, nil)
-		return false, common.NewCErrorData("Unsupported destination address type", sdata,
-			"type", rp.CmnHdr.DstType)
+		return false, common.NewBasicError("Unsupported destination address type",
+			scmp.NewError(scmp.C_CmnHdr, scmp.T_C_BadDstType, nil, nil), "type", rp.CmnHdr.DstType)
 	}
 	if !addr.HostTypeCheck(rp.CmnHdr.SrcType) || rp.CmnHdr.SrcType == addr.HostTypeSVC {
 		// Either the source address type isn't supported, or it is an SVC
 		// address (which is forbidden).
-		sdata := scmp.NewErrData(scmp.C_CmnHdr, scmp.T_C_BadSrcType, nil)
-		return false, common.NewCErrorData("Unsupported source address type", sdata,
-			"type", rp.CmnHdr.SrcType)
+		return false, common.NewBasicError("Unsupported source address type",
+			scmp.NewError(scmp.C_CmnHdr, scmp.T_C_BadSrcType, nil, nil), "type", rp.CmnHdr.SrcType)
 	}
 	if int(rp.CmnHdr.TotalLen) != len(rp.Raw) {
-		sdata := scmp.NewErrData(scmp.C_CmnHdr, scmp.T_C_BadPktLen,
-			&scmp.InfoPktSize{Size: uint16(len(rp.Raw)), MTU: uint16(intf.MTU)})
-		return false, common.NewCErrorData(
-			"Total length specified in common header doesn't match bytes received", sdata,
-			"totalLen", rp.CmnHdr.TotalLen, "actual", len(rp.Raw))
+		return false, common.NewBasicError(
+			"Total length specified in common header doesn't match bytes received",
+			scmp.NewError(scmp.C_CmnHdr, scmp.T_C_BadPktLen,
+				&scmp.InfoPktSize{Size: uint16(len(rp.Raw)), MTU: uint16(intf.MTU)}, nil),
+			"totalLen", rp.CmnHdr.TotalLen, "actual", len(rp.Raw),
+		)
 	}
 	if err := rp.validatePath(rp.DirFrom); err != nil {
 		return false, err
@@ -76,8 +75,8 @@ func (rp *RtrPkt) Validate() (bool, error) {
 		case ret == HookError:
 			return false, nil
 		default:
-			return false, common.NewCError(errHookResponse, "hook", "Validate", "idx", i,
-				"val", ret)
+			return false, common.NewBasicError(errHookResponse, nil,
+				"hook", "Validate", "idx", i, "val", ret)
 		}
 	}
 	return true, nil

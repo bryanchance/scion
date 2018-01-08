@@ -65,7 +65,7 @@ func Load(id, confDir string) (*Conf, error) {
 	// Find the config for this router.
 	topoBR, ok := conf.Topo.BR[id]
 	if !ok {
-		return nil, common.NewCError("Unable to find element ID in topology",
+		return nil, common.NewBasicError("Unable to find element ID in topology", nil,
 			"id", id, "path", topoPath)
 	}
 	conf.BR = &topoBR
@@ -107,7 +107,8 @@ func Load(id, confDir string) (*Conf, error) {
 	for ifid := range ec.IFCfg {
 		intf, ok := conf.Net.IFs[ifid]
 		if !ok {
-			return nil, common.NewCError("Unable to find IFID for extra config", "ifid", ifid)
+			return nil, common.NewBasicError("Unable to find IFID for extra config", nil,
+				"ifid", ifid)
 		}
 		intf.PushACL = ec.IFCfg[ifid]
 	}

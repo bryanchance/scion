@@ -209,25 +209,25 @@ func getZkService(connection *zk.Conn, isdas *addr.ISD_AS,
 		}
 		sinfo, err := decodePartydata(data)
 		if err != nil {
-			cerr := err.(*common.CError)
-			log.Error(cerr.Desc, cerr.Ctx...)
+			log.Error(common.FmtError(err))
 			return nil, err
 		}
 		sid, err := sinfo.Id()
 		if err != nil {
-			log.Error("Could not decode service Id", "sinfo", sinfo, "err", err)
+			log.Error("Could not decode service Id", "sinfo", sinfo, "err", common.FmtError(err))
 			return nil, err
 		}
 		addrs, err := sinfo.Addrs()
 		if err != nil {
-			log.Error("Could not decode service Addrs", "sinfo", sinfo, "err", err)
+			log.Error("Could not decode service Addrs", "sinfo", sinfo, "err", common.FmtError(err))
 			return nil, err
 		}
 		for i := 0; i < addrs.Len(); i++ {
 			var saddr string
 			addr, err := addrs.At(i).Addr()
 			if err != nil {
-				log.Error("Could not fetch service address", "addrs", addrs, "err", err)
+				log.Error("Could not fetch service address",
+					"addrs", addrs, "err", common.FmtError(err))
 				return nil, err
 			}
 			ip := net.IP(addr)
@@ -247,15 +247,15 @@ func decodePartydata(b []byte) (*proto.ZkId, error) {
 	decoded := make([]byte, len(b))
 	length, err := base64.StdEncoding.Decode(decoded, b)
 	if err != nil {
-		return nil, common.NewCError("Could not base64-decode party data", "err", err)
+		return nil, common.NewBasicError("Could not base64-decode party data", err)
 	}
 	msg, err := capnp.NewPackedDecoder(bytes.NewBuffer(decoded[:length])).Decode()
 	if err != nil {
-		return nil, common.NewCError("Could not decode party data", "err", err)
+		return nil, common.NewBasicError("Could not decode party data", err)
 	}
 	zkid, err := proto.ReadRootZkId(msg)
 	if err != nil {
-		return nil, common.NewCError("Could not read root ZkId from party data", "err", err)
+		return nil, common.NewBasicError("Could not read root ZkId from party data", err)
 	}
 	return &zkid, nil
 }

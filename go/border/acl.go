@@ -48,8 +48,6 @@ func (r *Router) genACLPkt(intf *netconf.Interface) {
 	srcAddr := intf.IFAddr.PublicAddrInfo(intf.IFAddr.Overlay)
 	if err := r.genPkt(intf.RemoteIA, addr.HostFromIP(intf.RemoteAddr.IP),
 		intf.RemoteAddr.L4Port, srcAddr, scpld); err != nil {
-		cerr := err.(*common.CError)
-		cerr.AddCtx("desc", cerr.Desc)
-		logger.Error("Error generating ACL Push packet", cerr.Ctx...)
+		logger.Error("Error generating ACL Push packet", "err", common.FmtError(err))
 	}
 }

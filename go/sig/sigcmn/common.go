@@ -74,19 +74,19 @@ func Init(ia *addr.ISD_AS, ip net.IP) error {
 	}
 	sd := sciond.NewService(*sciondPath)
 	if PathMgr, err = pathmgr.New(sd, timers, log.Root()); err != nil {
-		return common.NewCError("Error creating path manager", "err", err)
+		return common.NewBasicError("Error creating path manager", err)
 	}
 	network := snet.NewNetworkBasic(ia, *sciondPath, *dispatcherPath)
 	network.SetPathResolver(PathMgr)
 	// Initialize SCION local networking module
 	err = snet.InitWithNetwork(network)
 	if err != nil {
-		return common.NewCError("Error initializing SCION Network module", "err", err)
+		return common.NewBasicError("Error initializing SCION Network module", err)
 	}
 	CtrlConn, err = snet.ListenSCION(
 		"udp4", &snet.Addr{IA: IA, Host: Host, L4Port: uint16(*CtrlPort)})
 	if err != nil {
-		return common.NewCError("Error creating ctrl socket", "err", err)
+		return common.NewBasicError("Error creating ctrl socket", err)
 	}
 	return nil
 }
@@ -105,7 +105,7 @@ func EncapSnetAddr() *snet.Addr {
 
 func ValidatePort(desc string, port int) error {
 	if port < 1 || port > MaxPort {
-		return common.NewCError(fmt.Sprintf("Invalid %s port", desc),
+		return common.NewBasicError(fmt.Sprintf("Invalid %s port", desc), nil,
 			"min", 1, "max", MaxPort, "actual", port)
 	}
 	return nil

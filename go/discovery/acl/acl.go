@@ -70,12 +70,12 @@ func Load(filename string) error {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		l["result"] = ERRREADFILE
-		return common.NewCError("Could not open ACL file", "filename", filename, "err", err)
+		return common.NewBasicError("Could not open ACL file", err, "filename", filename)
 	}
 	newacl, err := makeACL(string(data))
 	if err != nil {
 		l["result"] = ERRPARSEACL
-		return common.NewCError("Could not parse ACL file", "filename", filename, "err", err)
+		return common.NewBasicError("Could not parse ACL file", err, "filename", filename)
 	}
 	fullTopoACL.Store(newacl)
 	l["result"] = SUCCESS
@@ -101,9 +101,8 @@ func makeACL(iplist string) ([]net.IPNet, error) {
 		}
 		_, n, err := net.ParseCIDR(ipnet)
 		if err != nil {
-			return nil, common.NewCError(
-				"Could not convert string to IP network",
-				"lineno", i+1, "string", ipnet, "err", err)
+			return nil, common.NewBasicError("Could not convert string to IP network", err,
+				"lineno", i+1, "string", ipnet)
 		}
 		newacl = append(newacl, *n)
 	}

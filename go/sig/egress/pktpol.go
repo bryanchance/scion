@@ -55,7 +55,7 @@ Top:
 				continue Top
 			}
 		}
-		return nil, common.NewCError("newPktPolicy: unknown session id",
+		return nil, common.NewBasicError("newPktPolicy: unknown session id", nil,
 			"name", name, "sessId", sessId)
 	}
 	return ppol, nil

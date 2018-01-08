@@ -19,14 +19,14 @@ import (
 func (rp *RtrPkt) processExtnACL(extnData common.RawBytes) (HookResult, error) {
 	acl, err := extn.NewPushACLFromRaw(extnData)
 	if err != nil {
-		return HookError, common.NewCError("Unable to parse PushACL message", "err", err)
+		return HookError, common.NewBasicError("Unable to parse PushACL message", err)
 	}
 	if rp.DirFrom != rcmn.DirExternal {
-		return HookError, common.NewCError("Bad packet direction", "actual", rp.DirFrom,
-			"expected", rcmn.DirExternal)
+		return HookError, common.NewBasicError("Bad packet direction", nil,
+			"actual", rp.DirFrom, "expected", rcmn.DirExternal)
 	}
 	if len(rp.Ingress.IfIDs) != 1 {
-		return HookError, common.NewCError("Unexpected IFIDs count for external packet",
+		return HookError, common.NewBasicError("Unexpected IFIDs count for external packet", nil,
 			"IFIDs", rp.Ingress.IfIDs, "actual", len(rp.Ingress.IfIDs), "expected", 1)
 	}
 	// Set ACL for the outgoing socket corresponding to the IFID on which we received it
@@ -46,7 +46,8 @@ func (rp *RtrPkt) validateACLHook() (HookResult, error) {
 		// srcIA is not guaranteed to be set at this stage
 		ia, err := rp.SrcIA()
 		if err != nil {
-			return HookError, common.NewCError("Unable to determine source IA for ACL", "rpkt", rp)
+			return HookError, common.NewBasicError("Unable to determine source IA for ACL", nil,
+				"rpkt", rp)
 		}
 		if !acl.Match(ia) {
 			//log.Debug("Packet dropped due to ACL", "srcIA", rp.srcIA, "acl", acl)

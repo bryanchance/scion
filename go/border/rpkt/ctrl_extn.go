@@ -14,7 +14,8 @@ func (rp *RtrPkt) processExtnList(edl *extn.CtrlExtnDataList) (HookResult, error
 		case "com.anapaya.pushacl":
 			rp.processExtnACL(e.Data)
 		default:
-			return HookError, common.NewCError("Unsupported ctrl extension", "type", e.Type)
+			return HookError, common.NewBasicError("Unsupported ctrl extension", nil,
+				"type", e.Type)
 		}
 	}
 	return HookContinue, nil

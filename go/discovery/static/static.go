@@ -42,7 +42,7 @@ func Load(filename string, usefmod bool) error {
 	if err != nil {
 		l["result"] = ERRFILEREAD
 		metrics.TotalTopoLoads.With(l).Inc()
-		return common.NewCError("Could not load topology.", "filename", filename, "err", err)
+		return common.NewBasicError("Could not load topology.", err, "filename", filename)
 	}
 	DiskTopo = b
 	rt, err := topology.LoadRaw(b)
@@ -55,7 +55,7 @@ func Load(filename string, usefmod bool) error {
 		if err != nil {
 			l["result"] = ERRFILESTAT
 			metrics.TotalTopoLoads.With(l).Inc()
-			return common.NewCError("Could not stat topo file", "filename", filename, "err", err)
+			return common.NewBasicError("Could not stat topo file", err, "filename", filename)
 		}
 		rt.Timestamp = fi.ModTime().Unix()
 		rt.TimestampHuman = fi.ModTime().Format(common.TimeFmt)

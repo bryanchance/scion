@@ -60,8 +60,7 @@ func init() {
 func main() {
 	isdas, err := verifyFlags()
 	if err != nil {
-		cerr := err.(*common.CError)
-		log.Crit(cerr.Desc, cerr.Ctx...)
+		log.Crit(common.FmtError(err))
 		liblog.Flush()
 		os.Exit(1)
 	}
@@ -71,14 +70,14 @@ func main() {
 
 	log.Info("Loading ACLs", "filename", *aclfile)
 	if err = acl.Load(*aclfile); err != nil {
-		cerr := err.(*common.CError)
-		log.Error(cerr.Desc, cerr.Ctx...)
+		log.Error(common.FmtError(err))
 		liblog.Flush()
 		os.Exit(1)
 	}
 	log.Info("Loading static topology", "filename", *topofile)
 	if err = static.Load(*topofile, *usefmod); err != nil {
-		log.Error("Could not load static topology file file", "filename", *topofile, "err", err)
+		log.Error("Could not load static topology file file",
+			"filename", *topofile, "err", common.FmtError(err))
 		liblog.Flush()
 		os.Exit(1)
 	}
@@ -86,7 +85,8 @@ func main() {
 	setupSignals()
 
 	go func() {
-		log.Debug("Starting topo update loop", "zklist", zklist, "frequency", *zkfreq, "conntimeout", *zktimeout)
+		log.Debug("Starting topo update loop", "zklist", zklist, "frequency", *zkfreq,
+			"conntimeout", *zktimeout)
 		for {
 			dynamic.UpdateFromZK(zklist, *id, *zktimeout)
 			time.Sleep(*zkfreq)
@@ -134,26 +134,26 @@ func main() {
 func verifyFlags() (*addr.ISD_AS, error) {
 	flag.Parse()
 	if *id == "" {
-		return nil, common.NewCError("No element ID specified")
+		return nil, common.NewBasicError("No element ID specified", nil)
 	}
 	if *ia == "" {
-		return nil, common.NewCError("No ISD-AS specified")
+		return nil, common.NewBasicError("No ISD-AS specified", nil)
 	}
 	isdas, err := addr.IAFromString(*ia)
 	if err != nil {
-		return nil, common.NewCError("Could not parse ISD-AS", "isd-as", ia, "err", err)
+		return nil, common.NewBasicError("Could not parse ISD-AS", err, "isd-as", ia)
 	}
 	if *topofile == "" {
-		return nil, common.NewCError("No static topology file specified")
+		return nil, common.NewBasicError("No static topology file specified", nil)
 	}
 	if *aclfile == "" {
-		return nil, common.NewCError("No ACL file specified")
+		return nil, common.NewBasicError("No ACL file specified", nil)
 	}
 	if *laddress == "" {
-		return nil, common.NewCError("No address to listen on specified")
+		return nil, common.NewBasicError("No address to listen on specified", nil)
 	}
 	if *zk == "" {
-		return nil, common.NewCError("No Zookeeper specified")
+		return nil, common.NewBasicError("No Zookeeper specified", nil)
 	}
 	return isdas, nil
 }
