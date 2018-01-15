@@ -36,13 +36,13 @@ func (r *Router) genACLPkt(intf *netconf.Interface) {
 	aclMsgObj := extn.NewPushACLFromValues(intf.PushACL)
 	extnDataMsgObj, err := extn.NewCtrlExtnDataFromValues(aclMsgObj, aclBufSize)
 	if err != nil {
-		logger.Error("Unable to construct CtrlExtnData object", "err", err)
+		logger.Error("Unable to construct CtrlExtnData object", "err", common.FmtError(err))
 		return
 	}
 	extnDataListMsgObj := extn.NewCtrlExtnDataListFromValues([]*extn.CtrlExtnData{extnDataMsgObj})
 	scpld, err := ctrl.NewSignedPldFromUnion(extnDataListMsgObj)
 	if err != nil {
-		logger.Error("Unable to construct signed CtrlPld object", "err", err)
+		logger.Error("Unable to construct signed CtrlPld object", "err", common.FmtError(err))
 		return
 	}
 	srcAddr := intf.IFAddr.PublicAddrInfo(intf.IFAddr.Overlay)

@@ -119,14 +119,14 @@ func main() {
 			http.DefaultServeMux.HandleFunc("/", metrics.MakeMainDebugPageHandler())
 			err := runHTTPServer(*paddress, *certfn, *keyfn, http.DefaultServeMux)
 			// If runHTTPServer returns, there will be a non-nil err
-			log.Crit("Could not start private HTTP server", "err", err)
+			log.Crit("Could not start private HTTP server", "err", common.FmtError(err))
 			liblog.Flush()
 			os.Exit(1)
 		}()
 	}
 	log.Info("Starting public server", "addr", *laddress)
 	err = runHTTPServer(*laddress, *certfn, *keyfn, pubMux)
-	log.Crit("Could not start public HTTP server", "err", err)
+	log.Crit("Could not start public HTTP server", "err", common.FmtError(err))
 	liblog.Flush()
 	os.Exit(1)
 }
@@ -169,14 +169,14 @@ func setupSignals() {
 			log.Info("Reloading ACL", "filename", *aclfile)
 			err := acl.Load(*aclfile)
 			if err != nil {
-				log.Error("ACL file reload failed", "err", err)
+				log.Error("ACL file reload failed", "err", common.FmtError(err))
 				// If there was an error, we should not try to reload the topofile
 				continue
 			}
 			log.Info("Reloading static topology file", "filename", *topofile)
 			err = static.Load(*topofile, *usefmod)
 			if err != nil {
-				log.Error("Static topology file reload failed", "err", err)
+				log.Error("Static topology file reload failed", "err", common.FmtError(err))
 			}
 		}
 	}() // End of HUP signal handler
