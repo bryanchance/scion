@@ -40,7 +40,12 @@ func (r *Router) genACLPkt(intf *netconf.Interface) {
 		return
 	}
 	extnDataListMsgObj := extn.NewCtrlExtnDataListFromValues([]*extn.CtrlExtnData{extnDataMsgObj})
-	scpld, err := ctrl.NewSignedPldFromUnion(extnDataListMsgObj)
+	cpld, err := ctrl.NewPld(extnDataListMsgObj, nil)
+	if err != nil {
+		logger.Error("Unable to construct CtrlPld object", "err", common.FmtError(err))
+		return
+	}
+	scpld, err := cpld.SignedPld(ctrl.NullSigner)
 	if err != nil {
 		logger.Error("Unable to construct signed CtrlPld object", "err", common.FmtError(err))
 		return
