@@ -51,7 +51,6 @@ type egressDispatcher struct {
 	devName          string
 	devIO            io.ReadWriteCloser
 	syncPktPols      *SyncPktPols
-	sess             *Session
 	pktsRecvCounters map[metrics.CtrPairKey]metrics.CtrPair
 }
 
@@ -69,7 +68,6 @@ func (ed *egressDispatcher) Run() {
 	defer liblog.LogPanicAndExit()
 	ed.Info("EgressDispatcher: starting")
 	bufs := make(ringbuf.EntryList, egressBufPkts)
-	remoteIAInt := ed.sess.IA.IAInt()
 BatchLoop:
 	for {
 		n, _ := egressFreePkts.Read(bufs, true)
@@ -108,7 +106,7 @@ BatchLoop:
 				continue
 			}
 			sess.ring.Write(ringbuf.EntryList{buf}, true)
-			ed.updateMetrics(remoteIAInt, sess.SessId, length)
+			ed.updateMetrics(sess.IA.IAInt(), sess.SessId, length)
 		}
 	}
 	ed.Info("EgressDispatcher: stopping")
