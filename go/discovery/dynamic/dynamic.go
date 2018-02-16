@@ -76,7 +76,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 	// Make ZK connection and set logger
 	c, _, err := zk.Connect(zks, sessionTimeout)
 	if err != nil {
-		log.Error("Error connecting to Zookeeper", "err", common.FmtError(err))
+		log.Error("Error connecting to Zookeeper", "err", err)
 		labels["result"] = ERRCONN
 		goto Out
 	}
@@ -86,7 +86,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 	// Get the base topo from the static part of DS so the two version agree as
 	// much as is useful.
 	if err := json.Unmarshal(static.DiskTopo, rt); err != nil {
-		log.Error("Could not re-parse topology", "err", common.FmtError(err))
+		log.Error("Could not re-parse topology", "err", err)
 		labels["result"] = ERRBASETOPOPARSE
 		goto Out
 	}
@@ -105,7 +105,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 	updateTimestamps(rt)
 
 	if err = marshallAndUpdate(rt, TopoFull); err != nil {
-		log.Error("Could not marshal full topo", "err", common.FmtError(err))
+		log.Error("Could not marshal full topo", "err", err)
 		labels["result"] = ERRMARSHALFULL
 		goto Out
 	}
@@ -114,7 +114,7 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 	topology.StripServices(rt)
 
 	if err = marshallAndUpdate(rt, TopoLimited); err != nil {
-		log.Error("Could not marshal reduced topo", "err", common.FmtError(err))
+		log.Error("Could not marshal reduced topo", "err", err)
 		labels["result"] = ERRMARSHALREDUCED
 		goto Out
 	}
@@ -209,25 +209,24 @@ func getZkService(connection *zk.Conn, isdas *addr.ISD_AS,
 		}
 		sinfo, err := decodePartydata(data)
 		if err != nil {
-			log.Error(common.FmtError(err))
+			log.Error("Could not decode party data", "err", err)
 			return nil, err
 		}
 		sid, err := sinfo.Id()
 		if err != nil {
-			log.Error("Could not decode service Id", "sinfo", sinfo, "err", common.FmtError(err))
+			log.Error("Could not decode service Id", "sinfo", sinfo, "err", err)
 			return nil, err
 		}
 		addrs, err := sinfo.Addrs()
 		if err != nil {
-			log.Error("Could not decode service Addrs", "sinfo", sinfo, "err", common.FmtError(err))
+			log.Error("Could not decode service Addrs", "sinfo", sinfo, "err", err)
 			return nil, err
 		}
 		for i := 0; i < addrs.Len(); i++ {
 			var saddr string
 			addr, err := addrs.At(i).Addr()
 			if err != nil {
-				log.Error("Could not fetch service address",
-					"addrs", addrs, "err", common.FmtError(err))
+				log.Error("Could not fetch service address", "addrs", addrs, "err", err)
 				return nil, err
 			}
 			ip := net.IP(addr)

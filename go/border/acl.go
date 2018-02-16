@@ -10,7 +10,6 @@ import (
 	"github.com/scionproto/scion/go/border/netconf"
 	"github.com/scionproto/scion/go/border/rctx"
 	"github.com/scionproto/scion/go/lib/addr"
-	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/ctrl"
 	"github.com/scionproto/scion/go/lib/ctrl/extn"
 	liblog "github.com/scionproto/scion/go/lib/log"
@@ -36,23 +35,23 @@ func (r *Router) genACLPkt(intf *netconf.Interface) {
 	aclMsgObj := extn.NewPushACLFromValues(intf.PushACL)
 	extnDataMsgObj, err := extn.NewCtrlExtnDataFromValues(aclMsgObj, aclBufSize)
 	if err != nil {
-		logger.Error("Unable to construct CtrlExtnData object", "err", common.FmtError(err))
+		logger.Error("Unable to construct CtrlExtnData object", "err", err)
 		return
 	}
 	extnDataListMsgObj := extn.NewCtrlExtnDataListFromValues([]*extn.CtrlExtnData{extnDataMsgObj})
 	cpld, err := ctrl.NewPld(extnDataListMsgObj, nil)
 	if err != nil {
-		logger.Error("Unable to construct CtrlPld object", "err", common.FmtError(err))
+		logger.Error("Unable to construct CtrlPld object", "err", err)
 		return
 	}
 	scpld, err := cpld.SignedPld(ctrl.NullSigner)
 	if err != nil {
-		logger.Error("Unable to construct signed CtrlPld object", "err", common.FmtError(err))
+		logger.Error("Unable to construct signed CtrlPld object", "err", err)
 		return
 	}
 	srcAddr := intf.IFAddr.PublicAddrInfo(intf.IFAddr.Overlay)
 	if err := r.genPkt(intf.RemoteIA, addr.HostFromIP(intf.RemoteAddr.IP),
 		intf.RemoteAddr.L4Port, srcAddr, scpld); err != nil {
-		logger.Error("Error generating ACL Push packet", "err", common.FmtError(err))
+		logger.Error("Error generating ACL Push packet", "err", err)
 	}
 }

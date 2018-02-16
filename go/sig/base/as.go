@@ -82,7 +82,7 @@ func (ae *ASEntry) ReloadConfig(cfg *config.ASEntry, classes pktcls.ClassMap,
 
 	sessionCfgs, err := config.BuildSessions(cfg.Sessions, actions)
 	if err != nil {
-		ae.Error("Unable to update sessions", "err", common.FmtError(err))
+		ae.Error("Unable to update sessions", "err", err)
 		s = false
 	}
 	s = ae.addNewSessions(sessionCfgs) && s
@@ -104,7 +104,7 @@ func (ae *ASEntry) addNewNets(ipnets []*config.IPNet) bool {
 	for _, ipnet := range ipnets {
 		err := ae.addNet(ipnet.IPNet())
 		if err != nil {
-			ae.Error("Unable to add network", "net", ipnet, "err", common.FmtError(err))
+			ae.Error("Unable to add network", "net", ipnet, "err", err)
 			s = false
 		}
 	}
@@ -123,7 +123,7 @@ Top:
 		}
 		err := ae.delNet(ne.Net)
 		if err != nil {
-			ae.Error("Unable to delete network", "NetEntry", ne, "err", common.FmtError(err))
+			ae.Error("Unable to delete network", "NetEntry", ne, "err", err)
 			s = false
 		}
 	}
@@ -191,7 +191,7 @@ func (ae *ASEntry) addNewSIGS(sigs config.SIGSet) bool {
 		}
 		err := ae.AddSig(sig.Id, sig.Addr, ctrlPort, encapPort, true)
 		if err != nil {
-			ae.Error("Unable to add SIG", "sig", sig, "err", common.FmtError(err))
+			ae.Error("Unable to add SIG", "sig", sig, "err", err)
 			s = false
 		}
 	}
@@ -208,7 +208,7 @@ func (ae *ASEntry) delOldSIGS(sigs config.SIGSet) bool {
 		if _, ok := sigs[sig.Id]; !ok {
 			err := ae.DelSig(sig.Id)
 			if err != nil {
-				ae.Error("Unable to delete SIG", "err", common.FmtError(err))
+				ae.Error("Unable to delete SIG", "err", err)
 				s = false
 			}
 		}
@@ -267,7 +267,7 @@ func (ae *ASEntry) addNewSessions(cfgs config.SessionSet) bool {
 	s := true
 	for _, cfg := range cfgs {
 		if err := ae.addSession(cfg.ID, cfg.PolName, cfg.Pred); err != nil {
-			ae.Error("Unable to add session", "id", cfg.ID, "err", common.FmtError(err))
+			ae.Error("Unable to add session", "id", cfg.ID, "err", err)
 			s = false
 			// Continue without rollback
 			continue
@@ -328,14 +328,15 @@ func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 
 // TODO(kormat): add DelSession, and set tun device down there's no sessions left.
 
-func (ae *ASEntry) buildNewPktPolicies(cfgPktPols []*config.PktPolicy, classes pktcls.ClassMap) []*egress.PktPolicy {
+func (ae *ASEntry) buildNewPktPolicies(cfgPktPols []*config.PktPolicy,
+	classes pktcls.ClassMap) []*egress.PktPolicy {
 	var newPktPolicies []*egress.PktPolicy
 	for _, pol := range cfgPktPols {
 		cls := classes[pol.ClassName]
 		// Packet policies are stateless, so we construct new ones
 		pp, err := egress.NewPktPolicy(pol.ClassName, cls, pol.SessIds, ae.Sessions)
 		if err != nil {
-			log.Error("Unable to create packet policy", "policy", pol, "err", common.FmtError(err))
+			log.Error("Unable to create packet policy", "policy", pol, "err", err)
 		}
 		newPktPolicies = append(newPktPolicies, pp)
 	}
@@ -397,7 +398,7 @@ func (ae *ASEntry) Cleanup() error {
 	ae.sigMgrStop <- struct{}{}
 	// Clean up the egress dispatcher.
 	if err := ae.tunIO.Close(); err != nil {
-		ae.Error("Error closing TUN io", "dev", ae.DevName, "err", common.FmtError(err))
+		ae.Error("Error closing TUN io", "dev", ae.DevName, "err", err)
 	}
 	// Clean up sessions, and associated workers.
 	ae.cleanSessions()
@@ -413,7 +414,7 @@ func (ae *ASEntry) Cleanup() error {
 func (ae *ASEntry) cleanSessions() {
 	for _, s := range ae.Sessions {
 		if err := s.Cleanup(); err != nil {
-			s.Error("Error cleaning up session", "err", common.FmtError(err))
+			s.Error("Error cleaning up session", "err", err)
 		}
 	}
 }

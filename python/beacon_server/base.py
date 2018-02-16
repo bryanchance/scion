@@ -98,6 +98,8 @@ REVOCATIONS_ISSUED = Counter("bs_revocations_issued_total", "# of issued revocat
                              ["server_id", "isd_as"])
 IS_MASTER = Gauge("bs_is_master", "true if this process is the replication master",
                   ["server_id", "isd_as"])
+IF_STATE = Gauge("bs_ifstate", "0/1/2 if interface is active/revoked/other",
+                 ["server_id", "isd_as", "ifid"])
 
 
 class BeaconServer(SCIONElement, metaclass=ABCMeta):
@@ -304,7 +306,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
                           pcb.short_desc())
             return
         seg_meta = PathSegMeta(pcb, self.continue_seg_processing, meta)
-        self._process_path_seg(seg_meta)
+        self._process_path_seg(seg_meta, cpld.req_id)
 
     def continue_seg_processing(self, seg_meta):
         """
@@ -434,18 +436,19 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
             br.interfaces[ifid].to_if_id = pld.p.origIF
             prev_state = self.ifid_state[ifid].update()
             if prev_state == InterfaceState.INACTIVE:
-                logging.info("IF %d activated", ifid)
+                logging.info("IF %d activated.", ifid)
             elif prev_state in [InterfaceState.TIMED_OUT,
                                 InterfaceState.REVOKED]:
                 logging.info("IF %d came back up.", ifid)
-            if not prev_state == InterfaceState.ACTIVE:
+            if prev_state != InterfaceState.ACTIVE:
                 if self.zk.have_lock():
                     # Inform BRs about the interface coming up.
                     metas = []
                     for br in self.topology.border_routers:
                         br_addr, br_port = br.int_addrs[0].public[0]
                         metas.append(UDPMetadata.from_values(host=br_addr, port=br_port))
-                    self._send_ifstate_update(metas)
+                    info = IFStateInfo.from_values(ifid, True)
+                    self._send_ifstate_update([info], metas)
 
     def run(self):
         """
@@ -617,12 +620,14 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
         if not self.zk.have_lock():
             return
         # Process revoked interfaces.
+        infos = []
         for if_id in revoked_ifs:
             rev_info = self._get_ht_proof(if_id)
             logging.info("Issuing revocation: %s", rev_info.short_desc())
             if self._labels:
                 REVOCATIONS_ISSUED.labels(**self._labels).inc()
             self._process_revocation(rev_info)
+            infos.append(IFStateInfo.from_values(if_id, False, rev_info))
         border_metas = []
         # Add all BRs.
         for br in self.topology.border_routers:
@@ -638,7 +643,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
             # Create a meta if there is a local path service
             if addr:
                 ps_meta.append(UDPMetadata.from_values(host=addr, port=port))
-        self._send_ifstate_update(border_metas, ps_meta)
+        self._send_ifstate_update(infos, border_metas, ps_meta)
 
     def _handle_scmp_revocation(self, pld, meta):
         rev_info = RevocationInfo.from_raw(pld.info.rev_info)
@@ -747,6 +752,14 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
                 to_revoke = []
                 for (if_id, if_state) in self.ifid_state.items():
                     cur_epoch = ConnectedHashTree.get_current_epoch()
+                    if self._labels:
+                        metric = IF_STATE.labels(ifid=if_id, **self._labels)
+                        if if_state.is_active():
+                            metric.set(0)
+                        elif if_state.is_revoked():
+                            metric.set(1)
+                        else:
+                            metric.set(2)
                     if not if_state.is_expired() or (
                             if_state.is_revoked() and if_id_last_revoked[if_id] == cur_epoch):
                         # Either the interface hasn't timed out, or it's already revoked for this
@@ -768,10 +781,6 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
         assert isinstance(req, IFStateRequest), type(req)
         if not self.zk.have_lock():
             return
-        self._send_ifstate_update([meta])
-
-    def _send_ifstate_update(self, border_metas, server_metas=None):
-        server_metas = server_metas or []
         with self.ifid_state_lock:
             infos = []
             for (ifid, state) in self.ifid_state.items():
@@ -782,10 +791,13 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
                 info = IFStateInfo.from_values(ifid, state.is_active(), rev_info)
                 infos.append(info)
             if not infos and not self._quiet_startup():
-                logging.warning("No IF state info to put in IFState update for %s.",
-                                ", ".join([str(m) for m in border_metas + server_metas]))
+                logging.warning("No IF state info to put in IFState update for %s.", meta)
                 return
-            payload = CtrlPayload(PathMgmt(IFStatePayload.from_values(infos)))
+        self._send_ifstate_update(infos, [meta])
+
+    def _send_ifstate_update(self, state_infos, border_metas, server_metas=None):
+        server_metas = server_metas or []
+        payload = CtrlPayload(PathMgmt(IFStatePayload.from_values(state_infos)))
         for meta in border_metas:
             self.send_meta(payload.copy(), meta, (meta.host, meta.port))
         for meta in server_metas:

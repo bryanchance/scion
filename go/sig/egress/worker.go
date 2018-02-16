@@ -61,6 +61,7 @@ type worker struct {
 	sess          *Session
 	currSig       *siginfo.Sig
 	currPathEntry *sciond.PathReplyEntry
+	frameSentCtrs metrics.CtrPair
 
 	epoch uint16
 	seq   uint32
@@ -72,7 +73,11 @@ func NewWorker(sess *Session, logger log.Logger) *worker {
 		Logger:   logger,
 		iaString: sess.IA.String(),
 		sess:     sess,
-		pkts:     make(ringbuf.EntryList, 0, egressBufPkts),
+		frameSentCtrs: metrics.CtrPair{
+			Pkts:  metrics.FramesSent.WithLabelValues(sess.IA.String(), sess.SessId.String()),
+			Bytes: metrics.FrameBytesSent.WithLabelValues(sess.IA.String(), sess.SessId.String()),
+		},
+		pkts: make(ringbuf.EntryList, 0, egressBufPkts),
 	}
 }
 
@@ -95,7 +100,7 @@ TopLoop:
 		} else if len(w.pkts) == 0 {
 			// Didn't read any new packets, send partial frame.
 			if err := w.write(f); err != nil {
-				w.Error("Error sending frame", "err", common.FmtError(err))
+				w.Error("Error sending frame", "err", err)
 			}
 			continue TopLoop
 		}
@@ -103,7 +108,7 @@ TopLoop:
 		for i := range w.pkts {
 			pkt := w.pkts[i].(common.RawBytes)
 			if err := w.processPkt(f, pkt); err != nil {
-				w.Error("Error sending frame", "err", common.FmtError(err))
+				w.Error("Error sending frame", "err", err)
 			}
 		}
 		// Return processed pkts to the free pool, and remove references.
@@ -182,26 +187,30 @@ func (w *worker) write(f *frame) error {
 	if err != nil {
 		return common.NewBasicError("Egress write error", err)
 	}
-	metrics.FramesSent.WithLabelValues(w.iaString).Inc()
-	metrics.FrameBytesSent.WithLabelValues(w.iaString).Add(float64(bytesWritten))
+	w.frameSentCtrs.Pkts.Inc()
+	w.frameSentCtrs.Bytes.Add(float64(bytesWritten))
 	return nil
 }
 
 func (w *worker) resetFrame(f *frame) {
 	var mtu uint16 = common.MinMTU
+	var addrLen, pathLen uint16
 	remote := w.sess.Remote()
 	if remote != nil {
 		w.currSig = remote.Sig
+		if w.currSig != nil {
+			addrLen = uint16(spkt.AddrHdrLen(w.currSig.Host, sigcmn.Host))
+		}
 		if remote.sessPath != nil {
 			w.currPathEntry = remote.sessPath.pathEntry
 		}
 		if w.currPathEntry != nil {
 			mtu = w.currPathEntry.Path.Mtu
+			pathLen = uint16(len(w.currPathEntry.Path.FwdPath))
 		}
 	}
-	// FIXME(kormat): to do this properly, need to calculate the address header size,
-	// and account for any ext headers.
-	f.reset(mtu - spkt.CmnHdrLen - 40 - l4.UDPLen)
+	// FIXME(kormat): to do this properly, need to account for any ext headers.
+	f.reset(mtu - spkt.CmnHdrLen - addrLen - pathLen - l4.UDPLen)
 }
 
 type frame struct {

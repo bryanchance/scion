@@ -60,7 +60,7 @@ func init() {
 func main() {
 	isdas, err := verifyFlags()
 	if err != nil {
-		log.Crit(common.FmtError(err))
+		log.Crit(err.Error())
 		liblog.Flush()
 		os.Exit(1)
 	}
@@ -70,14 +70,13 @@ func main() {
 
 	log.Info("Loading ACLs", "filename", *aclfile)
 	if err = acl.Load(*aclfile); err != nil {
-		log.Error(common.FmtError(err))
+		log.Error(err.Error())
 		liblog.Flush()
 		os.Exit(1)
 	}
 	log.Info("Loading static topology", "filename", *topofile)
 	if err = static.Load(*topofile, *usefmod); err != nil {
-		log.Error("Could not load static topology file file",
-			"filename", *topofile, "err", common.FmtError(err))
+		log.Error("Could not load static topology file file", "filename", *topofile, "err", err)
 		liblog.Flush()
 		os.Exit(1)
 	}
@@ -119,14 +118,14 @@ func main() {
 			http.DefaultServeMux.HandleFunc("/", metrics.MakeMainDebugPageHandler())
 			err := runHTTPServer(*paddress, *certfn, *keyfn, http.DefaultServeMux)
 			// If runHTTPServer returns, there will be a non-nil err
-			log.Crit("Could not start private HTTP server", "err", common.FmtError(err))
+			log.Crit("Could not start private HTTP server", "err", err)
 			liblog.Flush()
 			os.Exit(1)
 		}()
 	}
 	log.Info("Starting public server", "addr", *laddress)
 	err = runHTTPServer(*laddress, *certfn, *keyfn, pubMux)
-	log.Crit("Could not start public HTTP server", "err", common.FmtError(err))
+	log.Crit("Could not start public HTTP server", "err", err)
 	liblog.Flush()
 	os.Exit(1)
 }
@@ -169,14 +168,14 @@ func setupSignals() {
 			log.Info("Reloading ACL", "filename", *aclfile)
 			err := acl.Load(*aclfile)
 			if err != nil {
-				log.Error("ACL file reload failed", "err", common.FmtError(err))
+				log.Error("ACL file reload failed", "err", err)
 				// If there was an error, we should not try to reload the topofile
 				continue
 			}
 			log.Info("Reloading static topology file", "filename", *topofile)
 			err = static.Load(*topofile, *usefmod)
 			if err != nil {
-				log.Error("Static topology file reload failed", "err", common.FmtError(err))
+				log.Error("Static topology file reload failed", "err", err)
 			}
 		}
 	}() // End of HUP signal handler

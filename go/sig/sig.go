@@ -20,9 +20,11 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"os/user"
 	"syscall"
 
 	log "github.com/inconshreveable/log15"
+	"github.com/syndtr/gocapability/capability"
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
@@ -60,23 +62,26 @@ func main() {
 	liblog.Setup(*id)
 	defer liblog.LogPanicAndExit()
 	setupSignals()
+	if err := checkPerms(); err != nil {
+		fatal("Permissions checks failed", "err", err)
+	}
 
 	// Export prometheus metrics.
 	metrics.Init(*id)
 	if err := metrics.Start(); err != nil {
-		fatal("Unable to export prometheus metrics", "err", common.FmtError(err))
+		fatal("Unable to export prometheus metrics", "err", err)
 	}
 	// Parse basic flags
 	ia, err := addr.IAFromString(*isdas)
 	if err != nil {
-		fatal("Unable to parse local ISD-AS", "ia", *isdas, "err", common.FmtError(err))
+		fatal("Unable to parse local ISD-AS", "ia", *isdas, "err", err)
 	}
 	ip := net.ParseIP(*ipStr)
 	if ip == nil {
 		fatal("unable to parse IP address", "addr", *ipStr)
 	}
 	if err = sigcmn.Init(ia, ip); err != nil {
-		fatal("Error during initialization", "err", common.FmtError(err))
+		fatal("Error during initialization", "err", err)
 	}
 	egress.Init()
 	disp.Init(sigcmn.CtrlConn)
@@ -90,7 +95,7 @@ func main() {
 
 	// Spawn ingress Dispatcher.
 	if err := ingress.Init(); err != nil {
-		fatal("Unable to spawn ingress dispatcher", "err", common.FmtError(err))
+		fatal("Unable to spawn ingress dispatcher", "err", err)
 	}
 }
 
@@ -104,6 +109,24 @@ func setupSignals() {
 		liblog.Flush()
 		os.Exit(1)
 	}()
+}
+
+func checkPerms() error {
+	user, err := user.Current()
+	if err != nil {
+		return common.NewBasicError("Error retrieving user", err)
+	}
+	if user.Uid == "0" {
+		return common.NewBasicError("Running as root is not allowed for security reasons", nil)
+	}
+	caps, err := capability.NewPid(0)
+	if err != nil {
+		return common.NewBasicError("Error retrieving capabilities", err)
+	}
+	if !caps.Get(capability.EFFECTIVE, capability.CAP_NET_ADMIN) {
+		return common.NewBasicError("CAP_NET_ADMIN is required", nil, "caps", caps)
+	}
+	return nil
 }
 
 func reloadOnSIGHUP(path string) {
@@ -121,7 +144,7 @@ func reloadOnSIGHUP(path string) {
 func loadConfig(path string) bool {
 	cfg, err := config.LoadFromFile(path)
 	if err != nil {
-		log.Error("loadConfig: Failed", "err", common.FmtError(err))
+		log.Error("loadConfig: Failed", "err", err)
 		return false
 	}
 	return base.Map.ReloadConfig(cfg)

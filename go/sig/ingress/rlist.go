@@ -33,6 +33,7 @@ import (
 type ReassemblyList struct {
 	epoch             int
 	capacity          int
+	snd               sender
 	markedForDeletion bool
 	entries           *list.List
 	buf               *bytes.Buffer
@@ -40,10 +41,11 @@ type ReassemblyList struct {
 
 // NewReassemblyList returns a ReassemblyList object for the given epoch and with
 // given maximum capacity.
-func NewReassemblyList(epoch int, capacity int) *ReassemblyList {
+func NewReassemblyList(epoch int, capacity int, s sender) *ReassemblyList {
 	list := &ReassemblyList{
 		epoch:             epoch,
 		capacity:          capacity,
+		snd:               s,
 		markedForDeletion: false,
 		entries:           list.New(),
 		buf:               bytes.NewBuffer(make(common.RawBytes, 0, frameBufCap)),
@@ -184,8 +186,8 @@ func (l *ReassemblyList) collectAndWrite() {
 			"expected", pktLen, "have", l.buf.Len())
 	} else {
 		// Write the packet to the wire.
-		if err := send(l.buf.Bytes()); err != nil {
-			log.Error("Unable to send reassembled packet", "err", common.FmtError(err))
+		if err := l.snd.send(l.buf.Bytes()); err != nil {
+			log.Error("Unable to send reassembled packet", "err", err)
 		}
 	}
 	// Process the complete packets in the last frame

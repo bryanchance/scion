@@ -21,11 +21,13 @@ import (
 	log "github.com/inconshreveable/log15"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	liblog "github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/sig/metrics"
+	"github.com/scionproto/scion/go/sig/mgmt"
 )
 
 const (
@@ -46,17 +48,20 @@ func Init() {
 
 type egressDispatcher struct {
 	log.Logger
-	devName     string
-	devIO       io.ReadWriteCloser
-	syncPktPols *SyncPktPols
+	devName          string
+	devIO            io.ReadWriteCloser
+	syncPktPols      *SyncPktPols
+	sess             *Session
+	pktsRecvCounters map[metrics.CtrPairKey]metrics.CtrPair
 }
 
 func NewDispatcher(devName string, devIO io.ReadWriteCloser, spp *SyncPktPols) *egressDispatcher {
 	return &egressDispatcher{
-		Logger:      log.New("dev", devName),
-		devName:     devName,
-		devIO:       devIO,
-		syncPktPols: spp,
+		Logger:           log.New("dev", devName),
+		devName:          devName,
+		devIO:            devIO,
+		syncPktPols:      spp,
+		pktsRecvCounters: make(map[metrics.CtrPairKey]metrics.CtrPair),
 	}
 }
 
@@ -64,8 +69,7 @@ func (ed *egressDispatcher) Run() {
 	defer liblog.LogPanicAndExit()
 	ed.Info("EgressDispatcher: starting")
 	bufs := make(ringbuf.EntryList, egressBufPkts)
-	pktsRecv := metrics.PktsRecv.WithLabelValues(ed.devName)
-	pktBytesRecv := metrics.PktBytesRecv.WithLabelValues(ed.devName)
+	remoteIAInt := ed.sess.IA.IAInt()
 BatchLoop:
 	for {
 		n, _ := egressFreePkts.Read(bufs, true)
@@ -91,7 +95,7 @@ BatchLoop:
 						break BatchLoop
 					}
 				}
-				ed.Error("EgressDispatcher: error reading from devIO", "err", common.FmtError(err))
+				ed.Error("EgressDispatcher: error reading from devIO", "err", err)
 				continue
 			}
 			buf = buf[:length]
@@ -104,8 +108,7 @@ BatchLoop:
 				continue
 			}
 			sess.ring.Write(ringbuf.EntryList{buf}, true)
-			pktsRecv.Inc()
-			pktBytesRecv.Add(float64(length))
+			ed.updateMetrics(remoteIAInt, sess.SessId, length)
 		}
 	}
 	ed.Info("EgressDispatcher: stopping")
@@ -127,4 +130,20 @@ func (ed *egressDispatcher) chooseSess(b common.RawBytes) *Session {
 		}
 	}
 	return sess
+}
+
+func (ed *egressDispatcher) updateMetrics(remoteIA addr.IAInt, sessId mgmt.SessionType, read int) {
+	key := metrics.CtrPairKey{RemoteIA: remoteIA, SessId: sessId}
+	counters, ok := ed.pktsRecvCounters[key]
+	if !ok {
+		iaStr := remoteIA.IA().String()
+		counters = metrics.CtrPair{
+			Pkts:  metrics.PktsRecv.WithLabelValues(iaStr, sessId.String()),
+			Bytes: metrics.PktBytesRecv.WithLabelValues(iaStr, sessId.String()),
+		}
+		ed.pktsRecvCounters[key] = counters
+	}
+	counters.Pkts.Inc()
+	counters.Bytes.Add(float64(read))
+
 }
