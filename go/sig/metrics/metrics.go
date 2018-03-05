@@ -18,9 +18,11 @@ package metrics
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"sync/atomic"
 
 	log "github.com/inconshreveable/log15"
 
@@ -51,6 +53,9 @@ var (
 	FramesTooOld       prometheus.Counter
 	FramesDuplicated   prometheus.Counter
 )
+
+// Version number of loaded config, atomic
+var ConfigVersion uint64
 
 // Ensure all metrics are registered.
 func Init(elem string) {
@@ -101,6 +106,9 @@ func Start() error {
 		return common.NewBasicError("Unable to bind prometheus metrics port", err)
 	}
 	log.Info("Exporting prometheus metrics", "addr", *promAddr)
+	http.HandleFunc("/configversion", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintln(w, atomic.LoadUint64(&ConfigVersion))
+	})
 	go http.Serve(ln, nil)
 	return nil
 }

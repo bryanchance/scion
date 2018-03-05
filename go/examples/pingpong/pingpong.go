@@ -12,17 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Simple application for SCION connectivity using snet library.
+// +build ignore
+
+// Simple application for SCION connectivity using the snet library.
 package main
 
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"time"
 
 	log "github.com/inconshreveable/log15"
-	"github.com/lucas-clemente/quic-go/qerr"
+	//"github.com/lucas-clemente/quic-go"
+	//"github.com/lucas-clemente/quic-go/qerr"
 
 	"github.com/scionproto/scion/go/lib/addr"
 	liblog "github.com/scionproto/scion/go/lib/log"
@@ -52,6 +56,8 @@ var (
 		"Path to dispatcher socket")
 	count = flag.Int("count", 0,
 		fmt.Sprintf("Number of pings, between 0 and %d; a count of 0 means infinity", MaxPings))
+	timeout = flag.Duration("timeout", DefaultTimeout,
+		"Timeout for the ping response")
 	interval = flag.Duration("interval", DefaultInterval, "time between pings")
 )
 
@@ -124,6 +130,11 @@ func Client() {
 		before := time.Now()
 		written, err := qstream.Write([]byte(ReqMsg))
 		if err != nil {
+			//qer := qerr.ToQuicError(err)
+			//if qer.ErrorCode == qerr.NetworkIdleTimeout {
+			//	log.Debug("The connection timed out due to no network activity")
+			//	break
+			//}
 			log.Error("Unable to write", "err", err)
 			continue
 		}
@@ -134,16 +145,20 @@ func Client() {
 		}
 
 		// Receive pong message with timeout
-		err = qstream.SetReadDeadline(time.Now().Add(DefaultTimeout))
+		err = qstream.SetReadDeadline(time.Now().Add(*timeout))
 		if err != nil {
 			LogFatal("SetReadDeadline failed", "err", err)
 		}
 		read, err := qstream.Read(b)
 		if err != nil {
-			qer := qerr.ToQuicError(err)
-			if qer.ErrorCode == qerr.PeerGoingAway {
-				log.Debug("Quic peer disconnected")
-				break
+			//qer := qerr.ToQuicError(err)
+			//if qer.ErrorCode == qerr.PeerGoingAway {
+			//	log.Debug("Quic peer disconnected")
+			//	break
+			//}
+			if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
+				log.Debug("ReadDeadline missed", "err", err)
+				continue
 			}
 			log.Error("Unable to read", "err", err)
 			continue
@@ -158,7 +173,7 @@ func Client() {
 	}
 }
 
-// Server listens on a SCION address and replies to any ping messages.
+// Server listens on a SCION address and replies to any ping message.
 // On any error, the server exits.
 func Server() {
 	initNetwork()
@@ -169,11 +184,29 @@ func Server() {
 		LogFatal("Unable to listen", "err", err)
 	}
 	log.Debug("Listening", "local", qsock.Addr())
-	qsess, err := qsock.Accept()
-	if err != nil {
-		LogFatal("Unable to accept quic session", "err", err)
+	for {
+		qsess, err := qsock.Accept()
+		if err != nil {
+			LogFatal("Unable to accept quic session", "err", err)
+		}
+		log.Debug("Quic session accepted", "src", qsess.RemoteAddr())
+		go handleClient(qsess)
 	}
-	log.Debug("Quic session accepted", "src", qsess.RemoteAddr())
+}
+
+func initNetwork() {
+	// Initialize default SCION networking context
+	if err := snet.Init(local.IA, *sciond, *dispatcher); err != nil {
+		LogFatal("Unable to initialize SCION network", "err", err)
+	}
+	log.Debug("SCION network successfully initialized")
+	if err := squic.Init("", ""); err != nil {
+		LogFatal("Unable to initialize QUIC/SCION", "err", err)
+	}
+	log.Debug("QUIC/SCION successfully initialized")
+}
+
+func handleClient( /*qsess quic.Session*/ ) {
 	qstream, err := qsess.AcceptStream()
 	if err != nil {
 		LogFatal("Unable to accept quic stream", "err", err)
@@ -184,12 +217,13 @@ func Server() {
 		// Receive ping message
 		read, err := qstream.Read(b)
 		if err != nil {
-			qer := qerr.ToQuicError(err)
-			if qer.ErrorCode == qerr.PeerGoingAway {
-				log.Debug("Quic peer disconnected")
-				break
-			}
-			LogFatal("Unable to read", "err", err)
+			//qer := qerr.ToQuicError(err)
+			//if qer.ErrorCode == qerr.PeerGoingAway {
+			//	log.Debug("Quic peer disconnected")
+			//	break
+			//}
+			log.Error("Unable to read", "err", err)
+			break
 		}
 		if string(b[:read]) != ReqMsg {
 			fmt.Println("Received bad message", "expected", ReqMsg,
@@ -204,18 +238,6 @@ func Server() {
 			LogFatal("Wrote incomplete message", "expected", len(ReplyMsg), "actual", written)
 		}
 	}
-}
-
-func initNetwork() {
-	// Initialize default SCION networking context
-	if err := snet.Init(local.IA, *sciond, *dispatcher); err != nil {
-		LogFatal("Unable to initialize SCION network", "err", err)
-	}
-	log.Debug("SCION network successfully initialized")
-	if err := squic.Init("", ""); err != nil {
-		LogFatal("Unable to initialize QUIC/SCION", "err", err)
-	}
-	log.Debug("QUIC/SCION successfully initialized")
 }
 
 type Address snet.Addr
