@@ -31,10 +31,10 @@ import (
 
 // Cfg is a direct Go representation of the JSON file format.
 type Cfg struct {
+	ConfigVersion uint64
 	ASes          map[addr.ISD_AS]*ASEntry
 	Classes       pktcls.ClassMap
 	Actions       pktcls.ActionMap
-	ConfigVersion uint64
 }
 
 // Load a JSON config file from path and parse it into a Cfg struct.
@@ -117,8 +117,16 @@ func (in *IPNet) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (in *IPNet) MarshalJSON() ([]byte, error) {
+	return json.Marshal(in.String())
+}
+
 func (in *IPNet) IPNet() *net.IPNet {
 	return (*net.IPNet)(in)
+}
+
+func (in *IPNet) String() string {
+	return (*net.IPNet)(in).String()
 }
 
 // SIG represents a SIG in a remote IA.
@@ -132,7 +140,6 @@ type SIG struct {
 type SIGSet map[siginfo.SigIdType]*SIG
 
 type PktPolicy struct {
-	SessionId mgmt.SessionType
 	ClassName string
 	SessIds   []mgmt.SessionType
 }

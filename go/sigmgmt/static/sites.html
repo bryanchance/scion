@@ -1,0 +1,31 @@
+{{ template "logs.html" .Log.Records }}
+
+{{ $features := .Features }}
+<h2> Existing sites </h2>
+
+<form action="/config/sites?action=add" method="post">
+<table align="center">
+  <tr> <th> Name </th> <th> VHost </th> <th> Hosts </th>  <th> Metrics Port </th> <th> <th/> </tr>
+  {{ if len .Sites | eq 0 }}
+    <tr> <td colspan="4" class="info"> No sites defined </td> </tr>
+  {{ else }}
+    {{ range .Sites }}
+    <tr> <td> {{.Name}} </td> <td> {{.VHost}} </td> <td> {{.PrintHosts}} </td> <td> {{.MetricsPort}} </td> <td class="actions">
+      {{ if $features.Advanced }}
+        <a title="Delete" href="/config/sites?action=delete&name={{.Name}}"><img class="actionb" src="/static/delete_button.png"/></a>
+      {{ end }}
+        <a title="Configure" href="/config/as?site={{.Name}}"><img class="actionb" src="/static/config_button.png"/></a>
+    </tr>
+    {{ end }}
+  {{ end }}
+  {{ if $features.Advanced }}
+  <tr>
+    <td> <input title="Unique site name" type="text" name="name"/> </td>
+    <td> <input title="VHost" type="text" name="vhost"/> </td>
+    <td> <input title="Hostname/IP address" type="text" name="hosts" style="width:100%;" /> </td>
+    <td> <input title="Port Prometheus metrics are served on" type="text" name="port" style="width:100%;" /> </td>
+    <td> <input type="image" title="Submit" src="/static/add_button.png" alt="Submit" class="submitimg"/> </td>
+  </tr>
+  {{ end }}
+</table>
+</form>

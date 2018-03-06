@@ -1,0 +1,32 @@
+<html>
+  <head><title>Anapaya SIG Policy Configurator</title></head>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=PT+Sans">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inconsolata">
+    <link rel="stylesheet" href="/static/style.css">
+  <body>
+    <div class="header">
+      <div>
+        <a href="https://anapaya.net"> <img id="logo" src="/static/logo.png"/> </a>
+      </div>
+      <div class="title">
+        <p>SIG Policy Configurator</p>
+      </div>
+    </div>
+    <div id="menu">
+      <div> <a href="/config/sites"> Sites </a> </div>
+      <div> <a href="/static/doc/help.md"> Documentation </a> </div>
+      <div> <a href="/static/doc/contact.md"> Contact </a> </div>
+    </div>
+    <div class="container">
+      {{ printf "%s" .Body }}
+    </div>
+    <div class="footer">
+      <span> SIG Policy Configuration v0.2 </span>
+      <span> | </span>
+      <span> © 2018 Anapaya Systems AG </span>
+      <span> | </span>
+      <span> <a href="mailto:info@anapaya.net"> Contact </a> </span>
+  </div>
+  </body>
+</html>
+

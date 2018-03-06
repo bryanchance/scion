@@ -1,0 +1,240 @@
+html {
+    margin: 0;
+    font: 100%/1.4 "PT Sans", sans-serif;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+*,
+*:before,
+*:after {
+    box-sizing: inherit;
+}
+
+body {
+    position: relative;
+    margin: 0;
+    font: 100%/1.4 "PT Sans", sans-serif;
+    padding-bottom: 72px; /* Must be more than .footer height */
+    min-height: 100%;
+}
+
+div.header {
+    height: 64px;
+    margin: 0;
+    background-color: #101824;
+}
+
+div.header #logo {
+    height: 48px;
+    margin: 8px 100px 8px 8px;
+}
+
+div.header div {
+    float: right;
+    color: #fefefe;
+}
+
+div.header .title {
+    float: left;
+    margin: 8px 8px 8px 120px;
+}
+
+div.header .title p {
+    font-size: 24px;
+    line-height: 0;
+}
+
+div#menu {
+    height: 40px;
+    background: #101824;
+    border-top: 1px solid #212121;
+    padding-left: 80px;
+}
+
+div#menu div {
+    color: #fefefe;
+    font-size: 22px;
+    padding-top: 8px;
+    padding-left: 40px;
+    float: left;
+}
+
+div#menu a:link {
+    color: #fefefe;
+    text-decoration: none;
+}
+
+div#menu a:visited {
+    color: #fefefe;
+    text-decoration: none;
+}
+
+div#menu a:hover {
+    color: #DDDDDD;
+    text-decoration: underline;
+}
+
+.container {
+    padding: 24px 30px;
+}
+
+span.error {
+    color: #FF0000;
+}
+
+span.keyword {
+    font-weight: bold;
+}
+
+.container h2 {
+    color: #0070c0;
+    font-weight: bold;
+}
+
+.container h3 {
+    color: #70A0E0;
+    font-weight: bold;
+}
+
+.container h4 {
+    color: #70A0E0;
+    margin-left: 20px;
+}
+
+.container p {
+    margin-left: 12px;
+    margin-right: 12px;
+}
+
+.container pre {
+    background: #efefef;
+    margin-left: 12px;
+    margin-right: 12px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.container table {
+    border-collapse: collapse;
+    margin-left: 80px;
+}
+
+.container td {
+    text-align: left;
+    padding: 2px 8px;
+}
+
+.container th.tail {
+    border-bottom: none;
+}
+
+.container th {
+    text-align: left;
+    border-bottom: 1px solid #000;
+    border-left: 0px;
+    border-right: 0px;
+    padding: 3px 8px;
+}
+
+.container td.info {
+    text-align: center;
+    color: #7e7e7e;
+    font-style: italic;
+}
+
+div.ASPanel {
+    background: #F7F7F7;
+    margin-left: 12px;
+    margin-right: 12px;
+    margin-top: 20px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+/* Web Logger message types */
+div.log, p.code {
+    font: 100%/1.1 "Inconsolata";
+
+    background: #efefef;
+    margin-left: 12px;
+    margin-right: 12px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+div.log p {
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+div.log span.crit {
+    color: #FF0000;
+}
+
+div.log span.eror {
+    color: #FF0000;
+}
+
+div.log span.warn {
+    color: #ffa500;
+}
+
+div.log span.info {
+    color: #000000;
+}
+
+div.log span.dbug {
+    color: #444444;
+}
+
+div.log span.key {
+    font-weight: bold;
+}
+
+td.actions {
+    text-align: right;
+}
+
+img.actionb {
+    vertical-align: middle;
+    height: 16px;
+    width: 16px;
+}
+
+input.submitimg {
+    height: 16px;
+    width: 16px;
+}
+
+.footer {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    padding: 1rem;
+    background-color: #101824;
+    text-align: center;
+    height: 48px;
+    color: #cecece;
+}
+
+.footer span {
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+.footer a:link {
+    color: #cecece;
+    text-decoration: none;
+}
+
+.footer a:visited {
+    color: #cecece;
+    text-decoration: none;
+}
+
+.footer a:hover {
+    color: #DDDDDD;
+    text-decoration: underline;
+}

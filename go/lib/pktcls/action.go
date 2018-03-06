@@ -58,3 +58,7 @@ func (a *ActionFilterPaths) setName(name string) {
 func (a *ActionFilterPaths) Type() string {
 	return TypeActionFilterPaths
 }
+
+func (a *ActionFilterPaths) String() string {
+	return a.Contains.String()
+}
