@@ -130,29 +130,29 @@ func main() {
 	os.Exit(1)
 }
 
-func verifyFlags() (*addr.ISD_AS, error) {
+func verifyFlags() (addr.IA, error) {
 	flag.Parse()
 	if *id == "" {
-		return nil, common.NewBasicError("No element ID specified", nil)
+		return addr.IA{}, common.NewBasicError("No element ID specified", nil)
 	}
 	if *ia == "" {
-		return nil, common.NewBasicError("No ISD-AS specified", nil)
+		return addr.IA{}, common.NewBasicError("No ISD-AS specified", nil)
 	}
 	isdas, err := addr.IAFromString(*ia)
 	if err != nil {
-		return nil, common.NewBasicError("Could not parse ISD-AS", err, "isd-as", ia)
+		return addr.IA{}, common.NewBasicError("Could not parse ISD-AS", err, "isd-as", ia)
 	}
 	if *topofile == "" {
-		return nil, common.NewBasicError("No static topology file specified", nil)
+		return addr.IA{}, common.NewBasicError("No static topology file specified", nil)
 	}
 	if *aclfile == "" {
-		return nil, common.NewBasicError("No ACL file specified", nil)
+		return addr.IA{}, common.NewBasicError("No ACL file specified", nil)
 	}
 	if *laddress == "" {
-		return nil, common.NewBasicError("No address to listen on specified", nil)
+		return addr.IA{}, common.NewBasicError("No address to listen on specified", nil)
 	}
 	if *zk == "" {
-		return nil, common.NewBasicError("No Zookeeper specified", nil)
+		return addr.IA{}, common.NewBasicError("No Zookeeper specified", nil)
 	}
 	return isdas, nil
 }

@@ -35,14 +35,14 @@ type validatedForm struct {
 	dbase          *db.DB
 	request        *http.Request
 	site           *db.Site
-	ia             *addr.ISD_AS
+	ia             addr.IA
 	siteCfg        *sigcfg.Cfg
 	sig            *sigcfg.SIG
 	cidr           *net.IPNet
 	filter         *pktcls.ActionFilterPaths
 	session        *sigcfg.Session
-	policies       map[addr.ISD_AS]string
-	sessionAliases map[addr.ISD_AS]db.SessionAliasMap
+	policies       map[addr.IA]string
+	sessionAliases map[addr.IA]db.SessionAliasMap
 	policy         *string
 	webAppCfg      *config.Global
 	parsed         map[string]bool
@@ -83,8 +83,8 @@ func (vf *validatedForm) GetSite() *db.Site {
 	return vf.site
 }
 
-func (vf *validatedForm) GetIA() *addr.ISD_AS {
-	var ia *addr.ISD_AS
+func (vf *validatedForm) GetIA() addr.IA {
+	var ia addr.IA
 	if !vf.parsed["ia"] {
 		vf.parsed["ia"] = true
 		var err error
@@ -96,7 +96,7 @@ func (vf *validatedForm) GetIA() *addr.ISD_AS {
 		}
 		if ia, err = addr.IAFromString(iaStr); err != nil {
 			vf.log.Error("Unable to parse ISD-AS value", "ia", iaStr, "err", err)
-			return nil
+			return ia
 		}
 		vf.ia = ia
 	}
@@ -199,7 +199,7 @@ func (vf *validatedForm) GetPolicy() *string {
 	return vf.policy
 }
 
-func (vf *validatedForm) GetPolicies() map[addr.ISD_AS]string {
+func (vf *validatedForm) GetPolicies() map[addr.IA]string {
 	var err error
 	site := vf.GetSite()
 	if site == nil {
@@ -211,7 +211,7 @@ func (vf *validatedForm) GetPolicies() map[addr.ISD_AS]string {
 	return vf.policies
 }
 
-func (vf *validatedForm) GetSessionAliases() map[addr.ISD_AS]db.SessionAliasMap {
+func (vf *validatedForm) GetSessionAliases() map[addr.IA]db.SessionAliasMap {
 	var err error
 	site := vf.GetSite()
 	if site == nil {
@@ -224,12 +224,12 @@ func (vf *validatedForm) GetSessionAliases() map[addr.ISD_AS]db.SessionAliasMap 
 }
 
 func (vf *validatedForm) DeleteIA() {
-	ia := vf.GetIA()
 	site := vf.GetSite()
-	if ia == nil || site == nil {
+	ia := vf.GetIA()
+	if site == nil || ia.IsZero() {
 		return
 	}
-	if err := vf.dbase.DeleteAS(site.Name, *ia); err != nil {
+	if err := vf.dbase.DeleteAS(site.Name, ia); err != nil {
 		vf.log.Error("Unable to delete AS from database", "err", err)
 	}
 }
@@ -237,10 +237,10 @@ func (vf *validatedForm) DeleteIA() {
 func (vf *validatedForm) AddIA() {
 	site := vf.GetSite()
 	ia := vf.GetIA()
-	if site == nil || ia == nil {
+	if site == nil || ia.IsZero() {
 		return
 	}
-	if err := vf.dbase.InsertAS(site.Name, *ia); err != nil {
+	if err := vf.dbase.InsertAS(site.Name, ia); err != nil {
 		vf.log.Error("Unable to insert AS into database", "err", err)
 	}
 }
@@ -249,10 +249,10 @@ func (vf *validatedForm) AddNetwork() {
 	site := vf.GetSite()
 	ia := vf.GetIA()
 	cidr := vf.GetCIDR()
-	if site == nil || ia == nil || cidr == nil {
+	if site == nil || ia.IsZero() || cidr == nil {
 		return
 	}
-	if err := vf.dbase.InsertNetwork(site.Name, *ia, cidr); err != nil {
+	if err := vf.dbase.InsertNetwork(site.Name, ia, cidr); err != nil {
 		vf.log.Error("Unable to insert network into database", "err", err)
 	}
 }
@@ -261,10 +261,10 @@ func (vf *validatedForm) DeleteNetwork() {
 	site := vf.GetSite()
 	ia := vf.GetIA()
 	cidr := vf.GetCIDR()
-	if site == nil || ia == nil || cidr == nil {
+	if site == nil || ia.IsZero() || cidr == nil {
 		return
 	}
-	if err := vf.dbase.DeleteNetwork(site.Name, *ia, cidr.String()); err != nil {
+	if err := vf.dbase.DeleteNetwork(site.Name, ia, cidr.String()); err != nil {
 		vf.log.Error("Unable to delete network from database", "err", err)
 	}
 }
@@ -273,10 +273,10 @@ func (vf *validatedForm) AddSIG() {
 	site := vf.GetSite()
 	ia := vf.GetIA()
 	sig := vf.GetSIG()
-	if site == nil || ia == nil || sig == nil {
+	if site == nil || ia.IsZero() || sig == nil {
 		return
 	}
-	if err := vf.dbase.InsertSIG(site.Name, *ia, sig); err != nil {
+	if err := vf.dbase.InsertSIG(site.Name, ia, sig); err != nil {
 		vf.log.Error("Unable to insert SIG into database", "err", err)
 	}
 }
@@ -289,7 +289,7 @@ func (vf *validatedForm) DeleteSIG() {
 		vf.log.Error("Unable to parse ISD-AS value", "err", err)
 		return
 	}
-	if err := vf.dbase.DeleteSIG(site, *ia, sigName); err != nil {
+	if err := vf.dbase.DeleteSIG(site, ia, sigName); err != nil {
 		vf.log.Error("Unable to delete SIG from database", "err", err)
 		return
 	}
@@ -319,10 +319,10 @@ func (vf *validatedForm) AddSession() {
 	site := vf.GetSite()
 	ia := vf.GetIA()
 	session := vf.GetSession()
-	if site == nil || ia == nil || session == nil {
+	if site == nil || ia.IsZero() || session == nil {
 		return
 	}
-	if err := vf.dbase.InsertSession(site.Name, *ia, uint8(session.ID), session.PolName); err != nil {
+	if err := vf.dbase.InsertSession(site.Name, ia, uint8(session.ID), session.PolName); err != nil {
 		vf.log.Error("Unable to insert Session into database", "err", err)
 	}
 }
@@ -331,7 +331,7 @@ func (vf *validatedForm) DeleteSession() {
 	site := vf.GetSite()
 	ia := vf.GetIA()
 	session := vf.GetSession()
-	if err := vf.dbase.DeleteSession(site.Name, *ia, uint8(session.ID)); err != nil {
+	if err := vf.dbase.DeleteSession(site.Name, ia, uint8(session.ID)); err != nil {
 		vf.log.Error("Unable to delete Session from database", "err", err)
 	}
 }
@@ -342,11 +342,11 @@ func (vf *validatedForm) SetPolicy() {
 	policy := vf.GetPolicy()
 	// Compile the new policy rules to test for correctness prior to committing
 	// to the database.
-	if site == nil || ia == nil || policy == nil {
+	if site == nil || ia.IsZero() || policy == nil {
 		return
 	}
-	policies := map[addr.ISD_AS]string{
-		*ia: *policy,
+	policies := map[addr.IA]string{
+		ia: *policy,
 	}
 	siteConfig := vf.GetSiteConfig()
 	aliases := vf.GetSessionAliases()
@@ -358,7 +358,7 @@ func (vf *validatedForm) SetPolicy() {
 		return
 	}
 
-	if err := vf.dbase.SetPolicy(site.Name, *ia, *policy); err != nil {
+	if err := vf.dbase.SetPolicy(site.Name, ia, *policy); err != nil {
 		vf.log.Error("Unable to insert policy into database", "err", err)
 		return
 	}

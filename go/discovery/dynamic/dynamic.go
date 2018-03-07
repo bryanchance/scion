@@ -28,7 +28,7 @@ import (
 var baseTopo *topology.RawTopo
 var TopoFull *util.AtomicTopo
 var TopoLimited *util.AtomicTopo
-var isd_as *addr.ISD_AS
+var isd_as addr.IA
 
 const (
 	ERRCONN           = "connect-error"
@@ -55,9 +55,9 @@ func init() {
 	TopoLimited.Store([]byte{})
 }
 
-func Setup(IA *addr.ISD_AS, basetopofn string) error {
+func Setup(ia addr.IA, basetopofn string) error {
 	var err error
-	isd_as = IA
+	isd_as = ia
 	baseTopo, err = topology.LoadRawFromFile(basetopofn)
 	return err
 }
@@ -175,9 +175,9 @@ func marshallAndUpdate(rt *topology.RawTopo, topo *util.AtomicTopo) error {
 	return nil
 }
 
-func fillService(c *zk.Conn, isd_as *addr.ISD_AS, servicetype string,
+func fillService(c *zk.Conn, ia addr.IA, servicetype string,
 	fallback map[string]topology.RawAddrInfo) (map[string]topology.RawAddrInfo, string) {
-	service, err := getZkService(c, isd_as, servicetype)
+	service, err := getZkService(c, ia, servicetype)
 	if err != nil {
 		log.Warn("Could not fetch service entries from ZK, using fallback",
 			"servicetype", servicetype, "err", err)
@@ -190,10 +190,10 @@ func fillService(c *zk.Conn, isd_as *addr.ISD_AS, servicetype string,
 	return service, SUCCESS
 }
 
-func getZkService(connection *zk.Conn, isdas *addr.ISD_AS,
+func getZkService(connection *zk.Conn, ia addr.IA,
 	servertype string) (map[string]topology.RawAddrInfo, error) {
 	services := make(map[string]topology.RawAddrInfo)
-	partybase := fmt.Sprintf("/%s/%s/party", isdas, servertype)
+	partybase := fmt.Sprintf("/%s/%s/party", ia, servertype)
 	children, _, err := connection.Children(partybase)
 	if err != nil {
 		return nil, err

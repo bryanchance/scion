@@ -31,10 +31,10 @@ import (
 
 // Cfg is a direct Go representation of the JSON file format.
 type Cfg struct {
-	ConfigVersion uint64
-	ASes          map[addr.ISD_AS]*ASEntry
+	ASes          map[addr.IA]*ASEntry
 	Classes       pktcls.ClassMap
 	Actions       pktcls.ActionMap
+	ConfigVersion uint64
 }
 
 // Load a JSON config file from path and parse it into a Cfg struct.

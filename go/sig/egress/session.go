@@ -41,7 +41,7 @@ type SessionSet map[mgmt.SessionType]*Session
 // configurable routing.
 type Session struct {
 	log.Logger
-	IA     *addr.ISD_AS
+	IA     addr.IA
 	SessId mgmt.SessionType
 
 	// used when updating the path policy or its name
@@ -65,7 +65,7 @@ type Session struct {
 	workerStopped  chan struct{}
 }
 
-func NewSession(dstIA *addr.ISD_AS, sessId mgmt.SessionType,
+func NewSession(dstIA addr.IA, sessId mgmt.SessionType,
 	sigMap *siginfo.SigMap, logger log.Logger,
 	polName string, policy *pathmgr.PathPredicate) (*Session, error) {
 	var err error

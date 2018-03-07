@@ -42,7 +42,7 @@ const (
 	ReplyMsg        = "pong!"
 )
 
-func GetDefaultSCIONDPath(ia *addr.ISD_AS) string {
+func GetDefaultSCIONDPath(ia addr.IA) string {
 	return fmt.Sprintf("/run/shm/sciond/sd%v.sock", ia)
 }
 
@@ -122,7 +122,7 @@ func Client() {
 
 	b := make([]byte, 1<<12)
 	for i := 0; i < *count || *count == 0; i++ {
-		if i != 0 {
+		if i != 0 && *interval != 0 {
 			time.Sleep(*interval)
 		}
 

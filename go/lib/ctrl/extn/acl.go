@@ -16,7 +16,7 @@ type PushACL struct {
 	Permit []addr.IAInt `capnp:"permit"`
 }
 
-func NewPushACLFromValues(acl []*addr.ISD_AS) *PushACL {
+func NewPushACLFromValues(acl []addr.IA) *PushACL {
 	msg := &PushACL{}
 	for i := range acl {
 		msg.Permit = append(msg.Permit, acl[i].IAInt())
@@ -45,8 +45,8 @@ func (acl *PushACL) String() string {
 	return fmt.Sprintf("Permit: %v", acl.Permit)
 }
 
-func (acl *PushACL) ACL() []*addr.ISD_AS {
-	v := make([]*addr.ISD_AS, len(acl.Permit))
+func (acl *PushACL) ACL() []addr.IA {
+	v := make([]addr.IA, len(acl.Permit))
 	for i := range acl.Permit {
 		v[i] = addr.IAInt(acl.Permit[i]).IA()
 	}

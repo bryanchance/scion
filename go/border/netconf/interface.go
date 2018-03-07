@@ -135,7 +135,7 @@ type Interface struct {
 	// of the link.
 	RemoteAddr *topology.AddrInfo
 	// RemoteIA is the ISD-AS of the other end of the link.
-	RemoteIA *addr.ISD_AS
+	RemoteIA addr.IA
 	// BW is the bandwidth of the link.
 	BW int
 	// MTU is the maximum packet size allowed on the link, in bytes.
@@ -145,7 +145,7 @@ type Interface struct {
 	// TODO(kormat): switch to a non-string type.
 	Type topology.LinkType
 	// Source AS filters to push to neighboring BR
-	PushACL []*addr.ISD_AS
+	PushACL []addr.IA
 }
 
 // intfFromTopoIF is a constructor to create a new Interface instance from a

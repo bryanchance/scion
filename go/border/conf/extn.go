@@ -12,11 +12,11 @@ import (
 const ExtnCfgName = "extn.json"
 
 type ExtnConf struct {
-	IFCfg map[common.IFIDType][]*addr.ISD_AS
+	IFCfg map[common.IFIDType][]addr.IA
 }
 
 func ExtnLoadFromFile(path string) (*ExtnConf, error) {
-	ec := &ExtnConf{IFCfg: make(map[common.IFIDType][]*addr.ISD_AS)}
+	ec := &ExtnConf{IFCfg: make(map[common.IFIDType][]addr.IA)}
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {

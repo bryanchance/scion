@@ -181,7 +181,7 @@ func (db *DB) QuerySites() (map[string]*Site, error) {
 	return sites, rows.Err()
 }
 
-func (db *DB) InsertAS(site string, ia addr.ISD_AS) error {
+func (db *DB) InsertAS(site string, ia addr.IA) error {
 	// Insert an empty string in the policy field to not have the hassle of
 	// dealing with NULLs
 	_, err := db.Exec(
@@ -190,23 +190,23 @@ func (db *DB) InsertAS(site string, ia addr.ISD_AS) error {
 	return err
 }
 
-func (db *DB) DeleteAS(site string, ia addr.ISD_AS) error {
+func (db *DB) DeleteAS(site string, ia addr.IA) error {
 	_, err := db.Exec(
 		`DELETE FROM ASEntries WHERE IsdID = ? AND AsID = ? AND Site = ?`,
 		ia.I, ia.A, site)
 	return err
 }
 
-func (db *DB) QueryASes(site string) ([]addr.ISD_AS, error) {
+func (db *DB) QueryASes(site string) ([]addr.IA, error) {
 	rows, err := db.Query(`SELECT IsdID, AsID FROM ASEntries WHERE Site = ?`, site)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var ases []addr.ISD_AS
+	var ases []addr.IA
 	for rows.Next() {
-		ia := addr.ISD_AS{}
+		ia := addr.IA{}
 		err := rows.Scan(&ia.I, &ia.A)
 		if err != nil {
 			return nil, err
@@ -216,14 +216,14 @@ func (db *DB) QueryASes(site string) ([]addr.ISD_AS, error) {
 	return ases, rows.Err()
 }
 
-func (db *DB) SetPolicy(site string, ia addr.ISD_AS, policy string) error {
+func (db *DB) SetPolicy(site string, ia addr.IA, policy string) error {
 	_, err := db.Exec(
 		`UPDATE ASEntries SET Policy = ?  WHERE Site = ? AND IsdID = ? AND AsID = ?`,
 		policy, site, ia.I, ia.A)
 	return err
 }
 
-func (db *DB) GetPolicy(site string, ia addr.ISD_AS) (string, error) {
+func (db *DB) GetPolicy(site string, ia addr.IA) (string, error) {
 	var policy string
 	err := db.QueryRow(
 		`SELECT Policy FROM ASEntries WHERE Site = ? AND IsdID = ? AND AsID = ?`,
@@ -234,26 +234,26 @@ func (db *DB) GetPolicy(site string, ia addr.ISD_AS) (string, error) {
 	return policy, nil
 }
 
-func (db *DB) GetPolicies(site string) (map[addr.ISD_AS]string, error) {
+func (db *DB) GetPolicies(site string) (map[addr.IA]string, error) {
 	rows, err := db.Query(`SELECT IsdID, AsID, Policy FROM ASEntries WHERE Site = ?`, site)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	policies := make(map[addr.ISD_AS]string)
+	policies := make(map[addr.IA]string)
 	for rows.Next() {
 		var isd, as int
 		var policy string
 		if err := rows.Scan(&isd, &as, &policy); err != nil {
 			return nil, err
 		}
-		policies[addr.ISD_AS{I: isd, A: as}] = policy
+		policies[addr.IA{I: isd, A: as}] = policy
 	}
 	return policies, rows.Err()
 }
 
-func (db *DB) InsertSIG(site string, ia addr.ISD_AS, sig *config.SIG) error {
+func (db *DB) InsertSIG(site string, ia addr.IA, sig *config.SIG) error {
 	_, err := db.Exec(
 		`INSERT INTO SIGs (Name, Address, CtrlPort, EncapPort, IsdID, AsID, Site)
 			VALUES(?, ?, ?, ?, ?, ?, ?)`,
@@ -261,14 +261,14 @@ func (db *DB) InsertSIG(site string, ia addr.ISD_AS, sig *config.SIG) error {
 	return err
 }
 
-func (db *DB) DeleteSIG(site string, ia addr.ISD_AS, sigName string) error {
+func (db *DB) DeleteSIG(site string, ia addr.IA, sigName string) error {
 	_, err := db.Exec(
 		`DELETE FROM SIGs WHERE Name = ? AND IsdID = ? AND AsID = ? AND Site = ?`,
 		sigName, ia.I, ia.A, site)
 	return err
 }
 
-func (db *DB) QuerySIGs(site string, ia addr.ISD_AS) (config.SIGSet, error) {
+func (db *DB) QuerySIGs(site string, ia addr.IA) (config.SIGSet, error) {
 	rows, err := db.Query(
 		`SELECT Name, Address, CtrlPort, EncapPort FROM SIGs
 			WHERE Site = ? AND IsdID = ? AND AsID = ?`,
@@ -298,21 +298,21 @@ func (db *DB) QuerySIGs(site string, ia addr.ISD_AS) (config.SIGSet, error) {
 	return sigs, rows.Err()
 }
 
-func (db *DB) InsertNetwork(site string, ia addr.ISD_AS, network *net.IPNet) error {
+func (db *DB) InsertNetwork(site string, ia addr.IA, network *net.IPNet) error {
 	_, err := db.Exec(
 		`INSERT INTO Networks (CIDR, Site, IsdID, AsID) VALUES (?, ?, ?, ?)`,
 		network.String(), site, ia.I, ia.A)
 	return err
 }
 
-func (db *DB) DeleteNetwork(site string, ia addr.ISD_AS, network string) error {
+func (db *DB) DeleteNetwork(site string, ia addr.IA, network string) error {
 	_, err := db.Exec(
 		`DELETE FROM Networks WHERE CIDR = ? AND IsdID = ? AND AsID = ? AND Site = ?`,
 		network, ia.I, ia.A, site)
 	return err
 }
 
-func (db *DB) QueryNetworks(site string, ia addr.ISD_AS) ([]*config.IPNet, error) {
+func (db *DB) QueryNetworks(site string, ia addr.IA) ([]*config.IPNet, error) {
 	rows, err := db.Query(
 		`SELECT CIDR FROM Networks WHERE site = ? AND IsdID = ? AND AsID = ?`,
 		site, ia.I, ia.A)
@@ -372,21 +372,21 @@ func (db *DB) QueryFilters(site string) (pktcls.ActionMap, error) {
 	return actionMap, rows.Err()
 }
 
-func (db *DB) InsertSession(site string, ia addr.ISD_AS, name uint8, filter string) error {
+func (db *DB) InsertSession(site string, ia addr.IA, name uint8, filter string) error {
 	_, err := db.Exec(
 		`INSERT INTO Sessions (Name, FilterName, Site, IsdID, AsID) VALUES (?, ?, ?, ?, ?)`,
 		name, filter, site, ia.I, ia.A)
 	return err
 }
 
-func (db *DB) DeleteSession(site string, ia addr.ISD_AS, name uint8) error {
+func (db *DB) DeleteSession(site string, ia addr.IA, name uint8) error {
 	_, err := db.Exec(
 		`DELETE FROM Sessions WHERE Name = ? AND Site = ? AND IsdID = ? AND AsID = ?`,
 		name, site, ia.I, ia.A)
 	return err
 }
 
-func (db *DB) QuerySessions(site string, ia addr.ISD_AS) (config.SessionMap, error) {
+func (db *DB) QuerySessions(site string, ia addr.IA) (config.SessionMap, error) {
 	rows, err := db.Query(
 		`SELECT Name, FilterName FROM Sessions WHERE Site = ? AND IsdID = ? AND AsID = ?`,
 		site, ia.I, ia.A)
@@ -407,7 +407,7 @@ func (db *DB) QuerySessions(site string, ia addr.ISD_AS) (config.SessionMap, err
 	return sessionMap, rows.Err()
 }
 
-func (db *DB) InsertSessionAlias(site string, ia addr.ISD_AS, name string,
+func (db *DB) InsertSessionAlias(site string, ia addr.IA, name string,
 	sessions []uint8) error {
 
 	_, err := db.Exec(
@@ -416,14 +416,14 @@ func (db *DB) InsertSessionAlias(site string, ia addr.ISD_AS, name string,
 	return err
 }
 
-func (db *DB) DeleteSessionAlias(site string, ia addr.ISD_AS, name string) error {
+func (db *DB) DeleteSessionAlias(site string, ia addr.IA, name string) error {
 	_, err := db.Exec(
 		`DELETE FROM SessionAliases WHERE Name = ? AND Site = ? AND IsdID = ? AND AsID = ?`,
 		name, site, ia.I, ia.A)
 	return err
 }
 
-func (db *DB) GetSessionAliases(site string) (map[addr.ISD_AS]SessionAliasMap, error) {
+func (db *DB) GetSessionAliases(site string) (map[addr.IA]SessionAliasMap, error) {
 	rows, err := db.Query(
 		`SELECT Name, Sessions, IsdID, AsID FROM SessionAliases WHERE Site = ?`, site)
 	if err != nil {
@@ -431,14 +431,14 @@ func (db *DB) GetSessionAliases(site string) (map[addr.ISD_AS]SessionAliasMap, e
 	}
 	defer rows.Close()
 
-	sessionAliases := make(map[addr.ISD_AS]SessionAliasMap)
+	sessionAliases := make(map[addr.IA]SessionAliasMap)
 	for rows.Next() {
 		var aliasName, sessionList string
 		var isd, as int
 		if err := rows.Scan(&aliasName, &sessionList, &isd, &as); err != nil {
 			return nil, err
 		}
-		ia := addr.ISD_AS{I: isd, A: as}
+		ia := addr.IA{I: isd, A: as}
 		_, ok := sessionAliases[ia]
 		if !ok {
 			sessionAliases[ia] = make(SessionAliasMap)
@@ -454,7 +454,7 @@ func (db *DB) GetSiteConfig(site string) (*config.Cfg, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfg.ASes = make(map[addr.ISD_AS]*config.ASEntry)
+	cfg.ASes = make(map[addr.IA]*config.ASEntry)
 	for _, ia := range ases {
 		asEntry, err := db.GetASDetails(site, ia)
 		if err != nil {
@@ -470,7 +470,7 @@ func (db *DB) GetSiteConfig(site string) (*config.Cfg, error) {
 	return cfg, nil
 }
 
-func (db *DB) GetASDetails(site string, ia addr.ISD_AS) (*config.ASEntry, error) {
+func (db *DB) GetASDetails(site string, ia addr.IA) (*config.ASEntry, error) {
 	networks, err := db.QueryNetworks(site, ia)
 	if err != nil {
 		return nil, err

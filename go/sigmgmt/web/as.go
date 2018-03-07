@@ -17,8 +17,8 @@ import (
 type ASFormData struct {
 	Site              *db.Site
 	Cfg               *sigcfg.Cfg
-	Policies          map[addr.ISD_AS]string
-	AllSessionAliases map[addr.ISD_AS]db.SessionAliasMap
+	Policies          map[addr.IA]string
+	AllSessionAliases map[addr.IA]db.SessionAliasMap
 	Log               log.Logger
 	Features          config.FeatureLevel
 }
@@ -67,15 +67,16 @@ func BuildASFormData(webAppCfg *config.Global, dbase *db.DB, r *http.Request) *A
 	return data
 }
 
-func getPolicyFromIA(policies map[addr.ISD_AS]string, ia addr.ISD_AS) string {
+func getPolicyFromIA(policies map[addr.IA]string, ia addr.IA) string {
 	return policies[ia]
 }
 
-func getSessionAliasesFromIA(sessionAliasesMap map[addr.ISD_AS]db.SessionAliasMap, ia addr.ISD_AS) db.SessionAliasMap {
+func getSessionAliasesFromIA(sessionAliasesMap map[addr.IA]db.SessionAliasMap,
+	ia addr.IA) db.SessionAliasMap {
 	return sessionAliasesMap[ia]
 }
 
-func sortByIA(collection map[addr.ISD_AS]*sigcfg.ASEntry) map[addr.IAInt]interface{} {
+func sortByIA(collection map[addr.IA]*sigcfg.ASEntry) map[addr.IAInt]interface{} {
 	m := make(map[addr.IAInt]interface{})
 	for k, v := range collection {
 		m[k.IAInt()] = v
@@ -83,6 +84,6 @@ func sortByIA(collection map[addr.ISD_AS]*sigcfg.ASEntry) map[addr.IAInt]interfa
 	return m
 }
 
-func iaIntToIA(i addr.IAInt) addr.ISD_AS {
-	return *i.IA()
+func iaIntToIA(i addr.IAInt) addr.IA {
+	return i.IA()
 }

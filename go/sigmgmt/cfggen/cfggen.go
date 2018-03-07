@@ -29,8 +29,8 @@ import (
 // Compile inserts the rule specified by command into cfg. Any overwrites
 // happen silently. classID is used to derive a class name if one isn't found
 // in parameter command.
-func Compile(cfg *config.Cfg, policies map[addr.ISD_AS]string,
-	aliases map[addr.ISD_AS]db.SessionAliasMap) error {
+func Compile(cfg *config.Cfg, policies map[addr.IA]string,
+	aliases map[addr.IA]db.SessionAliasMap) error {
 
 	if cfg.Classes == nil {
 		cfg.Classes = make(pktcls.ClassMap)

@@ -55,13 +55,10 @@ func (m *ACLMap) Range(f func(key common.IFIDType, value ACL) bool) {
 	})
 }
 
-type ACL []*addr.ISD_AS
+type ACL []addr.IA
 
 // Match returns true if ia is in acl and false otherwise.
-func (acl ACL) Match(ia *addr.ISD_AS) bool {
-	if ia == nil {
-		return false
-	}
+func (acl ACL) Match(ia addr.IA) bool {
 	for _, aclIA := range acl {
 		if ia.Eq(aclIA) {
 			return true
