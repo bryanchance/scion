@@ -1,4 +1,4 @@
-// Copyright 2016 ETH Zurich
+// Copyright 2018 ETH Zurich
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,27 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package version
 
 import (
-	"github.com/scionproto/scion/go/lib/common"
+	"fmt"
+
+	"github.com/scionproto/scion/go/tools/scion-pki/internal/base"
 )
 
-// CalcPadding returns the number of padding bytes needed to round length bytes
-// to a multiple of blkSize
-func CalcPadding(length, blkSize int) int {
-	spare := length % blkSize
-	if spare != 0 {
-		return blkSize - spare
-	}
-	return 0
+const (
+	major = 0
+	minor = 1
+)
+
+var CmdVersion = &base.Command{
+	Name:      "version",
+	Run:       runVersion,
+	UsageLine: "version",
+	Short:     "Print scion-pki version",
+	Long:      "Print scion-pki version",
 }
 
-func FillPadding(b common.RawBytes, length, blkSize int) int {
-	padding := CalcPadding(length, blkSize)
-	total := length + padding
-	for i := range b[length:total] {
-		b[length+i] = 0
+func runVersion(cmd *base.Command, args []string) {
+	if len(args) != 0 {
+		cmd.Usage()
 	}
-	return total
+	fmt.Printf("SCION Control Plane PKI tool v%d.%d\n", major, minor)
 }
