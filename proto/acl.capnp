@@ -4,5 +4,5 @@ $Go.package("proto");
 $Go.import("github.com/scionproto/scion/go/proto");
 
 struct PushACL {
-    permit @0 :List(UInt32);
+    permit @0 :List(UInt64);
 }

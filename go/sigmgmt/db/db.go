@@ -243,12 +243,12 @@ func (db *DB) GetPolicies(site string) (map[addr.IA]string, error) {
 
 	policies := make(map[addr.IA]string)
 	for rows.Next() {
-		var isd, as int
+		var ia addr.IA
 		var policy string
-		if err := rows.Scan(&isd, &as, &policy); err != nil {
+		if err := rows.Scan(&ia.I, &ia.A, &policy); err != nil {
 			return nil, err
 		}
-		policies[addr.IA{I: isd, A: as}] = policy
+		policies[ia] = policy
 	}
 	return policies, rows.Err()
 }
@@ -434,11 +434,10 @@ func (db *DB) GetSessionAliases(site string) (map[addr.IA]SessionAliasMap, error
 	sessionAliases := make(map[addr.IA]SessionAliasMap)
 	for rows.Next() {
 		var aliasName, sessionList string
-		var isd, as int
-		if err := rows.Scan(&aliasName, &sessionList, &isd, &as); err != nil {
+		var ia addr.IA
+		if err := rows.Scan(&aliasName, &sessionList, &ia.I, &ia.A); err != nil {
 			return nil, err
 		}
-		ia := addr.IA{I: isd, A: as}
 		_, ok := sessionAliases[ia]
 		if !ok {
 			sessionAliases[ia] = make(SessionAliasMap)
