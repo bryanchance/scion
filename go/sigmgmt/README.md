@@ -1,3 +1,11 @@
+## Running
+
+Make sure the config output directory `output` exists in the running folder. And you have a config file.
+
+Then run the interface e.g. with `go run main.go -id=sm4-21-9 -bind=:8080 -config=cfg.json`.
+
+## Configuration
+
 The SIG Policy Configurator needs a json config file to run. The following keys are defined:
 * **Features** (integer). The feature set the web UI should expose to users. Two
   feature sets are defined:

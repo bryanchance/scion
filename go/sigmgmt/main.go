@@ -22,6 +22,7 @@ var (
 )
 
 func main() {
+	liblog.AddDefaultLogFlags()
 	flag.Parse()
 	liblog.Setup(*id)
 
