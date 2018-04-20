@@ -24,7 +24,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/lib/pathmgr"
+	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/lib/pktdisp"
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/lib/snet"
@@ -47,7 +47,7 @@ type Session struct {
 	// used when updating the path policy or its name
 	policyLock sync.Mutex
 	// used by pathmgr to filter the paths in the pool
-	policy  *pathmgr.PathPredicate
+	policy  *pktcls.ActionFilterPaths
 	polName string
 
 	// pool of paths, managed by pathmgr
@@ -67,7 +67,7 @@ type Session struct {
 
 func NewSession(dstIA addr.IA, sessId mgmt.SessionType,
 	sigMap *siginfo.SigMap, logger log.Logger,
-	polName string, policy *pathmgr.PathPredicate) (*Session, error) {
+	polName string, policy *pktcls.ActionFilterPaths) (*Session, error) {
 	var err error
 	s := &Session{
 		Logger:  logger.New("sessId", sessId),
@@ -78,7 +78,8 @@ func NewSession(dstIA addr.IA, sessId mgmt.SessionType,
 		pool:    NewAtomicSP(),
 		sigMap:  sigMap,
 	}
-	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, s.policy)
+	// FIXME(scrye): CRITICAL change nil below to s.policy
+	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -128,20 +129,23 @@ func (s *Session) Healthy() bool {
 	return s.healthy.Load().(bool)
 }
 
-func (s *Session) UpdatePolicy(name string, pred *pathmgr.PathPredicate) error {
+func (s *Session) UpdatePolicy(name string, afp *pktcls.ActionFilterPaths) error {
 	s.policyLock.Lock()
 	defer s.policyLock.Unlock()
 
-	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, pred)
+	// FIXME(scrye): CRITICAL change nil below to afp once pathmgr is patched
+	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, nil)
 	if err != nil {
 		return common.NewBasicError("Unable to register watch", err)
 	}
 	// Store old predicate so we can unwatch it later
 	oldPred := s.policy
 	s.polName = name
-	s.policy = pred
+	s.policy = afp
 	s.pool.UpdateSP(pool)
-	if err := sigcmn.PathMgr.UnwatchFilter(sigcmn.IA, s.IA, oldPred); err != nil {
+	_ = oldPred
+	// FIXME(scrye): CRITICAL change nil below to oldPred once pathmgr is patched
+	if err := sigcmn.PathMgr.UnwatchFilter(sigcmn.IA, s.IA, nil); err != nil {
 		return common.NewBasicError("Unable to unregister watch", err)
 	}
 	return nil

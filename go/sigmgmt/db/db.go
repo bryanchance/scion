@@ -367,7 +367,7 @@ func (db *DB) QueryFilters(site string) (pktcls.ActionMap, error) {
 			// Bug in pre-insertion validation
 			panic(fmt.Sprintf("bad filter string in db: %s", ppString))
 		}
-		actionMap[name] = pktcls.NewActionFilterPaths(name, pp)
+		actionMap[name] = pktcls.NewActionFilterPaths(name, pktcls.NewCondPathPredicate(pp))
 	}
 	return actionMap, rows.Err()
 }

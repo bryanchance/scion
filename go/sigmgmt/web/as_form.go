@@ -17,7 +17,6 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/pathmgr"
-	"github.com/scionproto/scion/go/lib/pktcls"
 	sigcfg "github.com/scionproto/scion/go/sig/config"
 	"github.com/scionproto/scion/go/sig/mgmt"
 	"github.com/scionproto/scion/go/sig/siginfo"
@@ -39,7 +38,8 @@ type validatedForm struct {
 	siteCfg        *sigcfg.Cfg
 	sig            *sigcfg.SIG
 	cidr           *net.IPNet
-	filter         *pktcls.ActionFilterPaths
+	filterName     string
+	filter         *pathmgr.PathPredicate
 	session        *sigcfg.Session
 	policies       map[addr.IA]string
 	sessionAliases map[addr.IA]db.SessionAliasMap
@@ -145,17 +145,18 @@ func (vf *validatedForm) GetSIG() *sigcfg.SIG {
 	return vf.sig
 }
 
-func (vf *validatedForm) GetFilter() *pktcls.ActionFilterPaths {
+func (vf *validatedForm) GetFilter() (string, *pathmgr.PathPredicate) {
 	if !vf.parsed["filter"] {
 		vf.parsed["filter"] = true
 		pp, err := pathmgr.NewPathPredicate(vf.request.Form.Get("pp"))
 		if err != nil {
 			vf.log.Error("Bad path selector string", "err", err)
-			return nil
+			return "", nil
 		}
-		vf.filter = pktcls.NewActionFilterPaths(vf.request.Form.Get("name"), pp)
+		vf.filterName = vf.request.Form.Get("name")
+		vf.filter = pp
 	}
-	return vf.filter
+	return vf.filterName, vf.filter
 }
 
 func (vf *validatedForm) GetSession() *sigcfg.Session {
@@ -297,11 +298,11 @@ func (vf *validatedForm) DeleteSIG() {
 
 func (vf *validatedForm) AddPathPredicate() {
 	site := vf.GetSite()
-	filter := vf.GetFilter()
+	filterName, filter := vf.GetFilter()
 	if site == nil || filter == nil {
 		return
 	}
-	if err := vf.dbase.InsertFilter(site.Name, filter.Name, filter.Contains); err != nil {
+	if err := vf.dbase.InsertFilter(site.Name, filterName, filter); err != nil {
 		vf.log.Error("Unable to insert path predicate into database", "err", err)
 	}
 }

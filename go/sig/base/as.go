@@ -25,7 +25,6 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	liblog "github.com/scionproto/scion/go/lib/log"
-	"github.com/scionproto/scion/go/lib/pathmgr"
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/sig/config"
@@ -292,17 +291,17 @@ func (ae *ASEntry) delOldSessions(cfgs config.SessionSet) egress.SessionSet {
 
 // AddSession idempotently adds a Session for the remote IA.
 func (ae *ASEntry) AddSession(sessId mgmt.SessionType, polName string,
-	pathPred *pathmgr.PathPredicate) error {
+	afp *pktcls.ActionFilterPaths) error {
 	ae.Lock()
 	defer ae.Unlock()
-	return ae.addSession(sessId, polName, pathPred)
+	return ae.addSession(sessId, polName, afp)
 }
 
 func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
-	pathPred *pathmgr.PathPredicate) error {
+	afp *pktcls.ActionFilterPaths) error {
 	if s, ok := ae.Sessions[sessId]; !ok {
 		// Session does not exist, so we create a new one
-		s, err := egress.NewSession(ae.IA, sessId, ae.Sigs, ae.Logger, polName, pathPred)
+		s, err := egress.NewSession(ae.IA, sessId, ae.Sigs, ae.Logger, polName, afp)
 		if err != nil {
 			return err
 		}
@@ -310,7 +309,7 @@ func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 		s.Start()
 	} else {
 		// Session exists, update its information
-		if err := s.UpdatePolicy(polName, pathPred); err != nil {
+		if err := s.UpdatePolicy(polName, afp); err != nil {
 			return err
 		}
 	}

@@ -23,7 +23,6 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/lib/pathmgr"
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/sig/mgmt"
 	"github.com/scionproto/scion/go/sig/siginfo"
@@ -147,7 +146,7 @@ type PktPolicy struct {
 type Session struct {
 	ID      mgmt.SessionType
 	PolName string
-	Pred    *pathmgr.PathPredicate
+	Pred    *pktcls.ActionFilterPaths
 }
 
 type SessionSet map[mgmt.SessionType]*Session
@@ -156,11 +155,8 @@ func BuildSessions(cfgSessMap SessionMap, actions pktcls.ActionMap) (SessionSet,
 	set := make(SessionSet)
 	for sessId, actName := range cfgSessMap {
 		act := actions[actName]
-		var pred *pathmgr.PathPredicate
-		if afp, ok := act.(*pktcls.ActionFilterPaths); ok {
-			pred = afp.Contains
-		}
-		if actName != "" && pred == nil {
+		afp, ok := act.(*pktcls.ActionFilterPaths)
+		if actName != "" && !ok {
 			// Unable to find the Action the session is referencing
 			return nil, common.NewBasicError("Unable to find referenced Action", nil,
 				"sessionID", sessId, "action", actName)
@@ -168,7 +164,7 @@ func BuildSessions(cfgSessMap SessionMap, actions pktcls.ActionMap) (SessionSet,
 		set[sessId] = &Session{
 			ID:      sessId,
 			PolName: actName,
-			Pred:    pred,
+			Pred:    afp,
 		}
 	}
 	return set, nil

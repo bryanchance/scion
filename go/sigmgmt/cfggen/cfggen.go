@@ -102,7 +102,7 @@ func compileCommand(cfg *config.Cfg, asEntry *config.ASEntry, aliasMap db.Sessio
 			return common.NewBasicError("unknown key", nil, "key", key)
 		}
 	}
-	cfg.Classes.Add(pktcls.NewClass(className, pktcls.NewCondAllOf(conditions...)))
+	cfg.Classes[className] = pktcls.NewClass(className, pktcls.NewCondAllOf(conditions...))
 
 	var sessionIDs []mgmt.SessionType
 	// Resolve session aliases to session IDs, and check that we're not using
