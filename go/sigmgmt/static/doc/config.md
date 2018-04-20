@@ -25,20 +25,22 @@ via HTTP to verify that it has loaded the correct config.
 
 **Path selectors**. Path selectors can be used to choose a subset of paths from
 a larger set. For example, if a SIG can reach a remote AS via two paths, one
-through ISD-AS 2-80 and one through ISD-AS 2-81, a path selector can be used to
-tell the SIG to always prefer the one through AS80.  A filter is a comma
-separated string of ISD-AS#IFID tokens, each token representing a condition.
-Wildcards can be specified for via a 0 value for an ISD, AS or IFID. Some
-examples:
+through ISD-AS 2-ff00:0:80 and one through ISD-AS 2-ff00:0:81, a path selector
+can be used to tell the SIG to always prefer the one through AS ff00:0:80. A
+filter is a comma separated string of ISD-AS#IFID tokens, each token
+representing a condition. Wildcards can be specified for via a 0 value for an
+ISD, AS or IFID. Some examples:
 
-* To select paths going through ISD-AS 2-81: `2-81#0`;
+* To select paths going through ISD-AS 2-ff00:0:81: `2-ff00:0:81#0`;
 * To select paths going through ISD 5 and then ISD 6 (not necessarily one after
   the other): `5-0#0,6-0#0`;
 
 Ordering of tokens is important, but gaps are allowed:
 
-* `5-1#10,6-2#20` does not match a path containing `...,6-2#20,5-1#10,...`;
-* `5-1#10,6-2#20` does match `...,5-1#10,7-1#52,7-1#55,6-2#20,...`;
+* `5-ff00:0:1#10,6-ff00:0:2#20` does not match a path containing
+  `...,6-ff00:0:2#20,5-ff00:0:1#10,...`;
+* `5-ff00:0:1#10,6-ff00:0:2#20` does match
+  `...,5-ff00:0:1#10,7-ff00:0:3#52,7-ff00:0:3#55,6-ff00:0:2#20,...`;
 
 
 #### Remote AS configuration

@@ -23,15 +23,10 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/crypto/cert"
 	"github.com/scionproto/scion/go/lib/crypto/trc"
-	"github.com/scionproto/scion/go/tools/scion-pki/internal/base"
 	"github.com/scionproto/scion/go/tools/scion-pki/internal/pkicmn"
 )
 
-func runVerify(cmd *base.Command, args []string) {
-	if len(args) < 1 {
-		cmd.Usage()
-		os.Exit(2)
-	}
+func runVerify(args []string) {
 	exitStatus := 0
 	for _, certPath := range args {
 		// Load file.
@@ -66,7 +61,7 @@ func verifyChain(chain *cert.Chain, subject addr.IA) error {
 
 func loadTRC(subject addr.IA, version uint64) (*trc.TRC, error) {
 	fname := fmt.Sprintf(pkicmn.TrcNameFmt, subject.I, version)
-	trcPath := filepath.Join(pkicmn.RootDir, fmt.Sprintf("ISD%d", subject.I), "trcs", fname)
+	trcPath := filepath.Join(pkicmn.RootDir, fmt.Sprintf("ISD%d", subject.I), pkicmn.TRCsDir, fname)
 	trcRaw, err := ioutil.ReadFile(trcPath)
 	if err != nil {
 		return nil, err

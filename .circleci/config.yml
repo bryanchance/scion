@@ -43,7 +43,7 @@ jobs:
 
     build:
         docker:
-            - image: anapaya/scion_base@sha256:7699e6779e2dd15a904be3cb4464b3835c626016782598de6b704229ee7dc07a
+            - image: anapaya/scion_base@sha256:c56f61cade10d5cd11443e70c743c30f756e60fa2272d331372d981c4b74fe0b
               auth:
                   username: aopsacct
                   password: $DOCKERHUB_PASSWORD

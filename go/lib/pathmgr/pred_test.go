@@ -35,24 +35,81 @@ func TestPathPredicates(t *testing.T) {
 		predicateStr string
 		expected     bool
 	}{
-		{"direct neighbors, exact match", "1-10", "1-19", "1-10#1019", true},
-		{"direct neighbors, not match", "1-10", "1-19", "1-10#1234", false},
-		{"direct neighbors, wildcard ifid match", "1-10", "1-19", "1-10#0", true},
-		{"direct neighbors, wildcard AS match", "1-10", "1-19", "1-0#1019", true},
-		{"direct neighbors, wildcard AS but no match", "1-10", "1-19", "1-0#1234", false},
-		{"direct neighbors, any wildcard match", "1-10", "1-19", "0-0#0", true},
-		{"direct neighbors, multiple any wildcards but no match", "1-10", "1-19",
-			"0-0#0,0-0#0,0-0#0", false},
-		{"far neighbors, match in the middle", "1-18", "2-22", "1-12#1215", true},
-		{"far neighbors, match in the middle, on egress", "1-18", "2-22", "1-12#1222", true},
-		{"far neighbors, match at the end", "1-18", "2-22", "2-22#2212", true},
-		{"far neighbors, match at the start", "1-18", "2-22", "1-18#1815", true},
-		{"far neighbors, not match", "1-18", "2-22", "1-14#0", false},
-		{"far neighbors, match multiple with wildcards", "1-18", "2-22", "1-15#0,1-15#1512", true},
-		{"far neighbors, match multiple with wildcards and jumps", "1-18", "2-22",
-			"1-12#1215,2-22#0", true},
-		{"far neighbors, not match with wildcard jumps", "1-18", "2-22",
-			"1-12#0,0-0#0,1-11#0", false},
+		{
+			"direct neighbors, exact match",
+			"1-ff00:0:133", "1-ff00:0:132",
+			"1-ff00:0:133#133132", true,
+		},
+		{
+			"direct neighbors, not match",
+			"1-ff00:0:133", "1-ff00:0:132",
+			"1-ff00:0:133#1234", false,
+		},
+		{
+			"direct neighbors, wildcard ifid match",
+			"1-ff00:0:133", "1-ff00:0:132",
+			"1-ff00:0:133#0", true,
+		},
+		{
+			"direct neighbors, wildcard AS match",
+			"1-ff00:0:133", "1-ff00:0:132",
+			"1-0#133132", true,
+		},
+		{
+			"direct neighbors, wildcard AS but no match",
+			"1-ff00:0:133", "1-ff00:0:132",
+			"1-0#1234", false,
+		},
+		{
+			"direct neighbors, any wildcard match",
+			"1-ff00:0:133", "1-ff00:0:132",
+			"0-0#0", true,
+		},
+		{
+			"direct neighbors, multiple any wildcards but no match",
+			"1-ff00:0:133", "1-ff00:0:132",
+			"0-0#0,0-0#0,0-0#0", false,
+		},
+		{
+			"far neighbors, match in the middle",
+			"1-ff00:0:122", "2-ff00:0:220",
+			"1-ff00:0:120#120121", true,
+		},
+		{
+			"far neighbors, match in the middle, on egress",
+			"1-ff00:0:122", "2-ff00:0:220",
+			"1-ff00:0:120#120220", true,
+		},
+		{
+			"far neighbors, match at the end",
+			"1-ff00:0:122", "2-ff00:0:220",
+			"2-ff00:0:220#220120", true,
+		},
+		{
+			"far neighbors, match at the start",
+			"1-ff00:0:122", "2-ff00:0:220",
+			"1-ff00:0:122#122121", true,
+		},
+		{
+			"far neighbors, not match",
+			"1-ff00:0:122", "2-ff00:0:220",
+			"1-ff00:0:111#0", false,
+		},
+		{
+			"far neighbors, match multiple with wildcards",
+			"1-ff00:0:122", "2-ff00:0:220",
+			"1-ff00:0:121#0,1-ff00:0:121#121120", true,
+		},
+		{
+			"far neighbors, match multiple with wildcards and jumps",
+			"1-ff00:0:122", "2-ff00:0:220",
+			"1-ff00:0:120#120121,2-ff00:0:220#0", true,
+		},
+		{
+			"far neighbors, not match with wildcard jumps",
+			"1-ff00:0:122", "2-ff00:0:220",
+			"1-ff00:0:120#0,0-0#0,1-ff00:0:110#0", false,
+		},
 	}
 
 	Convey("Test for various predicates and paths", t, func() {
@@ -78,11 +135,11 @@ func TestPathPredicateString(t *testing.T) {
 	testCases := []struct {
 		expr string
 	}{
-		{"1-10#42"},
-		{"1-10#42,1-10#43"},
-		{"1-10#0,1-10#0"},
+		{"1-ff00:0:133#42"},
+		{"1-ff00:0:133#42,1-ff00:0:133#43"},
+		{"1-ff00:0:133#0,1-ff00:0:133#0"},
 		{"1-0#0"},
-		{"2-0#0,2-0#0,3-0#0,3-0#0,4-41#1041,4-41#1051"},
+		{"2-0#0,2-0#0,3-0#0,3-0#0,4-ff00:0:310#1041,4-ff00:0:310#1051"},
 	}
 	Convey("Compile path predicates", t, func() {
 		for _, tc := range testCases {

@@ -47,7 +47,7 @@ func init() {
 }
 
 type Router struct {
-	// Id is the SCION element ID, e.g. "br4-21-9".
+	// Id is the SCION element ID, e.g. "br4-ff00:0:2f".
 	Id string
 	// confDir is the directory containing the configuration file.
 	confDir string
@@ -55,6 +55,8 @@ type Router struct {
 	freePkts *ringbuf.Ring
 	// revInfoQ is a channel for handling RevInfo payloads.
 	revInfoQ chan rpkt.RevTokenCallbackArgs
+	// iFID is a channel for handling IFID packets from the local BS
+	ifIDQ chan rpkt.IFIDCallbackArgs
 	// pktErrorQ is a channel for handling packet errors
 	pktErrorQ chan pktErrorArgs
 }
@@ -71,10 +73,10 @@ func NewRouter(id, confDir string) (*Router, error) {
 // Run sets up networking, and starts go routines for handling the main packet
 // processing as well as various other router functions.
 func (r *Router) Run() error {
-	go r.SyncInterface()
 	go r.PeriodicPushACL()
 	go r.IFStateUpdate()
 	go r.RevInfoFwd()
+	go r.IFIDFwd()
 	go r.PacketError()
 	go r.confSig()
 	// TODO(shitz): Here should be some code to periodically check the discovery

@@ -27,8 +27,8 @@ import (
 )
 
 var (
-	id = flag.String("id", "", "Element ID, e.g. 'ds4-21-9'")
-	ia = flag.String("ia", "", "ISD-AS, e.g. '4-11'")
+	id = flag.String("id", "", "Element ID, e.g. 'ds4-ff00:0:2f-9'")
+	ia = flag.String("ia", "", "ISD-AS, e.g. '4-ff00:0:2f'")
 
 	topofile = flag.String("static-topo", "", "Static topology file to serve (required)")
 	usefmod  = flag.Bool("usefmod", true, "Use file modification time for static topo timestamp")

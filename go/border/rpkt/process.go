@@ -41,6 +41,10 @@ const (
 	errPldGet = "Unable to retrieve payload"
 )
 
+type IFIDCallbackArgs struct {
+	RtrPkt *RtrPkt
+}
+
 // NeedsLocalProcessing determines if the router needs to do more than just
 // forward a packet (e.g. resolve an SVC destination address).
 func (rp *RtrPkt) NeedsLocalProcessing() error {
@@ -159,8 +163,18 @@ func (rp *RtrPkt) processDestSelf() (HookResult, error) {
 	}
 }
 
-// processIFID handles IFID (interface ID) packets from neighbouring ISD-ASes.
+// processIFID handles IFID (interface ID) packets
 func (rp *RtrPkt) processIFID(ifid *ifid.IFID) (HookResult, error) {
+	if rp.DirFrom == rcmn.DirLocal {
+		callbacks.ifIDF(IFIDCallbackArgs{RtrPkt: rp})
+		return HookFinish, nil
+	} else {
+		return rp.processRemoteIFID(ifid)
+	}
+}
+
+// processRemoteIFID handles IFID (interface ID) packets from neighbouring ISD-ASes.
+func (rp *RtrPkt) processRemoteIFID(ifid *ifid.IFID) (HookResult, error) {
 	// Set the RelayIF field in the payload to the current interface ID.
 	ifid.RelayIfID = uint64(*rp.ifCurr)
 	cpld, err := ctrl.NewPld(ifid, nil)
@@ -195,7 +209,7 @@ func (rp *RtrPkt) processIFID(ifid *ifid.IFID) (HookResult, error) {
 		return HookError, err
 	}
 	fwdrp.Route()
-	return HookFinish, nil
+	return HookContinue, nil
 }
 
 // processPathMgmtSelf handles Path Management SCION control messages.
@@ -211,7 +225,7 @@ func (rp *RtrPkt) processPathMgmtSelf(p *path_mgmt.Pld) (HookResult, error) {
 		return HookError, common.NewBasicError("Unsupported destination PathMgmt payload", nil,
 			"type", common.TypeOf(pld))
 	}
-	return HookFinish, nil
+	return HookContinue, nil
 }
 
 // processSCMP is a processing hook used to handle SCMP payloads.
@@ -219,8 +233,10 @@ func (rp *RtrPkt) processSCMP() (HookResult, error) {
 	// FIXME(shitz): rate-limit revocations
 	hdr := rp.l4.(*scmp.Hdr)
 	switch {
-	case hdr.Class == scmp.C_General && hdr.Type == scmp.T_G_RecordPathReply:
-		// Do nothing (no fallthrough)
+	case hdr.Class == scmp.C_General && hdr.Type == scmp.T_G_TraceRouteRequest:
+		if err := rp.processSCMPTraceRoute(); err != nil {
+			return HookError, err
+		}
 	case hdr.Class == scmp.C_General && hdr.Type == scmp.T_G_RecordPathRequest:
 		if err := rp.processSCMPRecordPath(); err != nil {
 			return HookError, err
@@ -236,7 +252,49 @@ func (rp *RtrPkt) processSCMP() (HookResult, error) {
 		return HookError, common.NewBasicError("Unsupported destination SCMP payload", nil,
 			"class", hdr.Class, "type", hdr.Type.Name(hdr.Class))
 	}
-	return HookFinish, nil
+	return HookContinue, nil
+}
+
+func (rp *RtrPkt) processSCMPTraceRoute() error {
+	pld, ok := rp.pld.(*scmp.Payload)
+	if !ok {
+		return common.NewBasicError("Invalid payload type in SCMP packet", nil,
+			"expected", "*scmp.Payload", "actual", common.TypeOf(rp.pld))
+	}
+	infoTrace, ok := pld.Info.(*scmp.InfoTraceRoute)
+	if !ok {
+		return common.NewBasicError("Invalid SCMP Info type in SCMP packet", nil,
+			"expected", "*scmp.InfoTraceRoute", "actual", common.TypeOf(pld.Info))
+	}
+	if infoTrace.HopOff != rp.CmnHdr.CurrHopF {
+		return nil
+	}
+	// If In is set and the packet came from the local AS,
+	// or if In is false and the packet came from outside,
+	// then stop processing.
+	if infoTrace.In != (rp.DirFrom == rcmn.DirExternal) {
+		return nil
+	}
+	infoTrace.IA = rp.Ctx.Conf.IA
+	infoTrace.IfID = *rp.ifCurr
+	// Create generic ScnPkt reply
+	sp, err := rp.CreateReplyScnPkt()
+	if err != nil {
+		return err
+	}
+	// Reply does not need to be HBH, so remove SCMP ext
+	sp.HBHExt = sp.HBHExt[1:]
+	scmpHdr := sp.L4.(*scmp.Hdr)
+	scmpHdr.Type = scmp.T_G_TraceRouteReply
+
+	reply, err := rp.CreateReply(sp)
+	if err != nil {
+		return err
+	}
+	reply.Route()
+	// Change direction of current packet so it is not forwarded
+	rp.DirTo = rcmn.DirSelf
+	return nil
 }
 
 func (rp *RtrPkt) processSCMPRecordPath() error {

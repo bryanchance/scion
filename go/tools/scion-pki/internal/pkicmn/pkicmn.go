@@ -31,6 +31,9 @@ const (
 	CoreCertNameFmt    = "ISD%d-AS%s-V%d-core.crt"
 	TrcNameFmt         = "ISD%d-V%d.trc"
 	ErrInvalidSelector = "Invalid selector."
+	TRCsDir            = "trcs"
+	CertsDir           = "certs"
+	KeysDir            = "keys"
 )
 
 var (
@@ -70,7 +73,7 @@ func ProcessSelector(selector string) (map[addr.ISD][]addr.IA, error) {
 		return nil, err
 	}
 	if len(isdDirs) == 0 {
-		return nil, common.NewBasicError("No directories found", nil, "selector", selector)
+		return nil, common.NewBasicError("No ISD directories found", nil, "selector", selector)
 	}
 	res := make(map[addr.ISD][]addr.IA)
 	for _, dir := range isdDirs {
@@ -83,7 +86,7 @@ func ProcessSelector(selector string) (map[addr.ISD][]addr.IA, error) {
 			return nil, err
 		}
 		if len(dirs) == 0 {
-			return nil, common.NewBasicError("No directories found", nil, "selector", selector)
+			return nil, common.NewBasicError("No AS directories found", nil, "selector", selector)
 		}
 		ases := make([]addr.IA, len(dirs))
 		for i, asDir := range dirs {
@@ -143,7 +146,7 @@ func WriteToFile(raw common.RawBytes, path string, perm os.FileMode) error {
 }
 
 func GetAsPath(ia addr.IA) string {
-	return filepath.Join(RootDir, fmt.Sprintf("ISD%d/AS%s", ia.I, ia.A))
+	return filepath.Join(RootDir, fmt.Sprintf("ISD%d/AS%s", ia.I, ia.A.FileFmt()))
 }
 
 func GetIsdPath(isd addr.ISD) string {

@@ -64,7 +64,7 @@ EOF
 result=$?
 
 run Revocation "integration/revocation_test.sh\
- ${REV_BRS:-as1-11:br1-11-3 as2-26:br2-26-2 as1-14:br1-14-3 as1-16:br1-16-2}"
+ ${REV_BRS:-as1-ff00:0:110:br1-ff00:0:110-3 as2-ff00:0:222:br2-ff00:0:222-2 as1-ff00:0:111:br1-ff00:0:111-3 as1-ff00:0:131:br1-ff00:0:131-2}"
 result=$((result+$?))
 
 shutdown

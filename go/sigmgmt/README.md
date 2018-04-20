@@ -2,7 +2,7 @@
 
 Make sure the config output directory `output` exists in the running folder. And you have a config file.
 
-Then run the interface e.g. with `go run main.go -id=sm4-21-9 -bind=:8080 -config=cfg.json`.
+Then run the interface e.g. with `go run main.go -id=sm4-ff00:0:2f-9 -bind=:8080 -config=cfg.json`.
 
 ## Configuration
 

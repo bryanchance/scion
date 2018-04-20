@@ -50,6 +50,7 @@ from lib.errors import (
     SCIONServiceLookupError,
 )
 from lib.msg_meta import UDPMetadata
+from lib.packet.ext.one_hop_path import OneHopPathExt
 from lib.path_seg_meta import PathSegMeta
 from lib.packet.ctrl_pld import CtrlPayload
 from lib.packet.ifid import IFIDPayload
@@ -120,6 +121,8 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
     ZK_REV_OBJ_MAX_AGE = HASHTREE_EPOCH_TIME
     # Interval to checked for timed out interfaces.
     IF_TIMEOUT_INTERVAL = 1
+    # Interval to send keep-alive msgs
+    IFID_INTERVAL = 1
 
     def __init__(self, server_id, conf_dir, spki_cache_dir=GEN_CACHE_PATH, prom_export=None):
         """
@@ -230,7 +233,7 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
     def _create_one_hop_path(self, egress_if):
         ts = int(SCIONTime.get_time())
         info = InfoOpaqueField.from_values(ts, self.addr.isd_as[0], hops=2)
-        hf1 = HopOpaqueField.from_values(self.hof_exp_time(ts), 0, egress_if)
+        hf1 = HopOpaqueField.from_values(OneHopPathExt.HOF_EXP_TIME, 0, egress_if)
         hf1.set_mac(self.of_gen_key, ts, None)
         # Return a path where second HF is empty.
         return SCIONPath.from_values(info, [hf1, HopOpaqueField()])
@@ -460,6 +463,9 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
             target=thread_safety_net, args=(self.worker,),
             name="BS.worker", daemon=True).start()
         # https://github.com/scionproto/scion/issues/308:
+        threading.Thread(
+            target=thread_safety_net, args=(self._send_ifid_updates,),
+            name="BS._send_if_updates", daemon=True).start()
         threading.Thread(
             target=thread_safety_net, args=(self._handle_if_timeouts,),
             name="BS._handle_if_timeouts", daemon=True).start()
@@ -805,6 +811,24 @@ class BeaconServer(SCIONElement, metaclass=ABCMeta):
             self.send_meta(payload.copy(), meta, (meta.host, meta.port))
         for meta in server_metas:
             self.send_meta(payload.copy(), meta)
+
+    def _send_ifid_updates(self):
+        start = time.time()
+        while self.run_flag.is_set():
+            sleep_interval(start, self.IFID_INTERVAL, "BS._send_ifid_updates cycle")
+            start = time.time()
+
+            # only master sends keep-alive messages
+            if not self.zk.have_lock():
+                continue
+
+            # send keep-alives on all known BR interfaces
+            for ifid in self.ifid2br:
+                br = self.ifid2br[ifid]
+                br_addr, br_port = br.int_addrs[0].public[0]
+                meta = self._build_meta(host=br_addr, port=br_port)
+                self.send_meta(CtrlPayload(IFIDPayload.from_values(ifid)),
+                               meta, (meta.host, meta.port))
 
     def _init_metrics(self):
         super()._init_metrics()

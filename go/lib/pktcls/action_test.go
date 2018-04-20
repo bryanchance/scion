@@ -221,79 +221,91 @@ func TestActionAct(t *testing.T) {
 		SubTestCases []subTestCase
 	}{
 		{
-			Name: "CondAllOf(1-15#1518, 1-12#0)",
+			Name: "CondAllOf(1-ff00:0:121#121122, 1-ff00:0:120#0)",
 			Action: &ActionFilterPaths{
-				Name: "go through 1-15#1518, followed by 1-12#0",
+				Name: "go through 1-ff00:0:121#121122, followed by 1-ff00:0:120#0",
 				Cond: CondAllOf{
-					mustCondPathPredicate(t, "1-15#1518"),
-					mustCondPathPredicate(t, "1-12#0"),
+					mustCondPathPredicate(t, "1-ff00:0:121#121122"),
+					mustCondPathPredicate(t, "1-ff00:0:120#0"),
 				},
 			},
 			SubTestCases: []subTestCase{
 				{
-					Name:           "2-25 -> 2-21",
-					Src:            addr.IA{I: 2, A: 25},
-					Dst:            addr.IA{I: 2, A: 21},
+					Name:           "2-ff00:0:212 -> 2-ff00:0:210",
+					Src:            addr.IA{I: 2, A: 0xff0000000212},
+					Dst:            addr.IA{I: 2, A: 0xff0000000210},
 					ExpPathStrings: map[string]struct{}{},
 				},
 				{
-					Name: "1-18 -> 2-22",
-					Src:  addr.IA{I: 1, A: 18},
-					Dst:  addr.IA{I: 2, A: 22},
+					Name: "1-ff00:0:122 -> 2-ff00:0:220",
+					Src:  addr.IA{I: 1, A: 0xff0000000122},
+					Dst:  addr.IA{I: 2, A: 0xff0000000220},
 					ExpPathStrings: map[string]struct{}{
-						"[1-18#1815 1-15#1518 1-15#1512 1-12#1215 1-12#1222 2-22#2212]": {},
+						"[1-ff00:0:122#122121 1-ff00:0:121#121122 " +
+							"1-ff00:0:121#121120 1-ff00:0:120#120121 " +
+							"1-ff00:0:120#120220 2-ff00:0:220#220120]": {},
 					},
 				},
 				{
-					Name: "1-18 -> 1-11",
-					Src:  addr.IA{I: 1, A: 18},
-					Dst:  addr.IA{I: 1, A: 11},
+					Name: "1-ff00:0:122 -> 1-ff00:0:110",
+					Src:  addr.IA{I: 1, A: 0xff0000000122},
+					Dst:  addr.IA{I: 1, A: 0xff0000000110},
 					ExpPathStrings: map[string]struct{}{
-						"[1-18#1815 1-15#1518 1-15#1512 1-12#1215 1-12#1211 1-11#1112]": {},
-						//"[1-18#1815 1-15#1518 1-15#1514 1-14#1415 1-14#1411 1-11#1114]", Filtered
+						"[1-ff00:0:122#122121 1-ff00:0:121#121122 " +
+							"1-ff00:0:121#121120 1-ff00:0:120#120121 " +
+							"1-ff00:0:120#120110 1-ff00:0:110#110120]": {},
+						//"[1-ff00:0:122#122121 1-ff00:0:121#121122 " +
+						//    "1-ff00:0:121#121111 "1-ff00:0:111#111121 " +
+						//    "1-ff00:0:111#111110 1-ff00:0:110#110111]", Filtered
 					},
 				},
 			},
 		},
 		{
-			Name: "transit 1-19 or 1-15",
+			Name: "transit 1-ff00:0:132 or 1-ff00:0:121",
 			Action: &ActionFilterPaths{
 				Cond: CondAnyOf{
 					CondAllOf{
-						mustCondPathPredicate(t, "1-16#0"),
-						mustCondPathPredicate(t, "1-16#0"),
+						mustCondPathPredicate(t, "1-ff00:0:131#0"),
+						mustCondPathPredicate(t, "1-ff00:0:131#0"),
 					},
 					CondAllOf{
-						mustCondPathPredicate(t, "1-15#0"),
-						mustCondPathPredicate(t, "1-15#0"),
+						mustCondPathPredicate(t, "1-ff00:0:121#0"),
+						mustCondPathPredicate(t, "1-ff00:0:121#0"),
 					},
 				},
 			},
 			SubTestCases: []subTestCase{
 				{
-					Name: "1-18 -> 2-22",
-					Src:  addr.IA{I: 1, A: 18},
-					Dst:  addr.IA{I: 2, A: 22},
+					Name: "1-ff00:0:122 -> 2-ff00:0:220",
+					Src:  addr.IA{I: 1, A: 0xff0000000122},
+					Dst:  addr.IA{I: 2, A: 0xff0000000220},
 					ExpPathStrings: map[string]struct{}{
-						"[1-18#1815 1-15#1518 1-15#1512 1-12#1215 1-12#1222 2-22#2212]": {},
+						"[1-ff00:0:122#122121 1-ff00:0:121#121122 " +
+							"1-ff00:0:121#121120 1-ff00:0:120#120121 " +
+							"1-ff00:0:120#120220 2-ff00:0:220#220120]": {},
 					},
 				},
 				{
-					Name: "1-16 -> 1-12",
-					Src:  addr.IA{I: 1, A: 16},
-					Dst:  addr.IA{I: 1, A: 12},
+					Name: "1-ff00:0:131 -> 1-ff00:0:120",
+					Src:  addr.IA{I: 1, A: 0xff0000000131},
+					Dst:  addr.IA{I: 1, A: 0xff0000000120},
 					ExpPathStrings: map[string]struct{}{
-						"[1-16#1613 1-13#1316 1-13#1312 1-12#1213]": {},
-						"[1-16#1615 1-15#1516 1-15#1512 1-12#1215]": {},
+						"[1-ff00:0:131#131130 1-ff00:0:130#130131 " +
+							"1-ff00:0:130#130120 1-ff00:0:120#120130]": {},
+						"[1-ff00:0:131#131121 1-ff00:0:121#121131 " +
+							"1-ff00:0:121#121120 1-ff00:0:120#120121]": {},
 					},
 				},
 				{
-					Name:           "2-24 -> 2-21",
-					Src:            addr.IA{I: 2, A: 24},
-					Dst:            addr.IA{I: 2, A: 21},
+					Name:           "2-ff00:0:221 -> 2-ff00:0:210",
+					Src:            addr.IA{I: 2, A: 0xff0000000221},
+					Dst:            addr.IA{I: 2, A: 0xff0000000210},
 					ExpPathStrings: map[string]struct{}{
-					//"[2-24#2423 2-23#2324 2-23#2321 2-21#2123]", Filtered
-					//"[2-24#2422 2-22#2224 2-22#2221 2-21#2122]", Filtered
+					//"[2-ff00:0:221#221211 2-ff00:0:211#211221 " +
+					//    "2-ff00:0:211#211210 2-ff00:0:210#210211]", Filtered
+					//"[2-ff00:0:221#221220 2-ff00:0:220#220221 " +
+					//    "2-ff00:0:220#220210 2-ff00:0:210#210220]", Filtered
 					},
 				},
 			},
