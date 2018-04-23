@@ -78,8 +78,7 @@ func NewSession(dstIA addr.IA, sessId mgmt.SessionType,
 		pool:    NewAtomicSP(),
 		sigMap:  sigMap,
 	}
-	// FIXME(scrye): CRITICAL change nil below to s.policy
-	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, nil)
+	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, policy)
 	if err != nil {
 		return nil, err
 	}
@@ -133,19 +132,16 @@ func (s *Session) UpdatePolicy(name string, afp *pktcls.ActionFilterPaths) error
 	s.policyLock.Lock()
 	defer s.policyLock.Unlock()
 
-	// FIXME(scrye): CRITICAL change nil below to afp once pathmgr is patched
-	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, nil)
+	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, afp)
 	if err != nil {
 		return common.NewBasicError("Unable to register watch", err)
 	}
 	// Store old predicate so we can unwatch it later
-	oldPred := s.policy
+	oldPolicy := s.policy
 	s.polName = name
 	s.policy = afp
 	s.pool.UpdateSP(pool)
-	_ = oldPred
-	// FIXME(scrye): CRITICAL change nil below to oldPred once pathmgr is patched
-	if err := sigcmn.PathMgr.UnwatchFilter(sigcmn.IA, s.IA, nil); err != nil {
+	if err := sigcmn.PathMgr.UnwatchFilter(sigcmn.IA, s.IA, oldPolicy); err != nil {
 		return common.NewBasicError("Unable to unregister watch", err)
 	}
 	return nil

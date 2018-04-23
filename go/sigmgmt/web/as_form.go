@@ -16,7 +16,7 @@ import (
 	log "github.com/inconshreveable/log15"
 
 	"github.com/scionproto/scion/go/lib/addr"
-	"github.com/scionproto/scion/go/lib/pathmgr"
+	"github.com/scionproto/scion/go/lib/spath/spathmeta"
 	sigcfg "github.com/scionproto/scion/go/sig/config"
 	"github.com/scionproto/scion/go/sig/mgmt"
 	"github.com/scionproto/scion/go/sig/siginfo"
@@ -39,7 +39,7 @@ type validatedForm struct {
 	sig            *sigcfg.SIG
 	cidr           *net.IPNet
 	filterName     string
-	filter         *pathmgr.PathPredicate
+	filter         *spathmeta.PathPredicate
 	session        *sigcfg.Session
 	policies       map[addr.IA]string
 	sessionAliases map[addr.IA]db.SessionAliasMap
@@ -145,10 +145,10 @@ func (vf *validatedForm) GetSIG() *sigcfg.SIG {
 	return vf.sig
 }
 
-func (vf *validatedForm) GetFilter() (string, *pathmgr.PathPredicate) {
+func (vf *validatedForm) GetFilter() (string, *spathmeta.PathPredicate) {
 	if !vf.parsed["filter"] {
 		vf.parsed["filter"] = true
-		pp, err := pathmgr.NewPathPredicate(vf.request.Form.Get("pp"))
+		pp, err := spathmeta.NewPathPredicate(vf.request.Form.Get("pp"))
 		if err != nil {
 			vf.log.Error("Bad path selector string", "err", err)
 			return "", nil

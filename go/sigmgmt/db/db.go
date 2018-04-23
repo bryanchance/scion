@@ -13,8 +13,8 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/lib/pathmgr"
 	"github.com/scionproto/scion/go/lib/pktcls"
+	"github.com/scionproto/scion/go/lib/spath/spathmeta"
 	"github.com/scionproto/scion/go/lib/sqlite"
 	"github.com/scionproto/scion/go/sig/config"
 	"github.com/scionproto/scion/go/sig/mgmt"
@@ -337,7 +337,7 @@ func (db *DB) QueryNetworks(site string, ia addr.IA) ([]*config.IPNet, error) {
 	return networks, rows.Err()
 }
 
-func (db *DB) InsertFilter(site string, name string, pp *pathmgr.PathPredicate) error {
+func (db *DB) InsertFilter(site string, name string, pp *spathmeta.PathPredicate) error {
 	_, err := db.Exec(
 		`INSERT INTO Filters (Name, Filter, Site) VALUES (?, ?, ?)`,
 		name, pp.String(), site)
@@ -362,7 +362,7 @@ func (db *DB) QueryFilters(site string) (pktcls.ActionMap, error) {
 		if err := rows.Scan(&name, &ppString); err != nil {
 			return nil, err
 		}
-		pp, err := pathmgr.NewPathPredicate(ppString)
+		pp, err := spathmeta.NewPathPredicate(ppString)
 		if err != nil {
 			// Bug in pre-insertion validation
 			panic(fmt.Sprintf("bad filter string in db: %s", ppString))
