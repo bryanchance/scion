@@ -102,7 +102,7 @@ func ProcessSelector(selector string) (map[addr.ISD][]addr.IA, error) {
 }
 
 func isdFromDir(dir string) (addr.ISD, error) {
-	isd, err := addr.ISDFromString(filepath.Base(dir)[3:])
+	isd, err := addr.ISDFromFileFmt(filepath.Base(dir), true)
 	if err != nil {
 		return 0, common.NewBasicError("Unable to parse ISD number from dir", err, "dir", dir)
 	}
@@ -110,7 +110,7 @@ func isdFromDir(dir string) (addr.ISD, error) {
 }
 
 func asFromDir(dir string) (addr.AS, error) {
-	as, err := addr.ASFromString(filepath.Base(dir)[2:])
+	as, err := addr.ASFromFileFmt(filepath.Base(dir), true)
 	if err != nil {
 		return 0, common.NewBasicError("Unable to parse AS number from dir", err, "dir", dir)
 	}
@@ -151,4 +151,9 @@ func GetAsPath(ia addr.IA) string {
 
 func GetIsdPath(isd addr.ISD) string {
 	return filepath.Join(RootDir, fmt.Sprintf("ISD%d", isd))
+}
+
+func ErrorAndExit(format string, a ...interface{}) {
+	fmt.Fprintf(os.Stderr, format, a...)
+	os.Exit(2)
 }
