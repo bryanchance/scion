@@ -34,17 +34,21 @@ import (
 	"github.com/scionproto/scion/go/sig/siginfo"
 )
 
-const sigMgrTick = 10 * time.Second
+const (
+	sigMgrTick        = 10 * time.Second
+	healthMonitorTick = 5 * time.Second
+)
 
 // ASEntry contains all of the information required to interact with a remote AS.
 type ASEntry struct {
 	sync.RWMutex
-	Nets       map[string]*net.IPNet
-	Sigs       *siginfo.SigMap
-	IA         addr.IA
-	IAString   string
-	egressRing *ringbuf.Ring
-	sigMgrStop chan struct{}
+	Nets              map[string]*net.IPNet
+	Sigs              *siginfo.SigMap
+	IA                addr.IA
+	IAString          string
+	egressRing        *ringbuf.Ring
+	sigMgrStop        chan struct{}
+	healthMonitorStop chan struct{}
 	log.Logger
 
 	PktPolicies *egress.SyncPktPols
@@ -53,12 +57,13 @@ type ASEntry struct {
 
 func newASEntry(ia addr.IA) (*ASEntry, error) {
 	ae := &ASEntry{
-		Logger:     log.New("ia", ia),
-		IA:         ia,
-		IAString:   ia.String(),
-		Nets:       make(map[string]*net.IPNet),
-		Sigs:       &siginfo.SigMap{},
-		sigMgrStop: make(chan struct{}),
+		Logger:            log.New("ia", ia),
+		IA:                ia,
+		IAString:          ia.String(),
+		Nets:              make(map[string]*net.IPNet),
+		Sigs:              &siginfo.SigMap{},
+		sigMgrStop:        make(chan struct{}),
+		healthMonitorStop: make(chan struct{}),
 	}
 	ae.PktPolicies = egress.NewSyncPktPols()
 	ae.Sessions = make(egress.SessionSet)
@@ -147,6 +152,13 @@ func (ae *ASEntry) addNet(ipnet *net.IPNet) error {
 		return err
 	}
 	ae.Nets[key] = ipnet
+	// Generate NetworkChanged event
+	params := NetworkChangedParams{
+		RemoteIA: ae.IA,
+		IpNet:    *ipnet,
+		Added:    true,
+	}
+	NetworkChanged(params)
 	ae.Info("Added network", "net", ipnet)
 	return nil
 }
@@ -168,6 +180,13 @@ func (ae *ASEntry) delNet(ipnet *net.IPNet) error {
 	}
 	delete(ae.Nets, key)
 	ae.Info("Removed network", "net", ipnet)
+	// Generate NetworkChanged event
+	params := NetworkChangedParams{
+		RemoteIA: ae.IA,
+		IpNet:    *ipnet,
+		Added:    false,
+	}
+	NetworkChanged(params)
 	return nil
 }
 
@@ -316,6 +335,7 @@ func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 	if len(ae.Sessions) == 1 {
 		go egress.NewDispatcher(ae.IA, ae.egressRing, ae.PktPolicies).Run()
 		go ae.sigMgr()
+		go ae.monitorHealth()
 	}
 	return nil
 }
@@ -385,11 +405,70 @@ Top:
 	ae.Info("sigMgr stopping")
 }
 
+func (ae *ASEntry) monitorHealth() {
+	defer liblog.LogPanicAndExit()
+	ticker := time.NewTicker(healthMonitorTick)
+	defer ticker.Stop()
+	ae.Info("Health monitor starting")
+	prevHealth := false
+Top:
+	for {
+		select {
+		case <-ae.healthMonitorStop:
+			break Top
+		case <-ticker.C:
+			prevHealth = ae.performHealthCheck(prevHealth)
+		}
+	}
+	close(ae.healthMonitorStop)
+	ae.Info("Health monitor stopping")
+}
+
+func (ae *ASEntry) performHealthCheck(prevHealth bool) bool {
+	ae.RLock()
+	defer ae.RUnlock()
+	curHealth := ae.checkHealth()
+	if curHealth != prevHealth {
+		// Generate slice of networks.
+		// XXX: This could become a bottleneck, namely in case of a large number
+		// of remote prefixes and flappy health.
+		nets := make([]*net.IPNet, 0, len(ae.Nets))
+		for _, n := range ae.Nets {
+			nets = append(nets, n)
+		}
+		// Overall health has changed. Generate event.
+		params := RemoteHealthChangedParams{
+			RemoteIA: ae.IA,
+			Nets:     nets,
+			Healthy:  curHealth,
+		}
+		RemoteHealthChanged(params)
+	}
+	return curHealth
+}
+
+func (ae *ASEntry) checkHealth() bool {
+	// If session 0 exists, determine overall health based on that session.
+	defSess, ok := ae.Sessions[mgmt.SessionType(0)]
+	if ok {
+		return defSess.Healthy()
+	}
+	// Otherwise, overall health is unhealthy if at least one session is unhealthy.
+	for _, sess := range ae.Sessions {
+		if !sess.Healthy() {
+			return false
+		}
+	}
+	return true
+}
+
 func (ae *ASEntry) Cleanup() error {
 	ae.Lock()
 	defer ae.Unlock()
 	// Clean up sigMgr goroutine.
 	ae.sigMgrStop <- struct{}{}
+	// Clean up health monitor
+	ae.healthMonitorStop <- struct{}{}
 	// Clean up NetMap entries
 	for _, v := range ae.Nets {
 		if err := ae.delNet(v); err != nil {
