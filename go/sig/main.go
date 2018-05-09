@@ -37,6 +37,7 @@ import (
 	"github.com/scionproto/scion/go/sig/egress"
 	"github.com/scionproto/scion/go/sig/ingress"
 	"github.com/scionproto/scion/go/sig/metrics"
+	"github.com/scionproto/scion/go/sig/quagga"
 	"github.com/scionproto/scion/go/sig/sigcmn"
 	"github.com/scionproto/scion/go/sig/xnet"
 )
@@ -94,6 +95,10 @@ func main() {
 	egress.Init()
 	disp.Init(sigcmn.CtrlConn)
 	go base.PollReqHdlr()
+	// Initialize Quagga exporter
+	if err := quagga.Init(); err != nil {
+		fatal("Unable to initalize Quagga Exporter", "err", err)
+	}
 	// Parse config
 	if loadConfig(*cfgPath) != true {
 		fatal("Unable to load config on startup")
@@ -179,10 +184,11 @@ func loadConfig(path string) bool {
 		return false
 	}
 	ok := base.Map.ReloadConfig(cfg)
-	if ok {
-		atomic.StoreUint64(&metrics.ConfigVersion, cfg.ConfigVersion)
+	if !ok {
+		return false
 	}
-	return ok
+	atomic.StoreUint64(&metrics.ConfigVersion, cfg.ConfigVersion)
+	return true
 }
 
 func fatal(msg string, args ...interface{}) {
