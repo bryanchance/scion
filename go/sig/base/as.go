@@ -49,6 +49,7 @@ type ASEntry struct {
 	egressRing        *ringbuf.Ring
 	sigMgrStop        chan struct{}
 	healthMonitorStop chan struct{}
+	version           uint64 // used to track certain changes made to ASEntry
 	log.Logger
 
 	PktPolicies *egress.SyncPktPols
@@ -152,10 +153,12 @@ func (ae *ASEntry) addNet(ipnet *net.IPNet) error {
 		return err
 	}
 	ae.Nets[key] = ipnet
+	ae.version++
 	// Generate NetworkChanged event
 	params := NetworkChangedParams{
 		RemoteIA: ae.IA,
 		IpNet:    *ipnet,
+		Healthy:  ae.checkHealth(),
 		Added:    true,
 	}
 	NetworkChanged(params)
@@ -179,14 +182,16 @@ func (ae *ASEntry) delNet(ipnet *net.IPNet) error {
 		return err
 	}
 	delete(ae.Nets, key)
-	ae.Info("Removed network", "net", ipnet)
+	ae.version++
 	// Generate NetworkChanged event
 	params := NetworkChangedParams{
 		RemoteIA: ae.IA,
 		IpNet:    *ipnet,
+		Healthy:  ae.checkHealth(),
 		Added:    false,
 	}
 	NetworkChanged(params)
+	ae.Info("Removed network", "net", ipnet)
 	return nil
 }
 
@@ -411,24 +416,25 @@ func (ae *ASEntry) monitorHealth() {
 	defer ticker.Stop()
 	ae.Info("Health monitor starting")
 	prevHealth := false
+	prevVersion := uint64(0)
 Top:
 	for {
 		select {
 		case <-ae.healthMonitorStop:
 			break Top
 		case <-ticker.C:
-			prevHealth = ae.performHealthCheck(prevHealth)
+			ae.performHealthCheck(&prevHealth, &prevVersion)
 		}
 	}
 	close(ae.healthMonitorStop)
 	ae.Info("Health monitor stopping")
 }
 
-func (ae *ASEntry) performHealthCheck(prevHealth bool) bool {
+func (ae *ASEntry) performHealthCheck(prevHealth *bool, prevVersion *uint64) {
 	ae.RLock()
 	defer ae.RUnlock()
 	curHealth := ae.checkHealth()
-	if curHealth != prevHealth {
+	if curHealth != *prevHealth || ae.version != *prevVersion {
 		// Generate slice of networks.
 		// XXX: This could become a bottleneck, namely in case of a large number
 		// of remote prefixes and flappy health.
@@ -444,7 +450,8 @@ func (ae *ASEntry) performHealthCheck(prevHealth bool) bool {
 		}
 		RemoteHealthChanged(params)
 	}
-	return curHealth
+	*prevHealth = curHealth
+	*prevVersion = ae.version
 }
 
 func (ae *ASEntry) checkHealth() bool {
