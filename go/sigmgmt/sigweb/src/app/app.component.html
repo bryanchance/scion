@@ -1,0 +1,28 @@
+<mat-toolbar color="primary">
+  <span>SIGWeb: Policy Configurator</span>
+  <div>
+    <button mat-button color="accent" routerLink="/sites">Sites</button>
+    <button mat-button color="accent" routerLink="/config">Config Doc</button>
+    <button mat-button color="accent" routerLink="/contact">Contact</button>
+    <button mat-button color="accent" *ngIf="userService.isLoggedIn | async" (click)="logout()" s>Logout</button>
+    <a href="https://www.anapaya.net" target="_blank">
+      <img src="assets/images/logo.png">
+    </a>
+  </div>
+</mat-toolbar>
+
+<main class="mat-typography">
+  <router-outlet></router-outlet>
+</main>
+
+<footer class="primary mat-typography">
+  <div>
+    <span> SIG Policy Configuration v1.0 </span>
+    <span> | </span>
+    <span> © 2018 Anapaya Systems AG </span>
+    <span> | </span>
+    <span>
+      <a href="mailto:info@anapaya.net"> Contact </a>
+    </span>
+  </div>
+</footer>

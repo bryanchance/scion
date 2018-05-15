@@ -4,7 +4,6 @@ package netcopy
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"net/http"
 	"os/exec"
@@ -21,33 +20,28 @@ const (
 	TimeForHTTPRequest             = 2 * time.Second
 )
 
-var (
-	sshKey = flag.String("sshkey", "", "The SSH key to use (private key file)."+
-		" If empty, let SSH find it or use the keys in the agent")
-	sshUser = flag.String("sshuser", "", "User on the target system to copy the config to.")
-)
-
 func CopyFileToSite(ctx context.Context, spath string, site *db.Site, dpath string,
 	logger log.Logger) error {
 
 	for _, host := range site.Hosts {
-		if err := CopyFileToHost(ctx, spath, host, dpath, logger); err != nil {
+		if err := CopyFileToHost(ctx, spath, &host, dpath, logger); err != nil {
 			return common.NewBasicError("Unable to copy configuration to host:", err)
 		}
 	}
 	return nil
 }
 
-func defaultSSHParams(ctx context.Context) []string {
+func defaultSSHParams(ctx context.Context, host *db.Host) []string {
 	var args []string
 	// Explicitly set the private key, if one is specified
-	if *sshKey != "" {
-		args = append(args, "-i", *sshKey)
+	if host.Key != "" {
+		args = append(args, "-i", host.Key)
 		// Only used supplied key
 		args = append(args, "-o", "IdentitiesOnly=yes")
 	}
 	// Enable batch mode so we don't get stuck on prompts
 	args = append(args, "-o", "BatchMode=yes")
+	args = append(args, "-o", "StrictHostKeyChecking=no")
 	// Do not allow the command to run for longer than the context; this is an
 	// approximation, as some time might pass before the argument is parsed by
 	// ssh/scp.
@@ -57,16 +51,17 @@ func defaultSSHParams(ctx context.Context) []string {
 	}
 	return args
 }
-func CopyFileToHost(ctx context.Context, spath string, host string, dpath string,
+func CopyFileToHost(ctx context.Context, spath string, host *db.Host, dpath string,
 	logger log.Logger) error {
 
 	// scp [ -i *sshKey ] spath [*sshUser@]host:dpath
-	args := defaultSSHParams(ctx)
+	args := defaultSSHParams(ctx, host)
 	args = append(args, spath)
-	if *sshUser == "" {
+
+	if host.User == "" {
 		args = append(args, fmt.Sprintf("%s:%s", host, dpath))
 	} else {
-		args = append(args, fmt.Sprintf("%s@%s:%s", *sshUser, host, dpath))
+		args = append(args, fmt.Sprintf("%s@%s:%s", host.User, host.Name, dpath))
 	}
 	scpCommand := exec.CommandContext(ctx, "scp", args...)
 	logger.Info("Copying SIG config file via scp", "args", args)
@@ -78,7 +73,7 @@ func ReloadSite(ctx context.Context, site *db.Site, logger log.Logger) error {
 	for _, host := range site.Hosts {
 		host := host
 		go func() {
-			errors <- ReloadHost(ctx, host, logger)
+			errors <- ReloadHost(ctx, &host, logger)
 		}()
 	}
 
@@ -104,13 +99,13 @@ Loop:
 	return nil
 }
 
-func ReloadHost(ctx context.Context, host string, logger log.Logger) error {
+func ReloadHost(ctx context.Context, host *db.Host, logger log.Logger) error {
 	// ssh [ -i *sshKey ] [*sshUser@]host sudo systemctl --signal=SIGHUP kill sig.service
-	args := defaultSSHParams(ctx)
-	if *sshUser == "" {
+	args := defaultSSHParams(ctx, host)
+	if host.User == "" {
 		args = append(args, fmt.Sprintf("%s", host))
 	} else {
-		args = append(args, fmt.Sprintf("%s@%s", *sshUser, host))
+		args = append(args, fmt.Sprintf("%s@%s", host.User, host.Name))
 	}
 	args = append(args, "sudo systemctl reload sig.service")
 	sshCommand := exec.CommandContext(ctx, "ssh", args...)
@@ -132,7 +127,7 @@ func VerifyConfigVersion(ctx context.Context, site *db.Site, version uint64,
 	for _, host := range site.Hosts {
 		host := host
 		go func() {
-			errors <- verifyConfigVersionHost(ctx, host, site.MetricsPort, version, logger)
+			errors <- verifyConfigVersionHost(ctx, &host, site.MetricsPort, version, logger)
 		}()
 	}
 	// Take the result from each goroutine
@@ -159,10 +154,10 @@ Loop:
 
 // verifyConfigVersionHost attempts multiple version verifications until one
 // suceeds, for as long as ctx allows.
-func verifyConfigVersionHost(ctx context.Context, host string, port uint16, version uint64,
+func verifyConfigVersionHost(ctx context.Context, host *db.Host, port uint16, version uint64,
 	logger log.Logger) error {
 
-	url := fmt.Sprintf("http://%s:%d/configversion", host, port)
+	url := fmt.Sprintf("http://%s:%d/configversion", host.Name, port)
 	log.Debug("Trying to fetch metric page", "url", url)
 	for try := 0; ; try++ {
 		if err := verifyConfigVersionURL(ctx, url, version); err != nil {

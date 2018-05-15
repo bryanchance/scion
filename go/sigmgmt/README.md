@@ -1,8 +1,9 @@
 ## Running
 
-Make sure the config output directory `output` exists in the running folder. And you have a config file.
+Make sure you have a config file. You should create your own TLS keys:
+`openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout key.pem -out cert.pem`
 
-Then run the interface e.g. with `go run main.go -id=sm4-ff00:0:2f-9 -bind=:8080 -config=cfg.json`.
+Then run the interface e.g. with `go run main.go -id=sm4-ff00:0:2f-9 -bind=:8080 -config=cfg.json`. Open the WebUI on `https://<your-bind-arg>`
 
 ## Configuration
 
@@ -21,16 +22,25 @@ The SIG Policy Configurator needs a json config file to run. The following keys 
     longer needed, they are not displayed. For deployments using **level 1**,
     preloading the database with information is optional.
 * **OutputDir**. The folder where the generated config files will be stored.
+* **Key**. Secret key for WebUI Authentication
+* **Username**. Username for the WebUI
+* **Password**. Password for the WebUI
+* **TLSCertificate**. TLS Certificate can be self-signed
+* **TLSKey**. TLS Key
 * **DBPath**. The SQlite3 database to use. Folder output must already exist.
   The database will be created if it does not already exist.
-* **WebAssetRoot**. The folder where the static resources of the web app are
-  located.
+* **WebAssetRoot**. The folder where the static resources of the web app are located.
 * **SIGCfgPath**. Path to SIG config files on target machines.
 
 Example file:
 ```
 {
     "Features": 1,
+    "Key": "secret key",
+    "Username": "admin",
+    "Password": "password",
+    "TLSCertificate": "go/sigmgmt/cert.pem",
+    "TLSKey": "go/sigmgmt/key.pem",
     "OutputDir": "output/",
     "DBPath": "testdb",
     "SIGCfgPath": "/etc/scion/sig/sig.json",

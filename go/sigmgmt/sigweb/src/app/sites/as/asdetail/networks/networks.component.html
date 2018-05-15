@@ -1,0 +1,37 @@
+<mat-card *ngIf="success" class="success">{{success}}</mat-card>
+<mat-card *ngIf="error" class="error">{{error}}</mat-card>
+<div class="flex-container">
+  <div class="flex-container-vertical">
+    <form #networkForm="ngForm" (submit)="onSubmit()">
+      <mat-form-field>
+        <input matInput name="cidr" [(ngModel)]="network.CIDR" placeholder="CIDR" type="text" required>
+        <mat-hint>
+          <strong>
+            IPv4 prefix known to belong to the remote AS.
+          </strong>
+        </mat-hint>
+      </mat-form-field>
+      <button mat-button type="submit" [disabled]="networkForm.invalid">
+        <mat-icon>add_box</mat-icon>
+      </button>
+    </form>
+    <mat-list>
+      <mat-list-item *ngFor="let network of networks; let idx = index">
+        <p>{{network.CIDR}}</p>
+        <button mat-button (click)="delete(idx)">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </mat-list-item>
+    </mat-list>
+  </div>
+  <mat-card class="help">
+    <mat-card-header>
+      <mat-card-title>Remote IPv4 networks.</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p>
+        The list of IPv4 prefixes known to belong to the remote AS. These will be converted to routes to the remote AS by the SIG.
+      </p>
+    </mat-card-content>
+  </mat-card>
+</div>

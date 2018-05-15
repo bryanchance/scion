@@ -1,0 +1,52 @@
+<mat-card *ngIf="success" class="success">{{success}}</mat-card>
+<mat-card *ngIf="error" class="error">{{error}}</mat-card>
+<div class="flex-container">
+  <div class="flex-container-left">
+    <form #sigForm="ngForm" (submit)="onSubmit()" *ngIf="!formDisabled">
+      <mat-form-field>
+        <input matInput name="name" [(ngModel)]="sig.ID" placeholder="Name" type="text" [disabled]="editing" required>
+      </mat-form-field>
+      <mat-form-field>
+        <input matInput name="address" [(ngModel)]="sig.Addr" placeholder="Address" type="text" required>
+      </mat-form-field>
+      <mat-form-field class="port">
+        <input matInput name="encapPort" [(ngModel)]="sig.EncapPort" placeholder="Encapsulation Port" type="number" required>
+      </mat-form-field>
+      <mat-form-field class="port">
+        <input matInput name="ctrlPort" [(ngModel)]="sig.CtrlPort" placeholder="Control Port" type="number" required>
+      </mat-form-field>
+      <button mat-button type="submit" *ngIf="!editing" [disabled]="sigForm.invalid || sig.CtrlPort > 65535 || sig.EncapPort > 65535">
+        <mat-icon>add_box</mat-icon>
+      </button>
+      <button mat-button type="submit" *ngIf="editing" [disabled]="sigForm.invalid">
+        <mat-icon>save</mat-icon>
+      </button>
+    </form>
+    <mat-list>
+      <mat-list-item *ngFor="let sig of sigs; let idx = index" class="mat-list-item">
+        <span>{{sig.ID}}</span>
+        <span>{{sig.Addr}}</span>
+        <span class="port">{{sig.EncapPort}}</span>
+        <span class="port">{{sig.CtrlPort}}</span>
+        <button *ngIf="!formDisabled" mat-button (click)="edit(idx)">
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button *ngIf="!formDisabled" mat-button (click)="delete(idx)">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </mat-list-item>
+    </mat-list>
+  </div>
+  <mat-card class="help">
+    <mat-card-header>
+      <mat-card-title>Remote SIGs</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p>
+        The list of available SIGs for the remote AS. Multiple SIGs can be defined to increase reliability. If one remote SIG is
+        down, the local SIG will start forwarding traffic to the remaining available ones. The encapsulation port and control
+        port are used by the SIGs to forward traffic and detect availability, and should be reachable by the local SIG.
+      </p>
+    </mat-card-content>
+  </mat-card>
+</div>

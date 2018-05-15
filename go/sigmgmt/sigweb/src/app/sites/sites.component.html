@@ -1,0 +1,26 @@
+<div class="wide-wrapper">
+    <div class="flex-container">
+        <h2 class="mat-h2">Sites</h2>
+        <button color="primary" routerLink="/sites/new" mat-button *ngIf="sites?.length && !formDisabled">
+            <mat-icon>add_box</mat-icon>
+        </button>
+    </div>
+
+    <mat-nav-list>
+        <mat-list-item class="flex-container" *ngFor="let site of sites; let idx = index">
+            <a matLine routerLink="/sites/{{site.Name}}">{{ site.Name }}</a>
+            <button mat-icon-button routerLink="/sites/{{site.Name}}">
+                <mat-icon>settings</mat-icon>
+            </button>
+            <button *ngIf="!formDisabled" mat-icon-button (click)="delete(idx)">
+                <mat-icon>delete</mat-icon>
+            </button>
+        </mat-list-item>
+        <mat-list-item *ngIf="!sites?.length && !formDisabled" routerLink="/sites/new">
+            <a matLine>No sites found! Add a new one...</a>
+            <button mat-icon-button>
+                <mat-icon>add_box</mat-icon>
+            </button>
+        </mat-list-item>
+    </mat-nav-list>
+</div>

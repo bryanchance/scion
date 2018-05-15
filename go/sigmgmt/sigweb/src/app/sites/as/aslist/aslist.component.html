@@ -1,0 +1,39 @@
+<mat-card *ngIf="success" class="success">{{success}}</mat-card>
+<mat-card *ngIf="error" class="error">{{error}}</mat-card>
+<div class="flex-container">
+  <div class="flex-container-vertical">
+    <form #iaForm="ngForm" (ngSubmit)="onSubmit()">
+      <mat-form-field class="isd-form">
+        <input matInput name="isd" [(ngModel)]="ia.ISD" type="text" placeholder="ISD" required [disabled]="formDisabled">
+      </mat-form-field>
+      <mat-form-field class="as-form">
+        <input matInput name="as" [(ngModel)]="ia.AS" type="text" placeholder="AS" required [disabled]="formDisabled">
+      </mat-form-field>
+      <button mat-button type="submit" [disabled]="iaForm.invalid || formDisabled">
+        <mat-icon>add_box</mat-icon>
+      </button>
+    </form>
+    <mat-nav-list>
+      <mat-list-item *ngFor="let ia of ias; let idx = index">
+        <a matLine routerLink="/sites/{{site.Name}}/ias/{{ia.ISD}}-{{ia.AS}}">
+          <span class="isd-name">{{ia.ISD}}</span>
+          <span class="as-name">{{ia.AS}}</span>
+        </a>
+        <button mat-button routerLink="/sites/{{site.Name}}/ias/{{ia.ISD}}-{{ia.AS}}">
+          <mat-icon>settings</mat-icon>
+        </button>
+        <button *ngIf="!formDisabled" mat-button (click)="delete(idx)">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </mat-list-item>
+    </mat-nav-list>
+  </div>
+  <mat-card class="help">
+    <mat-card-header>
+      <mat-card-title>Remote ASes</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p>The list of ASes the SIG in the current site is aware of.</p>
+    </mat-card-content>
+  </mat-card>
+</div>

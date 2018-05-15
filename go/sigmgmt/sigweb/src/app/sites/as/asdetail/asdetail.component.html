@@ -1,0 +1,33 @@
+<div class="flex-container">
+  <h2 class="mat-h2">ISD-AS {{ia.ISD}}-{{ia.AS}}</h2>
+  <button color="primary" routerLink="/sites/{{site.Name}}" mat-button>
+    <mat-icon>arrow_back</mat-icon>
+  </button>
+</div>
+
+<mat-accordion>
+  <mat-expansion-panel [expanded]="true">
+    <mat-expansion-panel-header>
+      Remote IPv4 Networks
+    </mat-expansion-panel-header>
+    <ana-networks [site]="site" [ia]="ia"></ana-networks>
+  </mat-expansion-panel>
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      Remote SIGs
+    </mat-expansion-panel-header>
+    <ana-sigs [site]="site" [ia]="ia"></ana-sigs>
+  </mat-expansion-panel>
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      Sessions
+    </mat-expansion-panel-header>
+    <ana-sessions [site]="site" [ia]="ia"></ana-sessions>
+  </mat-expansion-panel>
+  <mat-expansion-panel>
+    <mat-expansion-panel-header>
+      Traffic Policies
+    </mat-expansion-panel-header>
+    <ana-classifiers [site]="site" [ia]="ia"></ana-classifiers>
+  </mat-expansion-panel>
+</mat-accordion>

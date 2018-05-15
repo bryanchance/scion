@@ -17,6 +17,16 @@ type Global struct {
 	OutputDir string
 	// 0 for basic interface, >0 for advanced interface
 	Features FeatureLevel
+	// WebUI Auth secret key
+	Key string
+	// WebUI Username
+	Username string
+	// WebUI password
+	Password string
+	// TLS certificate path
+	TLSCertificate string
+	// TLS key path
+	TLSKey string
 	// Path to SIG config files on target machines
 	SIGCfgPath string
 	// WebAssetRoot for static files
@@ -32,14 +42,17 @@ func LoadConfig(name string) (*Global, error) {
 	if err := json.Unmarshal(b, &global); err != nil {
 		return nil, common.NewBasicError("Unable to parse JSON", err, "name", name)
 	}
-	if err := checkFolderExists(global.OutputDir); err != nil {
+	if err := createFolder(global.OutputDir); err != nil {
 		return nil, err
 	}
 	return global, nil
 }
 
-func checkFolderExists(path string) error {
+func createFolder(path string) error {
 	stat, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return os.MkdirAll(path, 0755)
+	}
 	if err != nil {
 		return common.NewBasicError("Stat error", err, "path", path)
 	}

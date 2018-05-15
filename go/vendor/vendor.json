@@ -74,6 +74,12 @@
 			"revisionTime": "2015-05-27T14:46:52Z"
 		},
 		{
+			"checksumSHA1": "4772zXrOaPVeDeSgdiV7Vp4KEjk=",
+			"path": "github.com/dgrijalva/jwt-go",
+			"revision": "06ea1031745cb8b3dab3f6a236daf2b0aa468b7e",
+			"revisionTime": "2018-03-08T23:13:08Z"
+		},
+		{
 			"checksumSHA1": "jK0knSGdB7hA/Pvc0mQBYkYxN/8=",
 			"path": "github.com/go-ini/ini",
 			"revision": "32e4c1e6bc4e7d0d8451aa6b75200d19e37a536a",
@@ -111,6 +117,24 @@
 			"path": "github.com/gopherjs/gopherjs/js",
 			"revision": "6f5a3c4a73badf117936d7d61a046e2fab8e2adb",
 			"revisionTime": "2016-10-23T18:47:00Z"
+		},
+		{
+			"checksumSHA1": "g/V4qrXjUGG9B+e3hB+4NAYJ5Gs=",
+			"path": "github.com/gorilla/context",
+			"revision": "08b5f424b9271eedf6f9f0ce86cb9396ed337a42",
+			"revisionTime": "2016-08-17T18:46:32Z"
+		},
+		{
+			"checksumSHA1": "XOY0t65siat4bLbC4VCmBA9dE7Y=",
+			"path": "github.com/gorilla/handlers",
+			"revision": "2b8556b16671de6e753c3eccf2aa763f3c55848a",
+			"revisionTime": "2018-04-16T20:39:09Z"
+		},
+		{
+			"checksumSHA1": "YuYKzn2jczaM6DQcFDmukvAHUX4=",
+			"path": "github.com/gorilla/mux",
+			"revision": "b57cb1605fd11ba2ecfa7f68992b4b9cc791934d",
+			"revisionTime": "2018-04-16T20:45:19Z"
 		},
 		{
 			"checksumSHA1": "UquR8kc0nKU285HwLbkievlLQz4=",
@@ -433,6 +457,12 @@
 			"revisionTime": "2016-09-28T07:47:57Z"
 		},
 		{
+			"checksumSHA1": "wWhBVw5JhTUIbBstf20hucDfY/o=",
+			"path": "github.com/urfave/negroni",
+			"revision": "22c5532ea862c34fdad414e90f8cc00b4f6f4cab",
+			"revisionTime": "2018-01-30T04:45:49Z"
+		},
+		{
 			"checksumSHA1": "t1ctd42IxJTpv7KWicxdmEeb+KE=",
 			"path": "github.com/vishvananda/netlink",
 			"revision": "177f1ceba557262b3f1c3aba4df93a29199fb4eb",
@@ -608,12 +638,6 @@
 			"path": "gopkg.in/restruct.v1",
 			"revision": "80ede2e57cc280052ab88753387703aa62475571",
 			"revisionTime": "2015-12-13T02:39:48Z"
-		},
-		{
-			"checksumSHA1": "WrnWl9sC9qr8Ny0wkfKfnuwIxDM=",
-			"path": "gopkg.in/russross/blackfriday.v2",
-			"revision": "cadec560ec52d93835bf2f15bd794700d3a2473b",
-			"revisionTime": "2017-08-06T17:10:14Z"
 		},
 		{
 			"checksumSHA1": "12GqsW8PiRPnezDDy0v4brZrndM=",

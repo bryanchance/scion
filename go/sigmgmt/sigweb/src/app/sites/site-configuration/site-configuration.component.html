@@ -1,0 +1,91 @@
+<mat-card *ngIf="success" class="success">{{success}}</mat-card>
+<mat-card *ngIf="error" class="error">{{error}}</mat-card>
+
+<div class="flex-container">
+  <div>
+    <form #siteForm="ngForm" (ngSubmit)="onSubmit()">
+      <mat-form-field>
+        <input matInput name="name" *ngIf="!newSite" [(ngModel)]="site.Name" disabled placeholder="Site Name">
+        <input matInput name="name" *ngIf="newSite" [(ngModel)]="site.Name" minlength="4" type="text" placeholder="Site Name" required>
+        <mat-hint align="start">
+          <strong>Unique identifier for the site</strong>
+        </mat-hint>
+      </mat-form-field>
+      <mat-form-field>
+        <input matInput name="port" [(ngModel)]="site.MetricsPort" type="number" placeholder="Metrics Port" required [disabled]="formDisabled">
+      </mat-form-field>
+      <mat-form-field>
+        <input matInput name="vhost" [(ngModel)]="site.VHost" type="text" placeholder="VHost" required [disabled]="formDisabled">
+      </mat-form-field>
+      <button [disabled]="siteForm.invalid || formDisabled || site.MetricsPort > 65535" type="submit" mat-button>
+        <mat-icon>save</mat-icon>
+      </button>
+    </form>
+    <div class="flex-container-vertical" *ngIf="!newSite">
+      <div class="host-form">
+        <strong>Hosts</strong>
+        <form #hostForm="ngForm" (ngSubmit)="saveHost()">
+          <mat-form-field>
+            <input matInput name="hostName" [(ngModel)]="host.Name" type="text" placeholder="Name" required [disabled]="formDisabled">
+          </mat-form-field>
+          <mat-form-field>
+            <input matInput name="hostUser" [(ngModel)]="host.User" type="text" placeholder="SSH User" [disabled]="formDisabled">
+          </mat-form-field>
+          <mat-form-field>
+            <input matInput name="hostKey" [(ngModel)]="host.Key" type="text" placeholder="SSH Key Path" [disabled]="formDisabled">
+            <mat-hint align="start">
+              <strong>E.g. /home/user/.ssh/user.key</strong>
+            </mat-hint>
+          </mat-form-field>
+          <button mat-button type="submit" *ngIf="!editing" [disabled]="hostForm.invalid || formDisabled">
+            <mat-icon>add_box</mat-icon>
+          </button>
+          <button mat-button type="submit" *ngIf="editing" [disabled]="hostForm.invalid || formDisabled">
+            <mat-icon>save</mat-icon>
+          </button>
+        </form>
+      </div>
+      <mat-list class="host-list">
+        <mat-list-item *ngFor="let host of site.Hosts; let idx = index">
+          <div class="host-info">
+            <span>{{host.User}}</span>
+            <span *ngIf="host.User">@</span>
+            <span>{{host.Name}}</span>
+            <p class="key" *ngIf="host.Key">SSHKey: {{host.Key}}</p>
+          </div>
+          <button mat-button (click)="editHost(idx)">
+            <mat-icon>edit mode</mat-icon>
+          </button>
+          <button *ngIf="!formDisabled" mat-button (click)="deleteHost(idx)">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </mat-list-item>
+      </mat-list>
+    </div>
+  </div>
+  <div class="flex-container-vertical">
+    <mat-card class="help">
+      <mat-card-header>
+        <mat-card-title>VHost</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>
+          Virtual host name or IP address. This will be the address of the host in a simple setup, or a virtual hostname or IP in a
+          high-availability setup.
+        </p>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="help">
+      <mat-card-header>
+        <mat-card-title>Hosts</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>
+          List of machine hostnames or IPs and their corresponding ssh users and keys. In a simple setup, this will be identical to
+          VHost. In a high-availability setup, each machine should be included here.
+        </p>
+      </mat-card-content>
+    </mat-card>
+  </div>
+</div>

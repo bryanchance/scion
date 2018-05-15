@@ -4,15 +4,20 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
 	log "github.com/inconshreveable/log15"
+	"github.com/urfave/negroni"
 
 	liblog "github.com/scionproto/scion/go/lib/log"
+	jwt "github.com/scionproto/scion/go/sigmgmt/auth"
 	"github.com/scionproto/scion/go/sigmgmt/config"
+	"github.com/scionproto/scion/go/sigmgmt/ctrl"
 	"github.com/scionproto/scion/go/sigmgmt/db"
-	"github.com/scionproto/scion/go/sigmgmt/web"
 )
 
 var (
@@ -35,17 +40,107 @@ func main() {
 		fatal("Unable to connect to database", "err", err)
 	}
 
-	// FIXME(scrye): The application currently provides no authentication, so
-	// it is vulnerable to CSRF (and just about any other attack under the
-	// sun). It should only be deployed in test or isolated production
-	// environments for now.
-	app := web.NewApplication(cfg, dbase)
-	http.HandleFunc("/", app.ServeHTTP)
-	log.Info("Starting HTTP server", "address", *bindAddress)
-	log.Info("HTTP server exit", "reason", http.ListenAndServe(*bindAddress, nil))
+	fmt.Printf("WebUI started, go to: https://%s\n", *bindAddress)
+	log.Debug("Started WebUI on", "address", *bindAddress)
+	router := configureRouter(cfg, dbase)
+	exit := http.ListenAndServeTLS(*bindAddress, cfg.TLSCertificate, cfg.TLSKey, router)
+	fatal("HTTP server exit", "reason", exit)
 }
 
 func fatal(msg string, desc ...interface{}) {
 	log.Crit(msg, desc...)
 	os.Exit(1)
+}
+
+func configureRouter(cfg *config.Global, dbase *db.DB) http.Handler {
+	r := mux.NewRouter()
+
+	jwtAuth := jwt.NewJWTAuth(cfg)
+	auth := ctrl.NewAuthController(cfg, jwtAuth)
+	r.HandleFunc("/api/auth", auth.GetToken).Methods("POST")
+
+	sc := ctrl.NewSiteController(dbase, cfg)
+	ac := ctrl.NewASController(dbase, cfg)
+
+	type methodMap map[string]func(http.ResponseWriter, *http.Request, http.HandlerFunc)
+	for path, methods := range map[string]methodMap{
+		"/api/sites": {
+			"GET":  sc.GetSites,
+			"POST": sc.PostSite,
+		},
+		"/api/sites/{site}": {
+			"GET":    sc.GetSite,
+			"PUT":    sc.PutSite,
+			"DELETE": sc.DeleteSite,
+		},
+		"/api/sites/{site}/reload-config": {
+			"GET": sc.ReloadConfig,
+		},
+		"/api/sites/{site}/paths": {
+			"GET":  sc.GetPathPredicates,
+			"POST": sc.AddPathPredicate,
+		},
+		"/api/sites/{site}/paths/{path}": {
+			"DELETE": sc.DeletePathPredicate,
+		},
+		"/api/sites/{site}/ias": {
+			"GET":  ac.GetIAs,
+			"POST": ac.PostIA,
+		},
+		"/api/sites/{site}/ias/{ia}": {
+			"GET":    ac.GetPolicy,
+			"PUT":    ac.UpdatePolicy,
+			"DELETE": ac.DeleteIA,
+		},
+		"/api/sites/{site}/ias/{ia}/networks": {
+			"GET":  ac.GetNetworks,
+			"POST": ac.PostNetwork,
+		},
+		"/api/sites/{site}/ias/{ia}/networks/{network}": {
+			"DELETE": ac.DeleteNetwork,
+		},
+		"/api/sites/{site}/ias/{ia}/sigs": {
+			"GET":  ac.GetSIGs,
+			"POST": ac.PostSIG,
+		},
+		"/api/sites/{site}/ias/{ia}/sigs/{sig}": {
+			"PUT":    ac.UpdateSIG,
+			"DELETE": ac.DeleteSIG,
+		},
+		"/api/sites/{site}/ias/{ia}/sessions": {
+			"GET":  ac.GetSessions,
+			"POST": ac.PostSession,
+		},
+		"/api/sites/{site}/ias/{ia}/sessions/{session}": {
+			"DELETE": ac.DeleteSession,
+		},
+		"/api/sites/{site}/ias/{ia}/session-aliases": {
+			"GET": ac.GetSessionAliases,
+		},
+		"/api/token/refresh": {
+			"POST": auth.RefreshToken,
+		},
+	} {
+		for method, handler := range methods {
+			r.Handle(
+				path,
+				negroni.New(
+					negroni.HandlerFunc(jwtAuth.RequiredAuthenticated),
+					negroni.HandlerFunc(handler),
+				),
+			).Methods(method)
+		}
+	}
+
+	r.PathPrefix("/doc/").Handler(http.FileServer(http.Dir(cfg.WebAssetRoot)))
+	// TODO(worxli): check if files exist, otherwise serve index.html
+	r.PathPrefix("/").Handler(http.FileServer(http.Dir(cfg.WebAssetRoot + "webui")))
+
+	handler := handlers.CORS(
+		handlers.AllowedMethods([]string{"POST", "PUT", "OPTIONS", "DELETE", "GET", "HEAD"}),
+		handlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),
+		handlers.AllowedOrigins([]string{"*"}),
+	)(r)
+
+	return handler
 }

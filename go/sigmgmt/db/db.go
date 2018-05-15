@@ -4,6 +4,7 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -32,8 +33,10 @@ const (
 
 	CREATE TABLE Hosts (
 		Name TEXT NOT NULL,
+		User TEXT NOT NULL,
+		Key TEXT NOT NULL,
 		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		PRIMARY KEY (Site, Name)
+		PRIMARY KEY (Site, Name, User, Key)
 	);
 
 	CREATE TABLE ASEntries (
@@ -57,12 +60,13 @@ const (
 	);
 
 	CREATE TABLE Networks (
+		ID INTEGER PRIMARY KEY AUTOINCREMENT,
 		CIDR TEXT NOT NULL,
 		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
 		IsdID INTEGER NOT NULL,
 		AsID INTEGER NOT NULL,
 		FOREIGN KEY (Site, IsdID, AsID) REFERENCES ASEntries ON DELETE CASCADE ON UPDATE CASCADE,
-		PRIMARY KEY (Site, IsdID, AsID, CIDR)
+		UNIQUE (ID, Site, IsdID, AsID, CIDR)
 	);
 
 	CREATE TABLE Filters (
@@ -119,7 +123,36 @@ func (db *DB) InsertSite(site *Site) error {
 		return common.NewBasicError("database transaction error", err, "rollback_error", rerr)
 	}
 	for _, host := range site.Hosts {
-		_, err := tx.Exec(`INSERT INTO Hosts (Name, Site) VALUES (?, ?)`, host, site.Name)
+		_, err := tx.Exec(`INSERT INTO Hosts (Name, User, Key, Site) VALUES (?, ?, ?, ?)`,
+			host.Name, host.User, host.Key, site.Name)
+		if err != nil {
+			rerr := tx.Rollback()
+			return common.NewBasicError("database transaction error", err, "rollback_error", rerr)
+		}
+	}
+	return tx.Commit()
+}
+
+func (db *DB) UpdateSite(site *Site) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(`UPDATE Sites SET VHost = ?, MetricsPort = ? WHERE Name = ?`,
+		site.VHost, site.MetricsPort, site.Name)
+	if err != nil {
+		rerr := tx.Rollback()
+		return common.NewBasicError("database transaction error", err, "rollback_error", rerr)
+	}
+	// Remove all hosts and add them again
+	_, err = tx.Exec(`DELETE FROM Hosts WHERE Site = ?`, site.Name)
+	if err != nil {
+		rerr := tx.Rollback()
+		return common.NewBasicError("database transaction error", err, "rollback_error", rerr)
+	}
+	for _, host := range site.Hosts {
+		_, err := tx.Exec(`INSERT INTO Hosts (Name, User, Key, Site) VALUES (?, ?, ?, ?)`,
+			host.Name, host.User, host.Key, site.Name)
 		if err != nil {
 			rerr := tx.Rollback()
 			return common.NewBasicError("database transaction error", err, "rollback_error", rerr)
@@ -133,9 +166,9 @@ func (db *DB) DeleteSite(name string) error {
 	return err
 }
 
-func (db *DB) GetSite(name string) (*Site, error) {
+func (db *DB) GetSiteWithHosts(name string) (*Site, error) {
 	rows, err := db.Query(`
-		SELECT Sites.Name, Sites.VHost, Sites.MetricsPort, Hosts.Name
+		SELECT Sites.Name, Sites.VHost, Sites.MetricsPort, Hosts.Name, Hosts.User, Hosts.Key
 		FROM Sites
 		INNER JOIN Hosts
 		WHERE Hosts.Site = Sites.Name AND Sites.Name = ?`, name)
@@ -146,37 +179,60 @@ func (db *DB) GetSite(name string) (*Site, error) {
 
 	site := Site{}
 	for rows.Next() {
-		var host string
-		if err := rows.Scan(&site.Name, &site.VHost, &site.MetricsPort, &host); err != nil {
+		host := Host{}
+		if err := rows.Scan(&site.Name, &site.VHost, &site.MetricsPort,
+			&host.Name, &host.User, &host.Key); err != nil {
 			return nil, err
 		}
 		site.Hosts = append(site.Hosts, host)
 	}
+	// Check if result is present
+	if site.Name == "" {
+		return nil, errors.New("Site not found")
+	}
 	return &site, rows.Err()
 }
 
-func (db *DB) QuerySites() (map[string]*Site, error) {
+func (db *DB) GetSite(name string) (*Site, error) {
 	rows, err := db.Query(`
-		SELECT Sites.Name, Sites.VHost, Sites.MetricsPort, Hosts.Name
+		SELECT Sites.Name, Sites.VHost, Sites.MetricsPort
 		FROM Sites
-		INNER JOIN Hosts
-		WHERE Hosts.Site = Sites.Name`)
+		WHERE Sites.Name = ?`, name)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	sites := make(map[string]*Site)
+	site := Site{Hosts: []Host{}}
 	for rows.Next() {
-		var siteStr, vHostStr, hostStr string
-		var metricsPort uint16
-		if err := rows.Scan(&siteStr, &vHostStr, &metricsPort, &hostStr); err != nil {
+		if err := rows.Scan(&site.Name, &site.VHost, &site.MetricsPort); err != nil {
 			return nil, err
 		}
-		if _, ok := sites[siteStr]; !ok {
-			sites[siteStr] = &Site{Name: siteStr, VHost: vHostStr, MetricsPort: metricsPort}
+	}
+	// Check if result is present
+	if site.Name == "" {
+		return nil, errors.New("Site not found")
+	}
+	return &site, rows.Err()
+}
+
+func (db *DB) QuerySites() ([]*Site, error) {
+	rows, err := db.Query(`
+		SELECT Sites.Name, Sites.VHost, Sites.MetricsPort
+		FROM Sites`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sites := []*Site{}
+	for rows.Next() {
+		var siteStr, vHostStr string
+		var metricsPort uint16
+		if err := rows.Scan(&siteStr, &vHostStr, &metricsPort); err != nil {
+			return nil, err
 		}
-		sites[siteStr].Hosts = append(sites[siteStr].Hosts, hostStr)
+		sites = append(sites, &Site{Name: siteStr, VHost: vHostStr, MetricsPort: metricsPort})
 	}
 	return sites, rows.Err()
 }
@@ -261,6 +317,14 @@ func (db *DB) InsertSIG(site string, ia addr.IA, sig *config.SIG) error {
 	return err
 }
 
+func (db *DB) UpdateSIG(site string, ia addr.IA, sig *config.SIG) error {
+	_, err := db.Exec(
+		`UPDATE SIGs SET Address = ?, CtrlPort = ?, EncapPort = ?
+		WHERE Name = ? AND IsdID = ? and AsID = ? and Site = ?`,
+		sig.Addr.String(), sig.CtrlPort, sig.EncapPort, sig.Id, ia.I, ia.A, site)
+	return err
+}
+
 func (db *DB) DeleteSIG(site string, ia addr.IA, sigName string) error {
 	_, err := db.Exec(
 		`DELETE FROM SIGs WHERE Name = ? AND IsdID = ? AND AsID = ? AND Site = ?`,
@@ -305,26 +369,27 @@ func (db *DB) InsertNetwork(site string, ia addr.IA, network *net.IPNet) error {
 	return err
 }
 
-func (db *DB) DeleteNetwork(site string, ia addr.IA, network string) error {
+func (db *DB) DeleteNetwork(site string, ia addr.IA, network int) error {
 	_, err := db.Exec(
-		`DELETE FROM Networks WHERE CIDR = ? AND IsdID = ? AND AsID = ? AND Site = ?`,
+		`DELETE FROM Networks WHERE ID = ? AND IsdID = ? AND AsID = ? AND Site = ?`,
 		network, ia.I, ia.A, site)
 	return err
 }
 
-func (db *DB) QueryNetworks(site string, ia addr.IA) ([]*config.IPNet, error) {
+func (db *DB) QueryNetworks(site string, ia addr.IA) (map[int]*config.IPNet, error) {
 	rows, err := db.Query(
-		`SELECT CIDR FROM Networks WHERE site = ? AND IsdID = ? AND AsID = ?`,
+		`SELECT ID, CIDR FROM Networks WHERE site = ? AND IsdID = ? AND AsID = ?`,
 		site, ia.I, ia.A)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var networks []*config.IPNet
+	networks := map[int]*config.IPNet{}
 	for rows.Next() {
+		var id int
 		var cidr string
-		if err := rows.Scan(&cidr); err != nil {
+		if err := rows.Scan(&id, &cidr); err != nil {
 			return nil, err
 		}
 		_, network, err := net.ParseCIDR(cidr)
@@ -332,7 +397,7 @@ func (db *DB) QueryNetworks(site string, ia addr.IA) ([]*config.IPNet, error) {
 			// Bug in pre-insertion validation
 			panic(fmt.Sprintf("bad IP network address in db: %s", cidr))
 		}
-		networks = append(networks, (*config.IPNet)(network))
+		networks[id] = (*config.IPNet)(network)
 	}
 	return networks, rows.Err()
 }
@@ -370,6 +435,24 @@ func (db *DB) QueryFilters(site string) (pktcls.ActionMap, error) {
 		actionMap[name] = pktcls.NewActionFilterPaths(name, pktcls.NewCondPathPredicate(pp))
 	}
 	return actionMap, rows.Err()
+}
+
+func (db *DB) QueryRawFilters(site string) ([]Filter, error) {
+	rows, err := db.Query(`SELECT Name, Filter FROM Filters WHERE Site = ?`, site)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	filters := []Filter{}
+	for rows.Next() {
+		var filter Filter
+		if err := rows.Scan(&filter.Name, &filter.PP); err != nil {
+			return nil, err
+		}
+		filters = append(filters, filter)
+	}
+	return filters, rows.Err()
 }
 
 func (db *DB) InsertSession(site string, ia addr.IA, name uint8, filter string) error {
@@ -470,9 +553,13 @@ func (db *DB) GetSiteConfig(site string) (*config.Cfg, error) {
 }
 
 func (db *DB) GetASDetails(site string, ia addr.IA) (*config.ASEntry, error) {
-	networks, err := db.QueryNetworks(site, ia)
+	networkMap, err := db.QueryNetworks(site, ia)
 	if err != nil {
 		return nil, err
+	}
+	networks := []*config.IPNet{}
+	for _, network := range networkMap {
+		networks = append(networks, network)
 	}
 	sigs, err := db.QuerySIGs(site, ia)
 	if err != nil {
@@ -502,10 +589,17 @@ type SessionAliasMap map[string]string
 type Site struct {
 	Name        string
 	VHost       string
-	Hosts       []string
+	Hosts       []Host
 	MetricsPort uint16
 }
 
-func (s *Site) PrintHosts() string {
-	return strings.Join(s.Hosts, ", ")
+type Host struct {
+	Name string
+	User string
+	Key  string
+}
+
+type Filter struct {
+	Name string
+	PP   string
 }

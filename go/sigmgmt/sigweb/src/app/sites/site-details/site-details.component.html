@@ -1,0 +1,53 @@
+<div class="flex-container">
+  <h2 class="mat-h2">Site Details</h2>
+  <button color="primary" routerLink="/sites" mat-button>
+    <mat-icon>arrow_back</mat-icon>
+  </button>
+</div>
+
+<mat-accordion>
+  <mat-expansion-panel [expanded]="true">
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        Site Configuration
+      </mat-panel-title>
+    </mat-expansion-panel-header>
+    <ana-site-configuration [newSite]="newSite" [site]="site"></ana-site-configuration>
+  </mat-expansion-panel>
+  <mat-expansion-panel *ngIf="!newSite">
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        Management
+      </mat-panel-title>
+      <mat-panel-description>
+        Generate and push SIG config files
+      </mat-panel-description>
+    </mat-expansion-panel-header>
+    <p>Clicking the Push and reload config button will generate a new JSON SIG Config file from saved settings, copy it to each
+      host in the site and then send a reload signal to the running SIG. Finally, the SIG is queried via HTTP to verify that
+      it has loaded the correct config.</p>
+    <mat-spinner [diameter]="40" *ngIf="loadingConfig" color="accent"></mat-spinner>
+    <span *ngIf="reloadSuccess" class="success">Config successfully reloaded!</span>
+    <span *ngIf="reloadError" class="error">{{reloadError}}</span>
+    <mat-action-row>
+      <button (click)="reloadConfig()" mat-button>Push and Reload Config</button>
+    </mat-action-row>
+  </mat-expansion-panel>
+  <mat-expansion-panel *ngIf="!newSite">
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        Remote ASes
+      </mat-panel-title>
+    </mat-expansion-panel-header>
+    <ana-aslist [site]="site"></ana-aslist>
+  </mat-expansion-panel>
+  <mat-expansion-panel *ngIf="!newSite">
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        Path Selectors
+      </mat-panel-title>
+    </mat-expansion-panel-header>
+    <ana-path-selector [site]="site"></ana-path-selector>
+
+  </mat-expansion-panel>
+</mat-accordion>

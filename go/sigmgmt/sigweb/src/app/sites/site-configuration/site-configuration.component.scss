@@ -1,0 +1,29 @@
+mat-card {
+    margin-bottom: 20px;
+}
+
+mat-form-field {
+    width: 300px;
+}
+
+.flex-container-vertical {
+    margin-top: 40px; 
+
+    .host-form {
+        width: 400px;
+    }
+
+    .host-list {
+        margin-top: 25px;
+        margin-left: -16px;
+
+        .host-info {
+            width: 216px;
+            font-size: 14px;
+
+            .key {
+                font-size: 10px;
+            }
+        }
+    }
+}

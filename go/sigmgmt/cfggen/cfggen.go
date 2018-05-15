@@ -111,12 +111,12 @@ func compileCommand(cfg *config.Cfg, asEntry *config.ASEntry, aliasMap db.Sessio
 		var err error
 		if tokenIsAliasName(token) {
 			if sessionIDs, err = appendByAlias(sessionIDs, asEntry, aliasMap[token]); err != nil {
-				return common.NewBasicError("alias error", err, "name", token)
+				return common.NewBasicError("Alias Error:", err, "name", token)
 			}
 		} else {
 			// Token is raw session ID
 			if sessionIDs, err = appendByRaw(sessionIDs, asEntry, token); err != nil {
-				return common.NewBasicError("session id error", err)
+				return common.NewBasicError("Session ID Error:", err)
 			}
 		}
 	}
@@ -139,7 +139,7 @@ func appendByAlias(sessionIDs []mgmt.SessionType, asEntry *config.ASEntry,
 	sessions string) ([]mgmt.SessionType, error) {
 
 	if sessions == "" {
-		return nil, common.NewBasicError("alias not found or empty", nil)
+		return nil, common.NewBasicError("Alias not found or empty", nil)
 	}
 	for _, token := range strings.Split(sessions, ",") {
 		var err error
@@ -162,7 +162,7 @@ func appendByRaw(sessionIDs []mgmt.SessionType, asEntry *config.ASEntry,
 		return nil, err
 	}
 	if _, ok := asEntry.Sessions[id]; !ok {
-		return nil, common.NewBasicError("session does not exist", nil, "id", id)
+		return nil, common.NewBasicError("Session does not exist", nil, "id", id)
 	}
 	return append(sessionIDs, id), nil
 }
@@ -176,7 +176,7 @@ func parseSessionID(input string) (mgmt.SessionType, error) {
 func kvSplit(token string) (key, value string, err error) {
 	items := strings.Split(token, "=")
 	if len(items) != 2 {
-		return "", "", common.NewBasicError("bad token", nil, "token", token)
+		return "", "", common.NewBasicError("Bad token: ", nil, "token", token)
 	}
 	return items[0], items[1], nil
 }
