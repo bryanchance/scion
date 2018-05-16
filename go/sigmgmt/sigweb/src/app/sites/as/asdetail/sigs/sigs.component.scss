@@ -1,20 +1,20 @@
 mat-list {
     margin-left: -16px;
-
     span {
         width: 185px;
         display: inline-block;
     }
-
     .port {
-        width: 123px;
+        width: 130px;
+    }
+    .ctrl-port {
+        width: 90px;
     }
 }
 
 form {
     height: 50px;
-
     .port {
-        width: 120px;
+        width: 135px;
     }
 }

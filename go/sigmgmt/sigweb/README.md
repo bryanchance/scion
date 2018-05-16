@@ -9,8 +9,8 @@ reload if you change any of the source files.
 
 ## Build
 
-Run `ng build --prod -op ../static/webui` to build the project and put the files into the default
-location.
+Run `ng build --prod --output-path ../static/webui` to build the project and put the files into the
+default location.
 
 ## Running unit tests
 

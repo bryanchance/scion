@@ -22,83 +22,6 @@ import (
 	"github.com/scionproto/scion/go/sig/siginfo"
 )
 
-const (
-	SchemaVersion = 1
-	Schema        = `
-	CREATE TABLE Sites (
-		Name TEXT PRIMARY KEY NOT NULL,
-		MetricsPort INTEGER NOT NULL,
-		VHost TEXT NOT NULL
-	);
-
-	CREATE TABLE Hosts (
-		Name TEXT NOT NULL,
-		User TEXT NOT NULL,
-		Key TEXT NOT NULL,
-		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		PRIMARY KEY (Site, Name, User, Key)
-	);
-
-	CREATE TABLE ASEntries (
-		IsdID INTEGER NOT NULL,
-		AsID INTEGER NOT NULL,
-		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		Policy TEXT NOT NULL,
-		PRIMARY KEY (Site, IsdID, AsID)
-	);
-
-	CREATE TABLE SIGs (
-		Name TEXT NOT NULL,
-		Address TEXT NOT NULL,
-		CtrlPort INTEGER NOT NULL,
-		EncapPort INTEGER NOT NULL,
-		Site TEXT REFERENCES Sites,
-		IsdID INTEGER NOT NULL,
-		AsID INTEGER NOT NULL,
-		FOREIGN KEY (Site, IsdID, AsID) REFERENCES ASEntries ON DELETE CASCADE ON UPDATE CASCADE,
-		PRIMARY KEY (Site, IsdID, AsID, Name)
-	);
-
-	CREATE TABLE Networks (
-		ID INTEGER PRIMARY KEY AUTOINCREMENT,
-		CIDR TEXT NOT NULL,
-		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		IsdID INTEGER NOT NULL,
-		AsID INTEGER NOT NULL,
-		FOREIGN KEY (Site, IsdID, AsID) REFERENCES ASEntries ON DELETE CASCADE ON UPDATE CASCADE,
-		UNIQUE (ID, Site, IsdID, AsID, CIDR)
-	);
-
-	CREATE TABLE Filters (
-		Name TEXT NOT NULL,
-		Filter TEXT NOT NULL,
-		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		PRIMARY KEY (Site, Name)
-	);
-
-	CREATE TABLE Sessions (
-		Name INTEGER NOT NULL,
-		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		IsdID INTEGER NOT NULL,
-		AsID INTEGER NOT NULL,
-		FilterName TEXT NOT NULL,
-		FOREIGN KEY (Site, FilterName) REFERENCES Filters ON DELETE CASCADE ON UPDATE CASCADE,
-		FOREIGN KEY (Site, IsdID, AsID) REFERENCES ASEntries ON DELETE CASCADE ON UPDATE CASCADE,
-		PRIMARY KEY (Site, IsdID, AsID, Name)
-	);
-
-	CREATE TABLE SessionAliases (
-		Name TEXT NOT NULL,
-		Sessions TEXT NOT NULL,
-		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		IsdID INTEGER NOT NULL,
-		AsID INTEGER NOT NULL,
-		FOREIGN KEY (Site, IsdID, AsID) REFERENCES ASEntries ON DELETE CASCADE ON UPDATE CASCADE,
-		PRIMARY KEY (Site, IsdID, AsID, Name)
-	);
-	`
-)
-
 type DB struct {
 	*sql.DB
 }
@@ -109,6 +32,31 @@ func New(path string) (*DB, error) {
 	} else {
 		return &DB{DB: db}, nil
 	}
+}
+
+func (db *DB) GetConfigValue(site string, ia addr.IA, name string) (*ASConfig, error) {
+	rows, err := db.Query(
+		`SELECT Name, Value FROM ASConfig WHERE Name = ? AND IsdID = ? AND AsID = ? AND Site = ?`,
+		name, ia.I, ia.A, site)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	config := ASConfig{}
+	for rows.Next() {
+		if err := rows.Scan(&config.Name, &config.Value); err != nil {
+			return nil, err
+		}
+	}
+	return &config, rows.Err()
+}
+
+func (db *DB) SetConfigValue(site string, ia addr.IA, name string, value string) error {
+	_, err := db.Exec(
+		`REPLACE INTO ASConfig (Name, Value, IsdID, AsID, Site) VALUES(?, ?, ?, ?, ?)`,
+		name, value, ia.I, ia.A, site)
+	return err
 }
 
 func (db *DB) InsertSite(site *Site) error {
@@ -237,12 +185,19 @@ func (db *DB) QuerySites() ([]*Site, error) {
 	return sites, rows.Err()
 }
 
-func (db *DB) InsertAS(site string, ia addr.IA) error {
+func (db *DB) InsertAS(site string, name string, ia addr.IA) error {
 	// Insert an empty string in the policy field to not have the hassle of
 	// dealing with NULLs
 	_, err := db.Exec(
-		`INSERT INTO ASEntries (IsdID, AsID, Site, Policy) VALUES(?, ?, ?, ?)`,
-		ia.I, ia.A, site, "")
+		`INSERT INTO ASEntries (Name, IsdID, AsID, Site, Policy) VALUES(?, ?, ?, ?, ?)`,
+		name, ia.I, ia.A, site, "")
+	return err
+}
+
+func (db *DB) UpdateAS(site string, name string, ia addr.IA) error {
+	_, err := db.Exec(
+		`UPDATE ASEntries SET Name = ?  WHERE Site = ? AND IsdID = ? AND AsID = ?`,
+		name, site, ia.I, ia.A)
 	return err
 }
 
@@ -253,7 +208,29 @@ func (db *DB) DeleteAS(site string, ia addr.IA) error {
 	return err
 }
 
-func (db *DB) QueryASes(site string) ([]addr.IA, error) {
+func (db *DB) QueryASes(site string) ([]AS, error) {
+	rows, err := db.Query(`SELECT Name, IsdID, AsID FROM ASEntries WHERE Site = ?`, site)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ases := []AS{}
+	for rows.Next() {
+		var name string
+		ia := addr.IA{}
+		err := rows.Scan(&name, &ia.I, &ia.A)
+		if err != nil {
+			return nil, err
+		}
+		as := *ASFromAddrIA(ia)
+		as.Name = name
+		ases = append(ases, as)
+	}
+	return ases, rows.Err()
+}
+
+func (db *DB) QueryIAs(site string) ([]addr.IA, error) {
 	rows, err := db.Query(`SELECT IsdID, AsID FROM ASEntries WHERE Site = ?`, site)
 	if err != nil {
 		return nil, err
@@ -279,15 +256,15 @@ func (db *DB) SetPolicy(site string, ia addr.IA, policy string) error {
 	return err
 }
 
-func (db *DB) GetPolicy(site string, ia addr.IA) (string, error) {
-	var policy string
+func (db *DB) GetAS(site string, ia addr.IA) (*AS, error) {
+	as := ASFromAddrIA(ia)
 	err := db.QueryRow(
-		`SELECT Policy FROM ASEntries WHERE Site = ? AND IsdID = ? AND AsID = ?`,
-		site, ia.I, ia.A).Scan(&policy)
+		`SELECT Name, Policy FROM ASEntries WHERE Site = ? AND IsdID = ? AND AsID = ?`,
+		site, ia.I, ia.A).Scan(&as.Name, &as.Policy)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return policy, nil
+	return as, nil
 }
 
 func (db *DB) GetPolicies(site string) (map[addr.IA]string, error) {
@@ -409,6 +386,13 @@ func (db *DB) InsertFilter(site string, name string, pp *spathmeta.PathPredicate
 	return err
 }
 
+func (db *DB) UpdateFilter(site string, name string, pp *spathmeta.PathPredicate) error {
+	_, err := db.Exec(
+		`UPDATE Filters SET Filter = ? WHERE Name = ? AND Site = ?`,
+		pp.String(), name, site)
+	return err
+}
+
 func (db *DB) DeleteFilter(site string, name string) error {
 	_, err := db.Exec(`DELETE FROM Filters WHERE Name = ? AND Site = ?`, name, site)
 	return err
@@ -456,6 +440,12 @@ func (db *DB) QueryRawFilters(site string) ([]Filter, error) {
 }
 
 func (db *DB) InsertSession(site string, ia addr.IA, name uint8, filter string) error {
+	if filter == "" {
+		_, err := db.Exec(
+			`INSERT INTO Sessions (Name, FilterName, Site, IsdID, AsID) VALUES (?, NULL, ?, ?, ?)`,
+			name, filter, site, ia.I, ia.A)
+		return err
+	}
 	_, err := db.Exec(
 		`INSERT INTO Sessions (Name, FilterName, Site, IsdID, AsID) VALUES (?, ?, ?, ?, ?)`,
 		name, filter, site, ia.I, ia.A)
@@ -532,12 +522,12 @@ func (db *DB) GetSessionAliases(site string) (map[addr.IA]SessionAliasMap, error
 
 func (db *DB) GetSiteConfig(site string) (*config.Cfg, error) {
 	cfg := &config.Cfg{}
-	ases, err := db.QueryASes(site)
+	ias, err := db.QueryIAs(site)
 	if err != nil {
 		return nil, err
 	}
 	cfg.ASes = make(map[addr.IA]*config.ASEntry)
-	for _, ia := range ases {
+	for _, ia := range ias {
 		asEntry, err := db.GetASDetails(site, ia)
 		if err != nil {
 			return nil, err
@@ -569,37 +559,21 @@ func (db *DB) GetASDetails(site string, ia addr.IA) (*config.ASEntry, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Add default session 0 if enabled
+	cfg, err := db.GetConfigValue(site, ia, "default_session")
+	if err != nil {
+		return nil, err
+	}
+	active, err := strconv.ParseBool(cfg.Value)
+	if err != nil {
+		return nil, err
+	}
+	if active {
+		sessions[0] = ""
+	}
 	return &config.ASEntry{
 		Nets:     networks,
 		Sigs:     sigs,
 		Sessions: sessions,
 	}, nil
-}
-
-func applyConvertUInt8(input []uint8) []string {
-	var output []string
-	for _, object := range input {
-		output = append(output, strconv.Itoa(int(object)))
-	}
-	return output
-}
-
-type SessionAliasMap map[string]string
-
-type Site struct {
-	Name        string
-	VHost       string
-	Hosts       []Host
-	MetricsPort uint16
-}
-
-type Host struct {
-	Name string
-	User string
-	Key  string
-}
-
-type Filter struct {
-	Name string
-	PP   string
 }

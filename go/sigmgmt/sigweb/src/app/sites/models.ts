@@ -3,6 +3,9 @@ export class Site {
     VHost: string
     Hosts: Host[] = []
     MetricsPort: number
+    constructor(Name: string = '') {
+        this.Name = Name
+    }
 }
 
 export class Host {
@@ -21,6 +24,7 @@ export class PathSelector {
 }
 
 export class IA {
+    Name: string
     ISD: string
     AS: string
     Policy: string
@@ -48,4 +52,11 @@ export class SIG {
 export class Session {
     ID: number
     FilterName: string // PathSelector name
+}
+
+export class DefaultSession {
+    Active: boolean
+    constructor(active: boolean) {
+        this.Active = active
+    }
 }

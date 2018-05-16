@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core'
 import { ActivatedRoute } from '@angular/router'
+import { forkJoin } from 'rxjs'
 
 import { ApiService } from '../../../api/api.service'
 import { IA, Session, SIG, Site } from '../../models'
@@ -26,8 +27,14 @@ export class ASDetailComponent implements OnInit {
 
     if (siteParam && iaParam) {
       [this.ia.ISD, this.ia.AS] = iaParam.split('-', 2)
-      this.api.getSite(siteParam).subscribe(
-        site => this.site = site,
+      forkJoin(
+        this.api.getSite(siteParam),
+        this.api.getIA(new Site(siteParam), this.ia)
+      ).subscribe(
+        ([site, ia]) => {
+          this.site = site
+          this.ia = ia
+        },
         () => { }
       )
     }

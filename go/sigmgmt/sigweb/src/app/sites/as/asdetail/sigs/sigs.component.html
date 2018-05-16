@@ -10,15 +10,15 @@
         <input matInput name="address" [(ngModel)]="sig.Addr" placeholder="Address" type="text" required>
       </mat-form-field>
       <mat-form-field class="port">
-        <input matInput name="encapPort" [(ngModel)]="sig.EncapPort" placeholder="Encapsulation Port" type="number" required>
+        <input matInput name="encapPort" [(ngModel)]="sig.EncapPort" [disabled]="!editing" placeholder="Encapsulation Port" type="number">
       </mat-form-field>
       <mat-form-field class="port">
-        <input matInput name="ctrlPort" [(ngModel)]="sig.CtrlPort" placeholder="Control Port" type="number" required>
+        <input matInput name="ctrlPort" [(ngModel)]="sig.CtrlPort" [disabled]="!editing" placeholder="Control Port" type="number">
       </mat-form-field>
-      <button mat-button type="submit" *ngIf="!editing" [disabled]="sigForm.invalid || sig.CtrlPort > 65535 || sig.EncapPort > 65535">
+      <button mat-icon-button type="submit" *ngIf="!editing" [disabled]="sigForm.invalid">
         <mat-icon>add_box</mat-icon>
       </button>
-      <button mat-button type="submit" *ngIf="editing" [disabled]="sigForm.invalid">
+      <button mat-icon-button type="submit" *ngIf="editing" [disabled]="sigForm.invalid || sig.CtrlPort > 65535 || sig.EncapPort > 65535">
         <mat-icon>save</mat-icon>
       </button>
     </form>
@@ -27,11 +27,11 @@
         <span>{{sig.ID}}</span>
         <span>{{sig.Addr}}</span>
         <span class="port">{{sig.EncapPort}}</span>
-        <span class="port">{{sig.CtrlPort}}</span>
-        <button *ngIf="!formDisabled" mat-button (click)="edit(idx)">
+        <span class="ctrl-port">{{sig.CtrlPort}}</span>
+        <button *ngIf="!formDisabled" mat-icon-button (click)="edit(idx)">
           <mat-icon>edit</mat-icon>
         </button>
-        <button *ngIf="!formDisabled" mat-button (click)="delete(idx)">
+        <button *ngIf="!formDisabled" mat-icon-button (click)="delete(idx)">
           <mat-icon>delete</mat-icon>
         </button>
       </mat-list-item>

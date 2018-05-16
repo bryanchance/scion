@@ -3,26 +3,36 @@
 <div class="flex-container">
   <div class="flex-container-vertical">
     <form #iaForm="ngForm" (ngSubmit)="onSubmit()">
+      <mat-form-field>
+        <input matInput name="name" [(ngModel)]="ia.Name" type="text" placeholder="Name" required [disabled]="formDisabled">
+      </mat-form-field>
       <mat-form-field class="isd-form">
-        <input matInput name="isd" [(ngModel)]="ia.ISD" type="text" placeholder="ISD" required [disabled]="formDisabled">
+        <input matInput name="isd" [(ngModel)]="ia.ISD" type="text" placeholder="ISD" required [disabled]="formDisabled || editing">
       </mat-form-field>
       <mat-form-field class="as-form">
-        <input matInput name="as" [(ngModel)]="ia.AS" type="text" placeholder="AS" required [disabled]="formDisabled">
+        <input matInput name="as" [(ngModel)]="ia.AS" type="text" placeholder="AS" required [disabled]="formDisabled || editing">
       </mat-form-field>
-      <button mat-button type="submit" [disabled]="iaForm.invalid || formDisabled">
+      <button mat-button type="submit" *ngIf="!editing" [disabled]="iaForm.invalid || formDisabled">
         <mat-icon>add_box</mat-icon>
+      </button>
+      <button mat-button type="submit" *ngIf="editing" [disabled]="iaForm.invalid || formDisabled">
+        <mat-icon>save</mat-icon>
       </button>
     </form>
     <mat-nav-list>
       <mat-list-item *ngFor="let ia of ias; let idx = index">
         <a matLine routerLink="/sites/{{site.Name}}/ias/{{ia.ISD}}-{{ia.AS}}">
+          <span class="name">{{ia.Name}}</span>
           <span class="isd-name">{{ia.ISD}}</span>
           <span class="as-name">{{ia.AS}}</span>
         </a>
-        <button mat-button routerLink="/sites/{{site.Name}}/ias/{{ia.ISD}}-{{ia.AS}}">
+        <button mat-icon-button routerLink="/sites/{{site.Name}}/ias/{{ia.ISD}}-{{ia.AS}}">
           <mat-icon>settings</mat-icon>
         </button>
-        <button *ngIf="!formDisabled" mat-button (click)="delete(idx)">
+        <button *ngIf="!formDisabled" mat-icon-button (click)="edit(idx)">
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button *ngIf="!formDisabled" mat-icon-button (click)="delete(idx)">
           <mat-icon>delete</mat-icon>
         </button>
       </mat-list-item>

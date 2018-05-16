@@ -12,10 +12,11 @@ import { PathSelector, Site } from '../models'
 })
 export class PathSelectorComponent implements OnInit {
   @Input() site: Site
-  newPathSelector = new PathSelector
+  pathSelector = new PathSelector
   pathSelectors: PathSelector[]
   success = ''
   error = ''
+  editing = false
   @ViewChild('pathForm') form: NgForm
 
   constructor(private api: ApiService, private userService: UserService) { }
@@ -29,13 +30,30 @@ export class PathSelectorComponent implements OnInit {
 
   onSubmit() {
     this.error = ''
-    this.api.createPathSelector(this.site, this.newPathSelector).subscribe(
-      () => {
-        this.pathSelectors.push({ ...this.newPathSelector })
-        this.form.resetForm()
-      },
-      (error) => this.error = error
-    )
+    if (this.editing) {
+      this.api.updatePathSelector(this.site, this.pathSelector).subscribe(
+        sig => {
+          this.pathSelector = new PathSelector
+          this.form.resetForm()
+          this.editing = false
+          this.success = 'Successfully updated PathSelector.'
+         },
+        error => this.error = error
+      )
+    } else {
+      this.api.createPathSelector(this.site, this.pathSelector).subscribe(
+        () => {
+          this.pathSelectors.push({ ...this.pathSelector })
+          this.form.resetForm()
+        },
+        (error) => this.error = error
+      )
+    }
+  }
+
+  edit(idx: number) {
+    this.editing = true
+    this.pathSelector = this.pathSelectors[idx]
   }
 
   delete(idx: number) {

@@ -14,14 +14,12 @@ export class ClassifiersComponent implements OnChanges {
   success = ''
   error = ''
 
-  policy = new Policy('')
-
   constructor(private api: ApiService) { }
 
   ngOnChanges() {
     if (this.site.Name && this.ia) {
-      this.api.getIAPolicy(this.site, this.ia).subscribe(
-        policy => this.policy = policy
+      this.api.getIA(this.site, this.ia).subscribe(
+        (ia: IA) => this.ia = ia
       )
     }
   }
@@ -29,7 +27,7 @@ export class ClassifiersComponent implements OnChanges {
   onSubmit() {
     this.success = ''
     this.error = ''
-    this.api.updateIAPolicy(this.site, this.ia, this.policy).subscribe(
+    this.api.updateIAPolicies(this.site, this.ia, this.ia.Policy).subscribe(
       () => this.success = 'Policies successfully updated!',
       error => this.error = error
     )

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http'
 import { Injectable } from '@angular/core'
 
-import { CIDR, IA, PathSelector, Policy, Session, SIG, Site } from '../sites/models'
+import { CIDR, DefaultSession, IA, PathSelector, Policy, Session, SIG, Site } from '../sites/models'
 import { User } from './user.service'
 
 @Injectable()
@@ -49,6 +49,10 @@ export class ApiService {
     return this.http.post<PathSelector>('sites/' + site.Name + '/paths', ps)
   }
 
+  updatePathSelector(site: Site, ps: PathSelector) {
+    return this.http.put('sites/' + site.Name + '/paths/' + ps.Name, ps)
+  }
+
   deletePathSelector(site: Site, ps: PathSelector) {
     return this.http.delete('sites/' + site.Name + '/paths/' + ps.Name)
   }
@@ -60,16 +64,20 @@ export class ApiService {
     return this.http.get<IA[]>('sites/' + site.Name + '/ias')
   }
 
-  getIAPolicy(site: Site, ia: IA) {
-    return this.http.get<Policy>(this.iaUrl(site, ia))
+  getIA(site: Site, ia: IA) {
+    return this.http.get<IA>(this.iaUrl(site, ia))
   }
 
   createIA(site: Site, ia: IA) {
     return this.http.post<IA>('sites/' + site.Name + '/ias', ia)
   }
 
-  updateIAPolicy(site: Site, ia: IA, policy: Policy) {
-    return this.http.put<string>(this.iaUrl(site, ia), policy)
+  updateIA(site: Site, ia: IA) {
+    return this.http.put<string>(this.iaUrl(site, ia), ia)
+  }
+
+  updateIAPolicies(site: Site, ia: IA, policy: string) {
+    return this.http.put<string>(this.iaUrl(site, ia) + '/policies', { Policy: policy })
   }
 
   deleteIA(site: Site, ia: IA) {
@@ -120,6 +128,14 @@ export class ApiService {
 
   deleteSession(site: Site, ia: IA, session: Session) {
     return this.http.delete(this.iaUrl(site, ia) + '/sessions/' + session.ID)
+  }
+
+  getDefaultSession(site: Site, ia: IA) {
+    return this.http.get<DefaultSession>(this.iaUrl(site, ia) + '/session-default')
+  }
+
+  setDefaultSession(site: Site, ia: IA, defaultSession: DefaultSession) {
+    return this.http.post(this.iaUrl(site, ia) + '/session-default', defaultSession)
   }
 
   getSessionAliases(site: Site, ia: IA) {

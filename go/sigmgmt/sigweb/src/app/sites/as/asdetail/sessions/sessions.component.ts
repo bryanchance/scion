@@ -3,7 +3,8 @@ import { NgForm } from '@angular/forms'
 
 import { ApiService } from '../../../../api/api.service'
 import { UserService } from '../../../../api/user.service'
-import { IA, PathSelector, Session, Site } from '../../../models'
+import { IA, PathSelector, Session, Site, DefaultSession } from '../../../models'
+import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'ana-sessions',
@@ -18,6 +19,7 @@ export class SessionsComponent implements OnChanges {
 
   session = new Session
   sessions: Session[]
+  defaultSession: boolean
   sessionAliases: string[]
   pathSelectors: PathSelector[] = []
   @ViewChild('sessionForm') form: NgForm
@@ -30,8 +32,14 @@ export class SessionsComponent implements OnChanges {
         this.api.getPathSelectors(this.site).subscribe(
           pathSelectors => this.pathSelectors = pathSelectors
         )
-        this.api.getSessions(this.site, this.ia).subscribe(
-          sessions => this.sessions = sessions
+        forkJoin(
+          this.api.getSessions(this.site, this.ia),
+          this.api.getDefaultSession(this.site, this.ia)
+        ).subscribe(
+          ([sessions, defaultSession]) => {
+            this.sessions = sessions
+            this.defaultSession = defaultSession.Active
+          }
         )
       } else {
         // get session aliases only
@@ -59,8 +67,14 @@ export class SessionsComponent implements OnChanges {
     )
   }
 
+  toggleDefaultSession() {
+    this.api.setDefaultSession(this.site, this.ia, new DefaultSession(this.defaultSession))
+      .subscribe(() => { })
+  }
+
   getPP(name): string {
-    return this.pathSelectors.filter(el => el.Name === name)[0].PP
+    const pred = this.pathSelectors.filter(el => el.Name === name)[0]
+    return pred ? pred.PP : ''
   }
 
   get formDisabled() {

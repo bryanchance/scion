@@ -81,16 +81,20 @@ func configureRouter(cfg *config.Global, dbase *db.DB) http.Handler {
 			"POST": sc.AddPathPredicate,
 		},
 		"/api/sites/{site}/paths/{path}": {
+			"PUT":    sc.PutPathPredicate,
 			"DELETE": sc.DeletePathPredicate,
 		},
 		"/api/sites/{site}/ias": {
-			"GET":  ac.GetIAs,
-			"POST": ac.PostIA,
+			"GET":  ac.GetASes,
+			"POST": ac.PostAS,
 		},
 		"/api/sites/{site}/ias/{ia}": {
-			"GET":    ac.GetPolicy,
-			"PUT":    ac.UpdatePolicy,
-			"DELETE": ac.DeleteIA,
+			"GET":    ac.GetAS,
+			"PUT":    ac.UpdateAS,
+			"DELETE": ac.DeleteAS,
+		},
+		"/api/sites/{site}/ias/{ia}/policies": {
+			"PUT": ac.UpdatePolicy,
 		},
 		"/api/sites/{site}/ias/{ia}/networks": {
 			"GET":  ac.GetNetworks,
@@ -117,6 +121,10 @@ func configureRouter(cfg *config.Global, dbase *db.DB) http.Handler {
 		"/api/sites/{site}/ias/{ia}/session-aliases": {
 			"GET": ac.GetSessionAliases,
 		},
+		"/api/sites/{site}/ias/{ia}/session-default": {
+			"GET":  ac.GetDefaultSession,
+			"POST": ac.UpdateDefaultSession,
+		},
 		"/api/token/refresh": {
 			"POST": auth.RefreshToken,
 		},
@@ -133,7 +141,7 @@ func configureRouter(cfg *config.Global, dbase *db.DB) http.Handler {
 	}
 
 	r.PathPrefix("/doc/").Handler(http.FileServer(http.Dir(cfg.WebAssetRoot)))
-	// TODO(worxli): check if files exist, otherwise serve index.html
+	// TODO(worxli): check if files exist, otherwise serve index.html - or use nginx instead!
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir(cfg.WebAssetRoot + "webui")))
 
 	handler := handlers.CORS(

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	log "github.com/inconshreveable/log15"
 
 	"github.com/scionproto/scion/go/lib/spath/spathmeta"
 	"github.com/scionproto/scion/go/sigmgmt/config"
@@ -114,8 +113,6 @@ func (sc *SiteController) ReloadConfig(w http.ResponseWriter, r *http.Request,
 		respondError(w, err, msg, http.StatusInternalServerError)
 		return
 	}
-	log.Info("SIG Config version verification successful", "vhost", site.VHost,
-		"version", siteCfg.ConfigVersion)
 }
 
 func (sc *SiteController) GetPathPredicates(w http.ResponseWriter, r *http.Request,
@@ -130,9 +127,11 @@ func (sc *SiteController) GetPathPredicates(w http.ResponseWriter, r *http.Reque
 
 func (sc *SiteController) AddPathPredicate(w http.ResponseWriter, r *http.Request,
 	_ http.HandlerFunc) {
-	var err error
 	filterJSON := db.Filter{}
-	json.NewDecoder(r.Body).Decode(&filterJSON)
+	if err := json.NewDecoder(r.Body).Decode(&filterJSON); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
 	pp, err := spathmeta.NewPathPredicate(strings.TrimSpace(filterJSON.PP))
 	if err != nil {
 		respondError(w, err, "Bad path selector string", 400)
@@ -140,6 +139,30 @@ func (sc *SiteController) AddPathPredicate(w http.ResponseWriter, r *http.Reques
 	}
 	if err := sc.dbase.InsertFilter(mux.Vars(r)["site"], filterJSON.Name, pp); err != nil {
 		respondError(w, err, "DB Error! Is the name unique?", 400)
+		return
+	}
+	respondEmpty(w)
+}
+
+func (sc *SiteController) PutPathPredicate(w http.ResponseWriter, r *http.Request,
+	_ http.HandlerFunc) {
+	filterSct := db.Filter{}
+	if err := json.NewDecoder(r.Body).Decode(&filterSct); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
+	if mux.Vars(r)["path"] != filterSct.Name {
+		respondError(w, errors.New("Names are not equal"), "Name cannot be changed.",
+			http.StatusBadRequest)
+		return
+	}
+	pp, err := spathmeta.NewPathPredicate(strings.TrimSpace(filterSct.PP))
+	if err != nil {
+		respondError(w, err, "Bad path selector string", 400)
+		return
+	}
+	if err := sc.dbase.UpdateFilter(mux.Vars(r)["site"], filterSct.Name, pp); err != nil {
+		respondError(w, err, "DB Error! Unable to update PathPredicate!", 400)
 		return
 	}
 	respondEmpty(w)

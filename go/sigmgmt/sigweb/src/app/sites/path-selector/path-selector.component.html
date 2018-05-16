@@ -4,23 +4,30 @@
   <div class="flex-container-vertical">
     <form #pathForm="ngForm" (ngSubmit)="onSubmit()" *ngIf="!formDisabled">
       <mat-form-field>
-        <input matInput name="pathName" [(ngModel)]="newPathSelector.Name" type="text" placeholder="Name" required>
+        <input matInput name="pathName" [(ngModel)]="pathSelector.Name" type="text" placeholder="Name" required [disabled]="editing">
       </mat-form-field>
-      <mat-form-field class="predicate">
-        <input matInput name="filter" [(ngModel)]="newPathSelector.PP" type="text" placeholder="Filter Predicate" required>
+      <mat-form-field class="predicate-form">
+        <input matInput name="filter" [(ngModel)]="pathSelector.PP" type="text" placeholder="Filter Predicate" required>
         <mat-hint align="start">
-          E.g. To select paths going through ISD-AS 1-ff00:0:110: <strong>1-ff00:0:110#0</strong>
+          E.g. To select paths going through ISD-AS 1-ff00:0:110:
+          <strong>1-ff00:0:110#0</strong>
         </mat-hint>
       </mat-form-field>
-      <button mat-button type="submit" [disabled]="pathForm.invalid">
+      <button mat-button type="submit" *ngIf="!editing" [disabled]="pathForm.invalid">
         <mat-icon>add_box</mat-icon>
+      </button>
+      <button mat-button type="submit" *ngIf="editing" [disabled]="pathForm.invalid">
+        <mat-icon>save</mat-icon>
       </button>
     </form>
     <mat-list>
       <mat-list-item *ngFor="let path of pathSelectors; let idx = index" class="path-list-row">
         <p class="name">{{path.Name}}</p>
         <p class="predicate">{{path.PP}}</p>
-        <button mat-button *ngIf="!formDisabled" (click)="delete(idx)">
+        <button *ngIf="!formDisabled" mat-icon-button (click)="edit(idx)">
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button mat-icon-button *ngIf="!formDisabled" (click)="delete(idx)">
           <mat-icon>delete</mat-icon>
         </button>
       </mat-list-item>

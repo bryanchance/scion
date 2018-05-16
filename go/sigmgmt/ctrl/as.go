@@ -12,6 +12,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	sigcfg "github.com/scionproto/scion/go/sig/config"
+	"github.com/scionproto/scion/go/sig/sigcmn"
 	"github.com/scionproto/scion/go/sig/siginfo"
 	"github.com/scionproto/scion/go/sigmgmt/config"
 	"github.com/scionproto/scion/go/sigmgmt/db"
@@ -29,40 +30,34 @@ func NewASController(dbase *db.DB, cfg *config.Global) *ASController {
 	}
 }
 
-func (ac ASController) GetIAs(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var err error
-	var ias []addr.IA
-	if ias, err = ac.dbase.QueryASes(mux.Vars(r)["site"]); err != nil {
-		respondError(w, err, "Unable to get IAs", 400)
+func (ac ASController) GetASes(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	ases, err := ac.dbase.QueryASes(mux.Vars(r)["site"])
+	if err != nil {
+		respondError(w, err, "Unable to get ASes", 400)
 		return
 	}
-
-	iaList := []IA{}
-	for _, ia := range ias {
-		iaList = append(iaList, *IAFromAddrIA(ia))
-	}
-	respondJSON(w, iaList)
+	respondJSON(w, ases)
 }
 
-func (ac ASController) PostIA(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var iaSct *IA
-	if err := json.NewDecoder(r.Body).Decode(&iaSct); err != nil {
+func (ac ASController) PostAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var asSct *db.AS
+	if err := json.NewDecoder(r.Body).Decode(&asSct); err != nil {
 		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
 		return
 	}
-	ia, err := iaSct.ToAddrIA()
+	ia, err := asSct.ToAddrIA()
 	if err != nil {
 		respondError(w, err, IAParseError, http.StatusBadRequest)
 		return
 	}
-	if err := ac.dbase.InsertAS(mux.Vars(r)["site"], ia); err != nil {
-		respondError(w, err, "DB Error! IS the ISD-AS identifier unique?", 400)
+	if err := ac.dbase.InsertAS(mux.Vars(r)["site"], asSct.Name, ia); err != nil {
+		respondError(w, err, "DB Error! Is the ISD-AS identifier unique?", 400)
 		return
 	}
-	respondJSON(w, iaSct)
+	respondJSON(w, asSct)
 }
 
-func (ac ASController) DeleteIA(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+func (ac ASController) DeleteAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
 	ia, msg, err := getIA(r)
 	if err != nil {
 		respondError(w, err, msg, http.StatusBadRequest)
@@ -75,18 +70,36 @@ func (ac ASController) DeleteIA(w http.ResponseWriter, r *http.Request, _ http.H
 	respondEmpty(w)
 }
 
-func (ac ASController) GetPolicy(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+func (ac ASController) GetAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
 	ia, msg, err := getIA(r)
 	if err != nil {
 		respondError(w, err, msg, 400)
 		return
 	}
-	policy := Policy{}
-	if policy.Policy, err = ac.dbase.GetPolicy(mux.Vars(r)["site"], *ia); err != nil {
-		respondError(w, err, "Unable to get Policy", 400)
+	as, err := ac.dbase.GetAS(mux.Vars(r)["site"], *ia)
+	if err != nil {
+		respondError(w, err, "Unable to get IA", 400)
 		return
 	}
-	respondJSON(w, policy)
+	respondJSON(w, as)
+}
+
+func (ac ASController) UpdateAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	ia, msg, err := getIA(r)
+	if err != nil {
+		respondError(w, err, msg, http.StatusBadRequest)
+		return
+	}
+	var asSct *db.AS
+	if err := json.NewDecoder(r.Body).Decode(&asSct); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
+	if err := ac.dbase.UpdateAS(mux.Vars(r)["site"], asSct.Name, *ia); err != nil {
+		respondError(w, err, "DB Error! IS the ISD-AS identifier unique?", 400)
+		return
+	}
+	respondEmpty(w)
 }
 
 func (ac ASController) UpdatePolicy(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
@@ -206,13 +219,13 @@ func (ac ASController) PostSIG(w http.ResponseWriter, r *http.Request, _ http.Ha
 		respondError(w, err, "IP Address is not valid!", 400)
 		return
 	}
-	sig.CtrlPort = sigSct.CtrlPort
-	sig.EncapPort = sigSct.EncapPort
+	sig.CtrlPort = sigcmn.DefaultCtrlPort
+	sig.EncapPort = sigcmn.DefaultEncapPort
 	if err = ac.dbase.InsertSIG(mux.Vars(r)["site"], *ia, &sig); err != nil {
 		respondError(w, err, "DB Error! Is the name unique?", 400)
 		return
 	}
-	respondJSON(w, sigSct)
+	respondJSON(w, SIGFromSIGCfg(sig))
 }
 
 func (ac ASController) UpdateSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
@@ -302,8 +315,58 @@ func (ac ASController) PostSession(w http.ResponseWriter, r *http.Request, _ htt
 		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
 		return
 	}
-	if err = ac.dbase.InsertSession(mux.Vars(r)["site"], *ia,
-		session.ID, session.FilterName); err != nil {
+	err = ac.dbase.InsertSession(mux.Vars(r)["site"], *ia, session.ID, session.FilterName)
+	if err != nil {
+		respondError(w, err, "DB Error! Is the ID unique?", 400)
+		return
+	}
+	respondJSON(w, session)
+}
+
+func (ac ASController) GetDefaultSession(w http.ResponseWriter, r *http.Request,
+	_ http.HandlerFunc) {
+	ia, msg, err := getIA(r)
+	if err != nil {
+		respondError(w, err, msg, http.StatusBadRequest)
+		return
+	}
+	cfg, err := ac.dbase.GetConfigValue(mux.Vars(r)["site"], *ia, "default_session")
+	if err != nil {
+		respondError(w, err, "Unable to get default session state", 400)
+		return
+	}
+	if cfg.Name == "" {
+		err = ac.dbase.SetConfigValue(mux.Vars(r)["site"], *ia, "default_session",
+			strconv.FormatBool(true))
+		if err != nil {
+			respondError(w, err, "DB Error! Cannot set default session", 400)
+			return
+		}
+		cfg.Value = "true"
+	}
+	active, err := strconv.ParseBool(cfg.Value)
+	if err != nil {
+		respondError(w, err, "Unable to parse default session state", 400)
+		return
+	}
+	respondJSON(w, DefaultSession{Active: active})
+}
+
+func (ac ASController) UpdateDefaultSession(w http.ResponseWriter, r *http.Request,
+	_ http.HandlerFunc) {
+	ia, msg, err := getIA(r)
+	if err != nil {
+		respondError(w, err, msg, http.StatusBadRequest)
+		return
+	}
+	var session *DefaultSession
+	if err := json.NewDecoder(r.Body).Decode(&session); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
+	err = ac.dbase.SetConfigValue(mux.Vars(r)["site"], *ia, "default_session",
+		strconv.FormatBool(session.Active))
+	if err != nil {
 		respondError(w, err, "DB Error! Is the ID unique?", 400)
 		return
 	}

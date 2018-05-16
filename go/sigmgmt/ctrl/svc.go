@@ -85,13 +85,15 @@ func (sc *SiteController) writeConfig(site *db.Site, siteCfg *sigcfg.Cfg) (strin
 	}
 	log.Info("SIG config copy to remote site successful", "site", site.Name)
 	if err := netcopy.ReloadSite(ctx, site, log.Root()); err != nil {
-		return "Unable to reload site", err
+		return "Unable to reload SIG on remote site", err
 	}
-	log.Info("SIG configuration reload successful", "vhost", site.VHost)
+	log.Debug("SIG configuration reload triggered successfully", "vhost", site.VHost)
 	if err := netcopy.VerifyConfigVersion(ctx, site, siteCfg.ConfigVersion,
 		log.Root()); err != nil {
 		return "Unable to verify version of reloaded config", err
 	}
+	log.Info("SIG Config version verification successful", "vhost", site.VHost,
+		"version", siteCfg.ConfigVersion)
 	return "", nil
 }
 

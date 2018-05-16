@@ -18,6 +18,14 @@
       </button>
     </form>
     <mat-list *ngIf="!formDisabled">
+      <mat-list-item>
+        <p>
+          <span class="">0</span>
+          <span>
+            <mat-checkbox [(ngModel)]="defaultSession" (change)="toggleDefaultSession()">Default Session</mat-checkbox>
+          </span>
+        </p>
+      </mat-list-item>
       <mat-list-item *ngFor="let session of sessions; let idx = index">
         <p>
           <span>{{session.ID}}</span>

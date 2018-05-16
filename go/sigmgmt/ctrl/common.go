@@ -4,12 +4,11 @@ package ctrl
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	log "github.com/inconshreveable/log15"
 
-	"github.com/scionproto/scion/go/lib/addr"
+	sigcfg "github.com/scionproto/scion/go/sig/config"
 )
 
 var (
@@ -17,11 +16,6 @@ var (
 )
 
 type (
-	IA struct {
-		ISD string
-		AS  string
-	}
-
 	Policy struct {
 		Policy string
 	}
@@ -34,6 +28,10 @@ type (
 	Session struct {
 		ID         uint8
 		FilterName string
+	}
+
+	DefaultSession struct {
+		Active bool
 	}
 
 	SessionAlias struct {
@@ -49,13 +47,9 @@ type (
 	}
 )
 
-func IAFromAddrIA(ia addr.IA) *IA {
-	return &IA{ISD: fmt.Sprint(ia.I), AS: ia.A.String()}
-}
-
-func (ia *IA) ToAddrIA() (addr.IA, error) {
-	iaStr := fmt.Sprintf("%s-%s", ia.ISD, ia.AS)
-	return addr.IAFromString(iaStr)
+func SIGFromSIGCfg(sig sigcfg.SIG) *SIG {
+	return &SIG{ID: string(sig.Id), Addr: sig.Addr.String(),
+		EncapPort: sig.EncapPort, CtrlPort: sig.CtrlPort}
 }
 
 func respond(w http.ResponseWriter, data []byte, status int) {

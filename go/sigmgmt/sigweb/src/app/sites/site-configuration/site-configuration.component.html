@@ -6,7 +6,7 @@
     <form #siteForm="ngForm" (ngSubmit)="onSubmit()">
       <mat-form-field>
         <input matInput name="name" *ngIf="!newSite" [(ngModel)]="site.Name" disabled placeholder="Site Name">
-        <input matInput name="name" *ngIf="newSite" [(ngModel)]="site.Name" minlength="4" type="text" placeholder="Site Name" required>
+        <input matInput name="name" *ngIf="newSite" [(ngModel)]="site.Name" minlength="1" type="text" placeholder="Site Name" required>
         <mat-hint align="start">
           <strong>Unique identifier for the site</strong>
         </mat-hint>
@@ -22,25 +22,25 @@
       </button>
     </form>
     <div class="flex-container-vertical" *ngIf="!newSite">
-      <div class="host-form">
+      <div class="host-form" *ngIf="!formDisabled">
         <strong>Hosts</strong>
         <form #hostForm="ngForm" (ngSubmit)="saveHost()">
           <mat-form-field>
-            <input matInput name="hostName" [(ngModel)]="host.Name" type="text" placeholder="Name" required [disabled]="formDisabled">
+            <input matInput name="hostName" [(ngModel)]="host.Name" type="text" placeholder="Name" required>
           </mat-form-field>
           <mat-form-field>
-            <input matInput name="hostUser" [(ngModel)]="host.User" type="text" placeholder="SSH User" [disabled]="formDisabled">
+            <input matInput name="hostUser" [(ngModel)]="host.User" type="text" placeholder="SSH User">
           </mat-form-field>
           <mat-form-field>
-            <input matInput name="hostKey" [(ngModel)]="host.Key" type="text" placeholder="SSH Key Path" [disabled]="formDisabled">
+            <input matInput name="hostKey" [(ngModel)]="host.Key" type="text" placeholder="SSH Key Path">
             <mat-hint align="start">
               <strong>E.g. /home/user/.ssh/user.key</strong>
             </mat-hint>
           </mat-form-field>
-          <button mat-button type="submit" *ngIf="!editing" [disabled]="hostForm.invalid || formDisabled">
+          <button mat-button type="submit" *ngIf="!editing" [disabled]="hostForm.invalid">
             <mat-icon>add_box</mat-icon>
           </button>
-          <button mat-button type="submit" *ngIf="editing" [disabled]="hostForm.invalid || formDisabled">
+          <button mat-button type="submit" *ngIf="editing" [disabled]="hostForm.invalid">
             <mat-icon>save</mat-icon>
           </button>
         </form>
@@ -53,7 +53,7 @@
             <span>{{host.Name}}</span>
             <p class="key" *ngIf="host.Key">SSHKey: {{host.Key}}</p>
           </div>
-          <button mat-button (click)="editHost(idx)">
+          <button *ngIf="!formDisabled" mat-button (click)="editHost(idx)">
             <mat-icon>edit mode</mat-icon>
           </button>
           <button *ngIf="!formDisabled" mat-button (click)="deleteHost(idx)">
