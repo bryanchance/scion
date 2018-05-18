@@ -1,0 +1,170 @@
+{
+    "ASes": {
+        "1-ff00:0:1": {
+            "Nets": [
+                "192.168.1.0/24",
+                "2001:db8::/48"
+            ],
+            "Sigs": {
+                "remote-1": {
+                    "Addr": "10.0.1.1",
+                    "CtrlPort": 1234,
+                    "EncapPort": 5678
+                },
+                "remote-2": {
+                    "Addr": "10.0.1.2",
+                    "CtrlPort": 65535,
+                    "EncapPort": 0
+                }
+            },
+            "Sessions": {
+                "3": "filter-A",
+                "4": "filter-B"
+            },
+            "PktPolicies": [
+                {
+                    "ClassName": "transit-isd-1",
+                    "SessIds": [
+                        3
+                    ]
+                },
+                {
+                    "ClassName": "transit-isd-2",
+                    "SessIds": [
+                        3,
+                        4
+                    ]
+                }
+            ]
+        },
+        "1-ff00:0:2": {
+            "Nets": [
+                "2.0.0.0/16"
+            ],
+            "Sigs": {},
+            "Sessions": null,
+            "PktPolicies": null
+        },
+        "1-ff00:0:3": {
+            "Nets": [],
+            "Sigs": {},
+            "Sessions": null,
+            "PktPolicies": null
+        },
+        "1-ff00:0:4": {
+            "Nets": [],
+            "Sigs": {
+                "remote-3": {
+                    "Addr": "2001:db8::4",
+                    "CtrlPort": 0,
+                    "EncapPort": 0
+                }
+            },
+            "Sessions": {
+                "0": ""
+            },
+            "PktPolicies": [
+                {
+                    "ClassName": "transit-isd-1",
+                    "SessIds": [
+                        0
+                    ]
+                }
+            ]
+        }
+    },
+    "Classes": {
+        "classC": {
+            "CondAllOf": null
+        },
+        "transit-isd-1": {
+            "CondAllOf": [
+                {
+                    "CondIPv4": {
+                        "MatchToS": {
+                            "TOS": "0x80"
+                        }
+                    }
+                },
+                {
+                    "CondIPv4": {
+                        "MatchDestination": {
+                            "Net": "192.168.1.0/24"
+                        }
+                    }
+                }
+            ]
+        },
+        "transit-isd-2": {
+            "CondAnyOf": [
+                {
+                    "CondIPv4": {
+                        "MatchToS": {
+                            "TOS": "0x0"
+                        }
+                    }
+                },
+                {
+                    "CondIPv4": {
+                        "MatchSource": {
+                            "Net": "10.0.0.0/8"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "Actions": {
+        "filter-A": {
+            "ActionFilterPaths": {
+                "CondAnyOf": [
+                    {
+                        "CondAllOf": [
+                            {
+                                "CondPathPredicate": {
+                                    "PP": "0-0#123"
+                                }
+                            },
+                            {
+                                "CondPathPredicate": {
+                                    "PP": "0-0#234"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "CondAllOf": [
+                            {
+                                "CondPathPredicate": {
+                                    "PP": "0-0#345"
+                                }
+                            },
+                            {
+                                "CondPathPredicate": {
+                                    "PP": "0-0#456"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        "filter-B": {
+            "ActionFilterPaths": {
+                "CondAnyOf": [
+                    {
+                        "CondPathPredicate": {
+                            "PP": "0-0#123"
+                        }
+                    },
+                    {
+                        "CondPathPredicate": {
+                            "PP": "0-0#134"
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "ConfigVersion": 0
+}

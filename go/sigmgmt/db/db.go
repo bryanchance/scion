@@ -15,7 +15,7 @@ import (
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/lib/spath/spathmeta"
 	"github.com/scionproto/scion/go/lib/sqlite"
-	"github.com/scionproto/scion/go/sig/config"
+	"github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sig/siginfo"
 )
 

@@ -22,7 +22,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/sig/config"
+	"github.com/scionproto/scion/go/sig/anaconfig"
 )
 
 var Map = &ASMap{}

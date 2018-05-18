@@ -8,7 +8,7 @@ import (
 
 	log "github.com/inconshreveable/log15"
 
-	sigcfg "github.com/scionproto/scion/go/sig/config"
+	sigcfg "github.com/scionproto/scion/go/sig/anaconfig"
 )
 
 var (

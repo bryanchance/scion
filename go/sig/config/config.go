@@ -23,16 +23,12 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/lib/pktcls"
-	"github.com/scionproto/scion/go/sig/mgmt"
 	"github.com/scionproto/scion/go/sig/siginfo"
 )
 
 // Cfg is a direct Go representation of the JSON file format.
 type Cfg struct {
 	ASes          map[addr.IA]*ASEntry
-	Classes       pktcls.ClassMap
-	Actions       pktcls.ActionMap
 	ConfigVersion uint64
 }
 
@@ -47,29 +43,6 @@ func LoadFromFile(path string) (*Cfg, error) {
 		return nil, common.NewBasicError("Unable to parse SIG config", err)
 	}
 	cfg.postprocess()
-	for ia, ae := range cfg.ASes {
-		for sessId, actName := range ae.Sessions {
-			if actName == "" {
-				continue
-			}
-			if _, ok := cfg.Actions[actName]; !ok {
-				return nil, common.NewBasicError("Unknown action name", nil,
-					"ia", ia, "sessId", sessId, "action", actName)
-			}
-		}
-		for i, pol := range ae.PktPolicies {
-			if _, ok := cfg.Classes[pol.ClassName]; !ok {
-				return nil, common.NewBasicError("Unknown class name", nil,
-					"ia", ia, "polIdx", i, "class", pol.ClassName)
-			}
-			for _, sessId := range pol.SessIds {
-				if _, ok := ae.Sessions[sessId]; !ok {
-					return nil, common.NewBasicError("Unknown session id", nil,
-						"ia", ia, "polIdx", i, "class", pol.ClassName, "sessId", sessId)
-				}
-			}
-		}
-	}
 	return cfg, nil
 }
 
@@ -85,13 +58,9 @@ func (cfg *Cfg) postprocess() {
 	}
 }
 
-type SessionMap map[mgmt.SessionType]string
-
 type ASEntry struct {
-	Nets        []*IPNet
-	Sigs        SIGSet
-	Sessions    SessionMap
-	PktPolicies []*PktPolicy
+	Nets []*IPNet
+	Sigs SIGSet
 }
 
 // IPNet is custom type of net.IPNet, to allow custom unmarshalling.
@@ -131,35 +100,3 @@ type SIG struct {
 }
 
 type SIGSet map[siginfo.SigIdType]*SIG
-
-type PktPolicy struct {
-	ClassName string
-	SessIds   []mgmt.SessionType
-}
-
-type Session struct {
-	ID      mgmt.SessionType
-	PolName string
-	Pred    *pktcls.ActionFilterPaths
-}
-
-type SessionSet map[mgmt.SessionType]*Session
-
-func BuildSessions(cfgSessMap SessionMap, actions pktcls.ActionMap) (SessionSet, error) {
-	set := make(SessionSet)
-	for sessId, actName := range cfgSessMap {
-		act := actions[actName]
-		afp, ok := act.(*pktcls.ActionFilterPaths)
-		if actName != "" && !ok {
-			// Unable to find the Action the session is referencing
-			return nil, common.NewBasicError("Unable to find referenced Action", nil,
-				"sessionID", sessId, "action", actName)
-		}
-		set[sessId] = &Session{
-			ID:      sessId,
-			PolName: actName,
-			Pred:    afp,
-		}
-	}
-	return set, nil
-}

@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/scionproto/scion/go/lib/addr"
-	sigcfg "github.com/scionproto/scion/go/sig/config"
+	sigcfg "github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sig/sigcmn"
 	"github.com/scionproto/scion/go/sig/siginfo"
 	"github.com/scionproto/scion/go/sigmgmt/config"

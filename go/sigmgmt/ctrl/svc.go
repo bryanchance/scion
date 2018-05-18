@@ -16,7 +16,7 @@ import (
 	log "github.com/inconshreveable/log15"
 
 	"github.com/scionproto/scion/go/lib/addr"
-	sigcfg "github.com/scionproto/scion/go/sig/config"
+	sigcfg "github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sigmgmt/cfggen"
 	"github.com/scionproto/scion/go/sigmgmt/db"
 	"github.com/scionproto/scion/go/sigmgmt/netcopy"
