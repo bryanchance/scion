@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	log "github.com/inconshreveable/log15"
 
 	"github.com/scionproto/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/log"
 	sigcfg "github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sigmgmt/cfggen"
 	"github.com/scionproto/scion/go/sigmgmt/db"

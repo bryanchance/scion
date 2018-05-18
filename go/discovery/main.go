@@ -4,6 +4,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	log "github.com/inconshreveable/log15"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -23,7 +23,7 @@ import (
 	"github.com/scionproto/scion/go/discovery/util"
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
-	liblog "github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/log"
 )
 
 var (
@@ -58,26 +58,30 @@ func init() {
 }
 
 func main() {
+	os.Setenv("TZ", "UTC")
 	isdas, err := verifyFlags()
 	if err != nil {
 		log.Crit(err.Error())
-		liblog.Flush()
+		log.Flush()
 		os.Exit(1)
 	}
 	zklist := strings.Split(*zk, ",")
-	liblog.Setup(*id)
+	if err := log.SetupFromFlags(*id); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: %s", err)
+		os.Exit(1)
+	}
 	metrics.Init(*id)
 
 	log.Info("Loading ACLs", "filename", *aclfile)
 	if err = acl.Load(*aclfile); err != nil {
 		log.Error(err.Error())
-		liblog.Flush()
+		log.Flush()
 		os.Exit(1)
 	}
 	log.Info("Loading static topology", "filename", *topofile)
 	if err = static.Load(*topofile, *usefmod); err != nil {
 		log.Error("Could not load static topology file file", "filename", *topofile, "err", err)
-		liblog.Flush()
+		log.Flush()
 		os.Exit(1)
 	}
 	dynamic.Setup(isdas, *topofile)
@@ -119,14 +123,14 @@ func main() {
 			err := runHTTPServer(*paddress, *certfn, *keyfn, http.DefaultServeMux)
 			// If runHTTPServer returns, there will be a non-nil err
 			log.Crit("Could not start private HTTP server", "err", err)
-			liblog.Flush()
+			log.Flush()
 			os.Exit(1)
 		}()
 	}
 	log.Info("Starting public server", "addr", *laddress)
 	err = runHTTPServer(*laddress, *certfn, *keyfn, pubMux)
 	log.Crit("Could not start public HTTP server", "err", err)
-	liblog.Flush()
+	log.Flush()
 	os.Exit(1)
 }
 
@@ -182,7 +186,7 @@ func setupSignals() {
 	go func() {
 		<-exitsigs
 		log.Info("Exiting")
-		liblog.Flush()
+		log.Flush()
 		os.Exit(1)
 	}() // End of SIGINT/SIGTERM handler
 }

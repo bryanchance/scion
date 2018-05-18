@@ -11,7 +11,6 @@ import (
 	"net"
 	"time"
 
-	log "github.com/inconshreveable/log15"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/samuel/go-zookeeper/zk"
 	"zombiezen.com/go/capnproto2"
@@ -21,6 +20,7 @@ import (
 	"github.com/scionproto/scion/go/discovery/util"
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/topology"
 	"github.com/scionproto/scion/go/proto"
 )

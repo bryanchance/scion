@@ -5,14 +5,12 @@ package main
 import (
 	"time"
 
-	log "github.com/inconshreveable/log15"
-
 	"github.com/scionproto/scion/go/border/netconf"
 	"github.com/scionproto/scion/go/border/rctx"
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/ctrl"
 	"github.com/scionproto/scion/go/lib/ctrl/extn"
-	liblog "github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/log"
 )
 
 const (
@@ -21,7 +19,7 @@ const (
 )
 
 func (r *Router) PeriodicPushACL() {
-	defer liblog.LogPanicAndExit()
+	defer log.LogPanicAndExit()
 	for range time.Tick(pushInterval) {
 		ctx := rctx.Get()
 		for _, intf := range ctx.Conf.Net.IFs {

@@ -5,7 +5,6 @@ package rpkt
 import (
 	"strconv"
 
-	//log "github.com/inconshreveable/log15"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/scionproto/scion/go/border/extn/aclextn"
@@ -13,6 +12,7 @@ import (
 	"github.com/scionproto/scion/go/border/rcmn"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/ctrl/extn"
+	//"github.com/scionproto/scion/go/lib/log"
 )
 
 // processExtnACL processes Push ACL messages received from a neighboring router

@@ -30,10 +30,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	log "github.com/inconshreveable/log15"
-
 	"github.com/scionproto/scion/go/lib/common"
-	liblog "github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/log"
 )
 
 var sighupC chan os.Signal
@@ -75,8 +73,10 @@ type Env struct {
 // buffered pending registration, and might be drained before the function is
 // registered.  Function reloadF itself must ensure that panics are logged.
 func Init(reloadF func()) (*Env, error) {
+	os.Setenv("TZ", "UTC")
 	env := &Env{}
-	liblog.AddDefaultLogFlags()
+	log.AddLogFileFlags()
+	log.AddLogConsFlags()
 	flag.Parse()
 	if err := env.setupLogging(); err != nil {
 		return nil, err
@@ -92,7 +92,7 @@ func (env *Env) setupLogging() error {
 		return common.NewBasicError("No element ID specified", nil)
 	}
 	env.ID = *id
-	liblog.Setup(env.ID)
+	log.SetupFromFlags(env.ID)
 	env.Log = log.Root()
 	return nil
 }

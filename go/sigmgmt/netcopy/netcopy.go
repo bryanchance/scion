@@ -9,9 +9,8 @@ import (
 	"os/exec"
 	"time"
 
-	log "github.com/inconshreveable/log15"
-
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/sigmgmt/db"
 )
 

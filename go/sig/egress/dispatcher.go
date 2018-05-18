@@ -15,11 +15,9 @@
 package egress
 
 import (
-	log "github.com/inconshreveable/log15"
-
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
-	liblog "github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/sig/metrics"
@@ -44,7 +42,7 @@ func NewDispatcher(ia addr.IA, ring *ringbuf.Ring, spp *SyncPktPols) *egressDisp
 }
 
 func (ed *egressDispatcher) Run() {
-	defer liblog.LogPanicAndExit()
+	defer log.LogPanicAndExit()
 	ed.Info("EgressDispatcher: starting")
 	bufs := make(ringbuf.EntryList, egressBufPkts)
 	for {

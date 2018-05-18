@@ -6,12 +6,12 @@ import (
 	"io/ioutil"
 	"os"
 
-	log "github.com/inconshreveable/log15"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/scionproto/scion/go/discovery/metrics"
 	"github.com/scionproto/scion/go/discovery/util"
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/topology"
 )
 

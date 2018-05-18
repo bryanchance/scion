@@ -8,11 +8,10 @@ import (
 	"net"
 	"sync"
 
-	log "github.com/inconshreveable/log15"
 	"github.com/osrg/gobgp/zebra"
 
 	"github.com/scionproto/scion/go/lib/common"
-	liblog "github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/sig/base"
 	"github.com/scionproto/scion/go/sig/sigcmn"
 )
@@ -85,7 +84,7 @@ func updateRoute(n net.IPNet, withdraw bool) {
 }
 
 func drain() {
-	defer liblog.LogPanicAndExit()
+	defer log.LogPanicAndExit()
 	for {
 		m, ok := <-cli.Receive()
 		if !ok {

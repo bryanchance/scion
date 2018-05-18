@@ -17,8 +17,6 @@ package egress
 import (
 	"sync/atomic"
 
-	//log "github.com/inconshreveable/log15"
-
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/sig/mgmt"

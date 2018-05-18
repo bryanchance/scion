@@ -6,8 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	log "github.com/inconshreveable/log15"
-
+	"github.com/scionproto/scion/go/lib/log"
 	sigcfg "github.com/scionproto/scion/go/sig/anaconfig"
 )
 

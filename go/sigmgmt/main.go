@@ -10,10 +10,9 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	log "github.com/inconshreveable/log15"
 	"github.com/urfave/negroni"
 
-	liblog "github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/log"
 	jwt "github.com/scionproto/scion/go/sigmgmt/auth"
 	"github.com/scionproto/scion/go/sigmgmt/config"
 	"github.com/scionproto/scion/go/sigmgmt/ctrl"
@@ -27,10 +26,13 @@ var (
 )
 
 func main() {
-	liblog.AddDefaultLogFlags()
+	os.Setenv("TZ", "UTC")
+	log.AddLogFileFlags()
 	flag.Parse()
-	liblog.Setup(*id)
-
+	if err := log.SetupFromFlags(*id); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: %s", err)
+		os.Exit(1)
+	}
 	cfg, err := config.LoadConfig(*cfgPath)
 	if err != nil {
 		fatal("Unable to load config file", "err", err)
