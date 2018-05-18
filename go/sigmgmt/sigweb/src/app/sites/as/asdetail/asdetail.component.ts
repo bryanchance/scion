@@ -3,7 +3,7 @@ import { ActivatedRoute } from '@angular/router'
 import { forkJoin } from 'rxjs'
 
 import { ApiService } from '../../../api/api.service'
-import { IA, Session, SIG, Site } from '../../models'
+import { IA, SIG, Site } from '../../models'
 
 @Component({
   selector: 'ana-asdetail',
@@ -13,7 +13,6 @@ import { IA, Session, SIG, Site } from '../../models'
 export class ASDetailComponent implements OnInit {
   site = new Site
   ia = new IA
-  sessions: Session[]
   sigs: SIG[]
 
   constructor(

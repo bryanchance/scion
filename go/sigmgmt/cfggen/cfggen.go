@@ -4,7 +4,7 @@
 // packet policies derived from text policy rules.
 //
 // One policy rule is supported:
-//   name=NAME [ src=NETWORK ]  [ dst=NETWORK ] [ dscp=DSCP ] sessions=SESSIONS
+//   name=NAME [ src=NETWORK ]  [ dst=NETWORK ] [ dscp=DSCP ] selectors=SELECTORS
 //
 // See the static markdown documentation for more information about the fields.
 package cfggen
@@ -14,162 +14,157 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/sig/config"
 	"github.com/scionproto/scion/go/sig/mgmt"
-	"github.com/scionproto/scion/go/sigmgmt/db"
 	"github.com/scionproto/scion/go/sigmgmt/util"
 )
 
-// Compile inserts the rule specified by command into cfg. Any overwrites
-// happen silently. classID is used to derive a class name if one isn't found
-// in parameter command.
-func Compile(cfg *config.Cfg, policies map[addr.IA]string,
-	aliases map[addr.IA]db.SessionAliasMap) error {
-
+// Compile inserts the rules specified by policies into cfg. Any overwrites happen silently.
+func Compile(cfg *config.Cfg, policies map[addr.IA]string) error {
 	if cfg.Classes == nil {
 		cfg.Classes = make(pktcls.ClassMap)
 	}
+
 	for ia, asEntry := range cfg.ASes {
-		policy := policies[ia]
-		for i, command := range strings.Split(policy, "\n") {
-			err := compileCommand(cfg, asEntry, aliases[ia], command,
-				fmt.Sprintf("class-%v-%d", ia, i))
+		var commands []*Command
+		for _, commandStr := range strings.Split(policies[ia], "\n") {
+			command, err := NewCommand(commandStr)
 			if err != nil {
 				return err
+			}
+			commands = append(commands, command)
+		}
+
+		// Determine which path selectors are used by the current remote AS
+		sessionMap := newSessionMapper(cfg.Actions)
+		for _, command := range commands {
+			if err := sessionMap.Add(command.Selectors); err != nil {
+				return err
+			}
+		}
+
+		for i, command := range commands {
+			var className = fmt.Sprintf("class-%v-%d", ia, i)
+			if command.Name != nil {
+				className = *command.Name
+			}
+
+			cfg.Classes[className] = pktcls.NewClass(
+				className,
+				pktcls.NewCondAllOf(command.Conditions...))
+			// Add sessionIDs based on path selectors
+			var sessIds []mgmt.SessionType
+			for _, selector := range command.Selectors {
+				sessIds = append(sessIds, sessionMap.sessions[selector])
+			}
+			asEntry.PktPolicies = append(
+				asEntry.PktPolicies,
+				&config.PktPolicy{
+					ClassName: className,
+					SessIds:   sessIds,
+				})
+			// Add the necessary sessions themselves
+			sessions := make(config.SessionMap)
+			for selector, id := range sessionMap.sessions {
+				sessions[id] = selector
+			}
+			asEntry.Sessions = sessions
+		}
+	}
+	return nil
+}
+
+type sessionMapper struct {
+	nextSessionID  mgmt.SessionType
+	sessions       map[string]mgmt.SessionType
+	knownSelectors pktcls.ActionMap
+}
+
+func newSessionMapper(knownSelectors pktcls.ActionMap) *sessionMapper {
+	return &sessionMapper{
+		sessions:       make(map[string]mgmt.SessionType),
+		knownSelectors: knownSelectors,
+	}
+}
+
+func (s *sessionMapper) Add(references []string) error {
+	for _, selector := range references {
+		if _, ok := s.knownSelectors[selector]; !ok {
+			return common.NewBasicError("Path selector does not exist:", nil, "selector", selector)
+		}
+		if _, ok := s.sessions[selector]; !ok {
+			s.sessions[selector] = s.nextSessionID
+			s.nextSessionID++
+			if s.nextSessionID == 0 {
+				// mgmt.SessionType overflowed
+				return common.NewBasicError("Too many sessions", nil)
 			}
 		}
 	}
 	return nil
 }
 
-func compileCommand(cfg *config.Cfg, asEntry *config.ASEntry, aliasMap db.SessionAliasMap,
-	command string, className string) error {
+type Command struct {
+	Name       *string
+	Conditions []pktcls.Cond
+	Selectors  []string
+}
 
-	var (
-		conditions    []pktcls.Cond
-		sessionTokens []string
-	)
+func NewCommand(command string) (*Command, error) {
+	cmd := &Command{}
 	for _, kvToken := range strings.Fields(command) {
 		key, value, err := kvSplit(kvToken)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		switch key {
 		case "name":
-			className = value
-			if err := util.ValidateIdentifier(className); err != nil {
-				return err
+			if err := util.ValidateIdentifier(value); err != nil {
+				return nil, err
 			}
+			otherValue := value
+			cmd.Name = &otherValue
 		case "src":
 			msrc := &pktcls.IPv4MatchSource{}
 			_, msrc.Net, err = net.ParseCIDR(value)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			conditions = append(conditions, pktcls.NewCondIPv4(msrc))
+			cmd.Conditions = append(cmd.Conditions, pktcls.NewCondIPv4(msrc))
 		case "dst":
 			mdst := &pktcls.IPv4MatchDestination{}
 			_, mdst.Net, err = net.ParseCIDR(value)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			conditions = append(conditions, pktcls.NewCondIPv4(mdst))
+			cmd.Conditions = append(cmd.Conditions, pktcls.NewCondIPv4(mdst))
 		case "tos":
 			mtos := &pktcls.IPv4MatchToS{}
 			tos, err := strconv.ParseUint(value, 0, 8)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			mtos.TOS = uint8(tos)
-			conditions = append(conditions, pktcls.NewCondIPv4(mtos))
+			cmd.Conditions = append(cmd.Conditions, pktcls.NewCondIPv4(mtos))
 		case "dscp":
 			mdscp := &pktcls.IPv4MatchDSCP{}
 			dscp, err := strconv.ParseUint(value, 0, 8)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			mdscp.DSCP = uint8(dscp)
-			conditions = append(conditions, pktcls.NewCondIPv4(mdscp))
-		case "sessions":
-			sessionTokens = strings.Split(value, ",")
+			cmd.Conditions = append(cmd.Conditions, pktcls.NewCondIPv4(mdscp))
+		case "selectors":
+			cmd.Selectors = strings.Split(value, ",")
 		default:
-			return common.NewBasicError("unknown key", nil, "key", key)
+			return nil, common.NewBasicError("unknown key", nil, "key", key)
 		}
 	}
-	cfg.Classes[className] = pktcls.NewClass(className, pktcls.NewCondAllOf(conditions...))
-
-	var sessionIDs []mgmt.SessionType
-	// Resolve session aliases to session IDs, and check that we're not using
-	// undefined session IDs.
-	for _, token := range sessionTokens {
-		var err error
-		if tokenIsAliasName(token) {
-			if sessionIDs, err = appendByAlias(sessionIDs, asEntry, aliasMap[token]); err != nil {
-				return common.NewBasicError("Alias Error:", err, "name", token)
-			}
-		} else {
-			// Token is raw session ID
-			if sessionIDs, err = appendByRaw(sessionIDs, asEntry, token); err != nil {
-				return common.NewBasicError("Session ID Error:", err)
-			}
-		}
-	}
-	policy := &config.PktPolicy{
-		ClassName: className,
-		SessIds:   sessionIDs,
-	}
-	asEntry.PktPolicies = append(asEntry.PktPolicies, policy)
-	return nil
-}
-
-func tokenIsAliasName(token string) bool {
-	r, _ := utf8.DecodeRuneInString(token)
-	return unicode.IsLetter(r)
-}
-
-// appendByAlias appends to sessionIDs the session IDs contained in string
-// sessions.
-func appendByAlias(sessionIDs []mgmt.SessionType, asEntry *config.ASEntry,
-	sessions string) ([]mgmt.SessionType, error) {
-
-	if sessions == "" {
-		return nil, common.NewBasicError("Alias not found or empty", nil)
-	}
-	for _, token := range strings.Split(sessions, ",") {
-		var err error
-		sessionIDs, err = appendByRaw(sessionIDs, asEntry, token)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return sessionIDs, nil
-}
-
-// appendByRaw appends to sessionIDs the session ID contained in string
-// session. appendByRaw also checks that the session ID is defined for the
-// specified asEntry.
-func appendByRaw(sessionIDs []mgmt.SessionType, asEntry *config.ASEntry,
-	session string) ([]mgmt.SessionType, error) {
-
-	id, err := parseSessionID(session)
-	if err != nil {
-		return nil, err
-	}
-	if _, ok := asEntry.Sessions[id]; !ok {
-		return nil, common.NewBasicError("Session does not exist", nil, "id", id)
-	}
-	return append(sessionIDs, id), nil
-}
-
-func parseSessionID(input string) (mgmt.SessionType, error) {
-	i, err := strconv.ParseUint(input, 0, 8)
-	return mgmt.SessionType(i), err
+	return cmd, nil
 }
 
 // kvSplit splits a "key=value" formatted token into its components.

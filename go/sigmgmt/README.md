@@ -12,16 +12,13 @@ The SIG Policy Configurator needs a json config file to run. The following keys 
 
 *   **Features** (integer). The feature set the web UI should expose to users. Two feature sets are
     defined:
-    *   **Level 0**. Sites cannot be added or deleted. Remote ASes cannot be added or deleted.
-        Sessions and path filters cannot be added or deleted, and are not shown in the UI.
-        Predefined Session Aliases are displayed instead. These aliases contain hidden sequences of
-        sessions, and can be referenced in policies. For deployments using **level 0**, the database
-        should come preloaded with Sites, sessions, path filters and session aliases. Note that
+    *   **Level 0**. Sites cannot be added or deleted. Remote ASes cannot be added or deleted. Path
+        filters cannot be added or deleted, and are not shown in the UI. For deployments using
+        **level 0**, the database should come preloaded with Sites and path filters. Note that
         functionality is only hidden; users can still run any query via crafting GETs and POSTs, but
         this is unsupported behavior.
-    *   **Level 1**. All functionality is exposed. Because Session Aliases are no longer needed,
-        they are not displayed. For deployments using **level 1**, preloading the database with
-        information is optional.
+    *   **Level 1**. All functionality is exposed. For deployments using **level 1**, preloading the
+        database with information is optional.
 *   **Key**. Secret key for WebUI Authentication
 *   **Username**. Username for the WebUI
 *   **Password**. Password for the WebUI

@@ -47,15 +47,11 @@ func (sc *SiteController) getAndValidateSiteCfg(name string) (*db.Site, *sigcfg.
 	if err != nil {
 		return nil, nil, "Error fetching policies", err
 	}
-	aliases, err := sc.dbase.GetSessionAliases(site.Name)
-	if err != nil {
-		return nil, nil, "Error fetching session aliases", err
-	}
-	if site == nil || siteCfg == nil || policies == nil || aliases == nil {
+	if site == nil || siteCfg == nil || policies == nil {
 		return nil, nil, "Not all necessary values are present",
-			errors.New("Empty site, siteCfg, policies or aliases")
+			errors.New("Empty site, siteCfg or policies")
 	}
-	if err = cfggen.Compile(siteCfg, policies, aliases); err != nil {
+	if err = cfggen.Compile(siteCfg, policies); err != nil {
 		return nil, nil, "Config compiler error", err
 	}
 	siteCfg.ConfigVersion = uint64(time.Now().Unix())
@@ -100,17 +96,10 @@ func (sc *SiteController) writeConfig(site *db.Site, siteCfg *sigcfg.Cfg) (strin
 func (ac *ASController) validatePolicies(site string,
 	policies map[addr.IA]string) (string, error) {
 	siteConfig, err := ac.dbase.GetSiteConfig(site)
-	if err != nil {
+	if err != nil || siteConfig == nil {
 		return "Unable to read site config from database", err
 	}
-	var aliases map[addr.IA]db.SessionAliasMap
-	if aliases, err = ac.dbase.GetSessionAliases(site); err != nil {
-		return "Unable to get sessions aliases", err
-	}
-	if siteConfig == nil || aliases == nil {
-		return "", errors.New("No siteConfig or no aliases")
-	}
-	if err = cfggen.Compile(siteConfig, policies, aliases); err != nil {
+	if err = cfggen.Compile(siteConfig, policies); err != nil {
 		return err.Error(), err
 	}
 	return "", nil

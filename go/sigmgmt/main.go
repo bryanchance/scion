@@ -111,20 +111,6 @@ func configureRouter(cfg *config.Global, dbase *db.DB) http.Handler {
 			"PUT":    ac.UpdateSIG,
 			"DELETE": ac.DeleteSIG,
 		},
-		"/api/sites/{site}/ias/{ia}/sessions": {
-			"GET":  ac.GetSessions,
-			"POST": ac.PostSession,
-		},
-		"/api/sites/{site}/ias/{ia}/sessions/{session}": {
-			"DELETE": ac.DeleteSession,
-		},
-		"/api/sites/{site}/ias/{ia}/session-aliases": {
-			"GET": ac.GetSessionAliases,
-		},
-		"/api/sites/{site}/ias/{ia}/session-default": {
-			"GET":  ac.GetDefaultSession,
-			"POST": ac.UpdateDefaultSession,
-		},
 		"/api/token/refresh": {
 			"POST": auth.RefreshToken,
 		},

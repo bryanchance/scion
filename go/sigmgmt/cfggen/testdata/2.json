@@ -1,0 +1,77 @@
+{
+    "ASes": {
+        "1-1": {
+            "Nets": null,
+            "Sigs": null,
+            "Sessions": {
+                "0": "foo",
+                "1": "bar"
+            },
+            "PktPolicies": [
+                {
+                    "ClassName": "audio",
+                    "SessIds": [
+                        0,
+                        1
+                    ]
+                }
+            ]
+        },
+        "2-2": {
+            "Nets": null,
+            "Sigs": null,
+            "Sessions": {
+                "0": "bar"
+            },
+            "PktPolicies": [
+                {
+                    "ClassName": "video",
+                    "SessIds": [
+                        0
+                    ]
+                }
+            ]
+        }
+    },
+    "Classes": {
+        "audio": {
+            "CondAllOf": [
+                {
+                    "CondIPv4": {
+                        "MatchSource": {
+                            "Net": "1.1.1.0/24"
+                        }
+                    }
+                }
+            ]
+        },
+        "video": {
+            "CondAllOf": [
+                {
+                    "CondIPv4": {
+                        "MatchDestination": {
+                            "Net": "2.2.2.0/24"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "Actions": {
+        "bar": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "0-0#0"
+                }
+            }
+        },
+        "foo": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "0-0#0"
+                }
+            }
+        }
+    },
+    "ConfigVersion": 0
+}

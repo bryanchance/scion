@@ -1,0 +1,98 @@
+{
+    "ASes": {
+        "1-1": {
+            "Nets": null,
+            "Sigs": null,
+            "Sessions": {
+                "0": "foo",
+                "1": "bar",
+                "2": "baz"
+            },
+            "PktPolicies": [
+                {
+                    "ClassName": "audio",
+                    "SessIds": [
+                        0,
+                        1
+                    ]
+                },
+                {
+                    "ClassName": "video",
+                    "SessIds": [
+                        1,
+                        2
+                    ]
+                }
+            ]
+        },
+        "2-2": {
+            "Nets": null,
+            "Sigs": null,
+            "Sessions": {},
+            "PktPolicies": [
+                {
+                    "ClassName": "class-2-2-0",
+                    "SessIds": null
+                }
+            ]
+        }
+    },
+    "Classes": {
+        "audio": {
+            "CondAllOf": [
+                {
+                    "CondIPv4": {
+                        "MatchDSCP": {
+                            "DSCP": "0x12"
+                        }
+                    }
+                }
+            ]
+        },
+        "class-2-2-0": {
+            "CondAllOf": null
+        },
+        "video": {
+            "CondAllOf": [
+                {
+                    "CondIPv4": {
+                        "MatchToS": {
+                            "TOS": "0x34"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "Actions": {
+        "bad": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "4-4#4"
+                }
+            }
+        },
+        "bar": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "2-2#2"
+                }
+            }
+        },
+        "baz": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "3-3#3"
+                }
+            }
+        },
+        "foo": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "1-1#1"
+                }
+            }
+        }
+    },
+    "ConfigVersion": 0
+}

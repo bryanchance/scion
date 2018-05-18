@@ -48,15 +48,3 @@ export class SIG {
     EncapPort: number
     CtrlPort: number
 }
-
-export class Session {
-    ID: number
-    FilterName: string // PathSelector name
-}
-
-export class DefaultSession {
-    Active: boolean
-    constructor(active: boolean) {
-        this.Active = active
-    }
-}

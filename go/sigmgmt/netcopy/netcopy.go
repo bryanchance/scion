@@ -59,7 +59,7 @@ func CopyFileToHost(ctx context.Context, spath string, host *db.Host, dpath stri
 	args = append(args, spath)
 
 	if host.User == "" {
-		args = append(args, fmt.Sprintf("%s:%s", host, dpath))
+		args = append(args, fmt.Sprintf("%s:%s", host.Name, dpath))
 	} else {
 		args = append(args, fmt.Sprintf("%s@%s:%s", host.User, host.Name, dpath))
 	}
@@ -103,7 +103,7 @@ func ReloadHost(ctx context.Context, host *db.Host, logger log.Logger) error {
 	// ssh [ -i *sshKey ] [*sshUser@]host sudo systemctl --signal=SIGHUP kill sig.service
 	args := defaultSSHParams(ctx, host)
 	if host.User == "" {
-		args = append(args, fmt.Sprintf("%s", host))
+		args = append(args, fmt.Sprintf("%s", host.Name))
 	} else {
 		args = append(args, fmt.Sprintf("%s@%s", host.User, host.Name))
 	}

@@ -1,0 +1,42 @@
+{
+    "ASes": {
+        "1-1": {
+            "Nets": null,
+            "Sigs": null,
+            "Sessions": {
+                "0": "foo"
+            },
+            "PktPolicies": [
+                {
+                    "ClassName": "audio",
+                    "SessIds": [
+                        0
+                    ]
+                }
+            ]
+        }
+    },
+    "Classes": {
+        "audio": {
+            "CondAllOf": [
+                {
+                    "CondIPv4": {
+                        "MatchSource": {
+                            "Net": "1.1.1.0/24"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    "Actions": {
+        "foo": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "0-0#0"
+                }
+            }
+        }
+    },
+    "ConfigVersion": 0
+}

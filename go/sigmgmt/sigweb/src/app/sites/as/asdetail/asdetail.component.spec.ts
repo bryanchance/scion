@@ -6,7 +6,6 @@ import { TestingModule } from '../../../testing/testing.module'
 import { ASDetailComponent } from './asdetail.component'
 import { ClassifiersComponent } from './classifiers/classifiers.component'
 import { NetworksComponent } from './networks/networks.component'
-import { SessionsComponent } from './sessions/sessions.component'
 import { SigsComponent } from './sigs/sigs.component'
 
 describe('AsdetailComponent', () => {
@@ -24,7 +23,7 @@ describe('AsdetailComponent', () => {
             }
           }
         }],
-      declarations: [ASDetailComponent, SigsComponent, SessionsComponent, NetworksComponent, ClassifiersComponent]
+      declarations: [ASDetailComponent, SigsComponent, NetworksComponent, ClassifiersComponent]
     })
       .compileComponents()
   }))

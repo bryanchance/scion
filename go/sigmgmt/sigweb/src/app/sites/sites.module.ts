@@ -7,7 +7,6 @@ import { MaterialModule } from '../material/material.module'
 import { ASDetailComponent } from './as/asdetail/asdetail.component'
 import { ClassifiersComponent } from './as/asdetail/classifiers/classifiers.component'
 import { NetworksComponent } from './as/asdetail/networks/networks.component'
-import { SessionsComponent } from './as/asdetail/sessions/sessions.component'
 import { SigsComponent } from './as/asdetail/sigs/sigs.component'
 import { ASListComponent } from './as/aslist/aslist.component'
 import { PathSelectorComponent } from './path-selector/path-selector.component'
@@ -30,7 +29,6 @@ import { SitesComponent } from './sites.component'
     ASListComponent,
     ASDetailComponent,
     NetworksComponent,
-    SessionsComponent,
     SigsComponent,
     ClassifiersComponent
   ]

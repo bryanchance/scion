@@ -17,8 +17,6 @@ func applyConvertUInt8(input []uint8) []string {
 	return output
 }
 
-type SessionAliasMap map[string]string
-
 type Site struct {
 	Name        string
 	VHost       string

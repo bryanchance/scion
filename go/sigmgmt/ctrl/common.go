@@ -25,20 +25,6 @@ type (
 		CIDR string
 	}
 
-	Session struct {
-		ID         uint8
-		FilterName string
-	}
-
-	DefaultSession struct {
-		Active bool
-	}
-
-	SessionAlias struct {
-		Name     string
-		Sessions string
-	}
-
 	SIG struct {
 		ID        string
 		Addr      string

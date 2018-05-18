@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http'
 import { Injectable } from '@angular/core'
 
-import { CIDR, DefaultSession, IA, PathSelector, Policy, Session, SIG, Site } from '../sites/models'
+import { CIDR, IA, PathSelector, Policy, SIG, Site } from '../sites/models'
 import { User } from './user.service'
 
 @Injectable()
@@ -115,31 +115,6 @@ export class ApiService {
 
   deleteSIG(site: Site, ia: IA, sig: SIG) {
     return this.http.delete(this.iaUrl(site, ia) + '/sigs/' + sig.ID)
-  }
-
-  /** Sessions */
-  getSessions(site: Site, ia: IA) {
-    return this.http.get<Session[]>(this.iaUrl(site, ia) + '/sessions')
-  }
-
-  createSession(site: Site, ia: IA, session: Session) {
-    return this.http.post<Session>(this.iaUrl(site, ia) + '/sessions', session)
-  }
-
-  deleteSession(site: Site, ia: IA, session: Session) {
-    return this.http.delete(this.iaUrl(site, ia) + '/sessions/' + session.ID)
-  }
-
-  getDefaultSession(site: Site, ia: IA) {
-    return this.http.get<DefaultSession>(this.iaUrl(site, ia) + '/session-default')
-  }
-
-  setDefaultSession(site: Site, ia: IA, defaultSession: DefaultSession) {
-    return this.http.post(this.iaUrl(site, ia) + '/session-default', defaultSession)
-  }
-
-  getSessionAliases(site: Site, ia: IA) {
-    return this.http.get<string[]>(this.iaUrl(site, ia) + '/session-aliases')
   }
 
   /** Authentication */

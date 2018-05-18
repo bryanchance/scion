@@ -7,8 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"strconv"
-	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 
@@ -18,7 +16,6 @@ import (
 	"github.com/scionproto/scion/go/lib/spath/spathmeta"
 	"github.com/scionproto/scion/go/lib/sqlite"
 	"github.com/scionproto/scion/go/sig/config"
-	"github.com/scionproto/scion/go/sig/mgmt"
 	"github.com/scionproto/scion/go/sig/siginfo"
 )
 
@@ -394,6 +391,9 @@ func (db *DB) UpdateFilter(site string, name string, pp *spathmeta.PathPredicate
 }
 
 func (db *DB) DeleteFilter(site string, name string) error {
+	if name == "any" {
+		return errors.New("Cannot delete default path selector!")
+	}
 	_, err := db.Exec(`DELETE FROM Filters WHERE Name = ? AND Site = ?`, name, site)
 	return err
 }
@@ -439,87 +439,6 @@ func (db *DB) QueryRawFilters(site string) ([]Filter, error) {
 	return filters, rows.Err()
 }
 
-func (db *DB) InsertSession(site string, ia addr.IA, name uint8, filter string) error {
-	if filter == "" {
-		_, err := db.Exec(
-			`INSERT INTO Sessions (Name, FilterName, Site, IsdID, AsID) VALUES (?, NULL, ?, ?, ?)`,
-			name, filter, site, ia.I, ia.A)
-		return err
-	}
-	_, err := db.Exec(
-		`INSERT INTO Sessions (Name, FilterName, Site, IsdID, AsID) VALUES (?, ?, ?, ?, ?)`,
-		name, filter, site, ia.I, ia.A)
-	return err
-}
-
-func (db *DB) DeleteSession(site string, ia addr.IA, name uint8) error {
-	_, err := db.Exec(
-		`DELETE FROM Sessions WHERE Name = ? AND Site = ? AND IsdID = ? AND AsID = ?`,
-		name, site, ia.I, ia.A)
-	return err
-}
-
-func (db *DB) QuerySessions(site string, ia addr.IA) (config.SessionMap, error) {
-	rows, err := db.Query(
-		`SELECT Name, FilterName FROM Sessions WHERE Site = ? AND IsdID = ? AND AsID = ?`,
-		site, ia.I, ia.A)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	sessionMap := make(config.SessionMap)
-	for rows.Next() {
-		var name int
-		var filter string
-		if err := rows.Scan(&name, &filter); err != nil {
-			return nil, err
-		}
-		sessionMap[mgmt.SessionType(name)] = filter
-	}
-	return sessionMap, rows.Err()
-}
-
-func (db *DB) InsertSessionAlias(site string, ia addr.IA, name string,
-	sessions []uint8) error {
-
-	_, err := db.Exec(
-		`INSERT INTO SessionAliases (Name, Sessions, Site, IsdID, AsID) VALUES (?, ?, ?, ?, ?)`,
-		name, strings.Join(applyConvertUInt8(sessions), ","), site, ia.I, ia.A)
-	return err
-}
-
-func (db *DB) DeleteSessionAlias(site string, ia addr.IA, name string) error {
-	_, err := db.Exec(
-		`DELETE FROM SessionAliases WHERE Name = ? AND Site = ? AND IsdID = ? AND AsID = ?`,
-		name, site, ia.I, ia.A)
-	return err
-}
-
-func (db *DB) GetSessionAliases(site string) (map[addr.IA]SessionAliasMap, error) {
-	rows, err := db.Query(
-		`SELECT Name, Sessions, IsdID, AsID FROM SessionAliases WHERE Site = ?`, site)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	sessionAliases := make(map[addr.IA]SessionAliasMap)
-	for rows.Next() {
-		var aliasName, sessionList string
-		var ia addr.IA
-		if err := rows.Scan(&aliasName, &sessionList, &ia.I, &ia.A); err != nil {
-			return nil, err
-		}
-		_, ok := sessionAliases[ia]
-		if !ok {
-			sessionAliases[ia] = make(SessionAliasMap)
-		}
-		sessionAliases[ia][aliasName] = sessionList
-	}
-	return sessionAliases, nil
-}
-
 func (db *DB) GetSiteConfig(site string) (*config.Cfg, error) {
 	cfg := &config.Cfg{}
 	ias, err := db.QueryIAs(site)
@@ -555,25 +474,8 @@ func (db *DB) GetASDetails(site string, ia addr.IA) (*config.ASEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	sessions, err := db.QuerySessions(site, ia)
-	if err != nil {
-		return nil, err
-	}
-	// Add default session 0 if enabled
-	cfg, err := db.GetConfigValue(site, ia, "default_session")
-	if err != nil {
-		return nil, err
-	}
-	active, err := strconv.ParseBool(cfg.Value)
-	if err != nil {
-		return nil, err
-	}
-	if active {
-		sessions[0] = ""
-	}
 	return &config.ASEntry{
-		Nets:     networks,
-		Sigs:     sigs,
-		Sessions: sessions,
+		Nets: networks,
+		Sigs: sigs,
 	}, nil
 }

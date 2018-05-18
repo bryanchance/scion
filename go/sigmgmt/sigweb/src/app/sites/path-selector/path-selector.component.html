@@ -24,10 +24,10 @@
       <mat-list-item *ngFor="let path of pathSelectors; let idx = index" class="path-list-row">
         <p class="name">{{path.Name}}</p>
         <p class="predicate">{{path.PP}}</p>
-        <button *ngIf="!formDisabled" mat-icon-button (click)="edit(idx)">
+        <button *ngIf="!formDisabled && path.Name!='any'" mat-icon-button (click)="edit(idx)">
           <mat-icon>edit</mat-icon>
         </button>
-        <button mat-icon-button *ngIf="!formDisabled" (click)="delete(idx)">
+        <button mat-icon-button *ngIf="!formDisabled && path.Name!='any'" (click)="delete(idx)">
           <mat-icon>delete</mat-icon>
         </button>
       </mat-list-item>
@@ -40,9 +40,9 @@
     <mat-card-content>
       <p>
         Path selectors can be used to choose a subset of paths from a larger set. For example, if a SIG can reach a remote AS via
-        two paths, one through ISD-AS 2-80 and one through ISD-AS 2-81, a path selector can be used to tell the SIG to always
-        prefer the one through AS80. A filter is a comma separated string of ISD-AS#IFID tokens, each token representing
-        a condition. Wildcards can be specified for via a 0 value for an ISD, AS or IFID.</p>
+        two paths, one through ISD-AS 1-ff00:0:110 and one through ISD-AS 1-ff00:0:111, a path selector can be used to tell
+        the SIG to always prefer the one through ASff00:0:111. A filter is a comma separated string of ISD-AS#IFID tokens,
+        each token representing a condition. Wildcards can be specified for via a 0 value for an ISD, AS or IFID.</p>
     </mat-card-content>
   </mat-card>
 </div>

@@ -69,6 +69,16 @@ func (sc *SiteController) PostSite(w http.ResponseWriter, r *http.Request, _ htt
 		respondError(w, err, "Unable to get site", http.StatusBadRequest)
 		return
 	}
+	// add default "any" path selector
+	pp, err := spathmeta.NewPathPredicate("0-0#0")
+	if err != nil {
+		respondError(w, err, "Bad path selector string", 400)
+		return
+	}
+	if err := sc.dbase.InsertFilter(site.Name, "any", pp); err != nil {
+		respondError(w, err, "DB Error!", 400)
+		return
+	}
 	respondJSON(w, &insSite)
 }
 
