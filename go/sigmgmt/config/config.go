@@ -5,7 +5,8 @@ package config
 import (
 	"encoding/json"
 	"io/ioutil"
-	"os"
+
+	log "github.com/inconshreveable/log15"
 
 	"github.com/scionproto/scion/go/lib/common"
 )
@@ -42,24 +43,12 @@ func LoadConfig(name string) (*Global, error) {
 	if err := json.Unmarshal(b, &global); err != nil {
 		return nil, common.NewBasicError("Unable to parse JSON", err, "name", name)
 	}
-	if err := createFolder(global.OutputDir); err != nil {
+	global.OutputDir, err = ioutil.TempDir("", "sigmgmt")
+	if err != nil {
 		return nil, err
 	}
+	log.Info("Created temp output folder", "folder", global.OutputDir)
 	return global, nil
-}
-
-func createFolder(path string) error {
-	stat, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return os.MkdirAll(path, 0755)
-	}
-	if err != nil {
-		return common.NewBasicError("Stat error", err, "path", path)
-	}
-	if !stat.IsDir() {
-		return common.NewBasicError("Path is not a directory", nil, "path", path)
-	}
-	return nil
 }
 
 // FeatureLevel provides access to the feature level via methods. This makes
