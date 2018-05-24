@@ -3,55 +3,56 @@
 package db
 
 import (
-	"fmt"
-	"strconv"
+	"net"
 
-	"github.com/scionproto/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/pktcls"
+	"github.com/scionproto/scion/go/lib/spath/spathmeta"
+	"github.com/scionproto/scion/go/sig/anaconfig"
+	"github.com/scionproto/scion/go/sig/siginfo"
 )
 
-func applyConvertUInt8(input []uint8) []string {
-	var output []string
-	for _, object := range input {
-		output = append(output, strconv.Itoa(int(object)))
+// SIGSetFromSIGs converts a slice of sigs to a SIGSet
+func SIGSetFromSIGs(sigs []SIG) (config.SIGSet, error) {
+	sigSet := make(config.SIGSet)
+	for _, sig := range sigs {
+		sig := &config.SIG{
+			Id:        siginfo.SigIdType(sig.Name),
+			Addr:      net.ParseIP(sig.Address),
+			CtrlPort:  uint16(sig.CtrlPort),
+			EncapPort: uint16(sig.EncapPort),
+		}
+		if sig.Addr == nil {
+			return nil, common.NewBasicError("Bad IP address", nil, sig.Addr)
+		}
+		sigSet[sig.Id] = sig
 	}
-	return output
+	return sigSet, nil
 }
 
-type Site struct {
-	Name        string
-	VHost       string
-	Hosts       []Host
-	MetricsPort uint16
+// IPNetsFromNetworks converts a slice of networks to a slice of IPNet
+func IPNetsFromNetworks(networks []Network) ([]*config.IPNet, error) {
+	ipNets := []*config.IPNet{}
+	for _, network := range networks {
+		_, ipNet, err := net.ParseCIDR(network.CIDR)
+		if err != nil {
+			return nil, err
+		}
+		ipNets = append(ipNets, (*config.IPNet)(ipNet))
+	}
+	return ipNets, nil
 }
 
-type Host struct {
-	Name string
-	User string
-	Key  string
-}
-
-type Filter struct {
-	Name string
-	PP   string
-}
-
-type ASConfig struct {
-	Name  string
-	Value string
-}
-
-type AS struct {
-	Name   string
-	ISD    string
-	AS     string
-	Policy string
-}
-
-func ASFromAddrIA(ia addr.IA) *AS {
-	return &AS{ISD: fmt.Sprint(ia.I), AS: ia.A.String()}
-}
-
-func (as *AS) ToAddrIA() (addr.IA, error) {
-	iaStr := fmt.Sprintf("%s-%s", as.ISD, as.AS)
-	return addr.IAFromString(iaStr)
+// ActionMapFromSelectors converts a slice of path selectors to an ActionMap
+func ActionMapFromSelectors(selectors []PathSelector) (pktcls.ActionMap, error) {
+	actionMap := make(pktcls.ActionMap)
+	for _, selector := range selectors {
+		pp, err := spathmeta.NewPathPredicate(selector.Filter)
+		if err != nil {
+			return nil, err
+		}
+		actionMap[selector.Name] = pktcls.NewActionFilterPaths(selector.Name,
+			pktcls.NewCondPathPredicate(pp))
+	}
+	return actionMap, nil
 }

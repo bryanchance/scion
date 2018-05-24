@@ -3,7 +3,7 @@ import { NgForm } from '@angular/forms'
 
 import { ApiService } from '../../../api/api.service'
 import { UserService } from '../../../api/user.service'
-import { IA, Site } from '../../models'
+import { ASEntry, Site } from '../../models'
 
 @Component({
   selector: 'ana-aslist',
@@ -12,8 +12,8 @@ import { IA, Site } from '../../models'
 })
 export class ASListComponent implements OnChanges {
   @Input() site: Site
-  ia = new IA
-  ias: IA[] = []
+  ia = new ASEntry
+  ias: ASEntry[] = []
   success = ''
   error = ''
   editing = false
@@ -22,9 +22,9 @@ export class ASListComponent implements OnChanges {
   constructor(private api: ApiService, private userService: UserService) { }
 
   ngOnChanges() {
-    if (this.site) {
-      this.api.getIAs(this.site).subscribe(
-        (ias: IA[]) => this.ias = ias
+    if (this.site.ID) {
+      this.api.getASes(this.site).subscribe(
+        (ias: ASEntry[]) => this.ias = ias
       )
     }
   }
@@ -32,9 +32,9 @@ export class ASListComponent implements OnChanges {
   onSubmit() {
     this.error = ''
     if (this.editing) {
-      this.api.updateIA(this.site, this.ia).subscribe(
+      this.api.updateAS(this.site, this.ia).subscribe(
         ia => {
-          this.ia = new IA
+          this.ia = new ASEntry
           this.form.resetForm()
           this.editing = false
           this.success = 'Successfully updated AS.'
@@ -42,9 +42,9 @@ export class ASListComponent implements OnChanges {
         error => this.error = error
       )
     } else {
-      this.api.createIA(this.site, this.ia).subscribe(
+      this.api.createAS(this.site, this.ia).subscribe(
         ia => {
-          this.ias.push({ ...ia })
+          this.ias.push(ia)
           this.form.resetForm()
         },
         error => this.error = error
@@ -58,7 +58,7 @@ export class ASListComponent implements OnChanges {
   }
 
   delete(idx: number) {
-    this.api.deleteIA(this.site, this.ias[idx]).subscribe(
+    this.api.deleteAS(this.site, this.ias[idx]).subscribe(
       () => this.ias.splice(idx, 1)
     )
   }

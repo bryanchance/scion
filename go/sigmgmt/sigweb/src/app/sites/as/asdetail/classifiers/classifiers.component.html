@@ -3,7 +3,7 @@
 <div class="flex-container">
   <form #classifierForm="ngForm" (submit)="onSubmit()">
     <mat-form-field>
-      <textarea matInput name="id" [(ngModel)]="ia.Policy" matTextareaAutosize matAutosizeMinRows="3" placeholder="name=audio src=172.16.0.0/24 dst=192.168.0.0/16 dscp=0x12 selectors=first,second,default">
+      <textarea matInput name="id" [(ngModel)]="ia.Policies" matTextareaAutosize matAutosizeMinRows="3" placeholder="name=audio src=172.16.0.0/24 dst=192.168.0.0/16 dscp=0x12 selectors=first,second,default">
       </textarea>
       <mat-hint>
         <strong>Contains traffic policy rules, one per line. One type of rule is supported, which tells packets matching certain

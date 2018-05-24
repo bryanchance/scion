@@ -21,9 +21,9 @@ export class SiteDetailsComponent implements OnInit {
     private api: ApiService) { }
 
   ngOnInit() {
-    const name = this.route.snapshot.paramMap.get('site')
-    if (name) {
-      this.api.getSite(name).subscribe(
+    const id = this.route.snapshot.paramMap.get('site')
+    if (id) {
+      this.api.getSite(id).subscribe(
         site => {
           this.site = site
           this.newSite = false
@@ -35,7 +35,7 @@ export class SiteDetailsComponent implements OnInit {
   reloadConfig() {
     this.reloadError = ''
     this.loadingConfig = true
-    this.api.reloadConfig(this.site.Name).subscribe(
+    this.api.reloadConfig(this.site.ID).subscribe(
       () => {
         this.reloadSuccess = true
         this.loadingConfig = false

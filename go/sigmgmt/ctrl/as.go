@@ -10,258 +10,209 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/scionproto/scion/go/lib/addr"
-	sigcfg "github.com/scionproto/scion/go/sig/anaconfig"
+	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/sig/sigcmn"
-	"github.com/scionproto/scion/go/sig/siginfo"
-	"github.com/scionproto/scion/go/sigmgmt/config"
 	"github.com/scionproto/scion/go/sigmgmt/db"
 )
 
-type ASController struct {
-	dbase *db.DB
-	cfg   *config.Global
-}
+const (
+	iaParseError   = "Unable to parse ISD-AS string"
+	cidrParseError = "Unable to parse CIDR address"
+)
 
-func NewASController(dbase *db.DB, cfg *config.Global) *ASController {
-	return &ASController{
-		dbase: dbase,
-		cfg:   cfg,
-	}
-}
-
-func (ac ASController) GetASes(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	ases, err := ac.dbase.QueryASes(mux.Vars(r)["site"])
-	if err != nil {
-		respondError(w, err, "Unable to get ASes", 400)
+func (c *Controller) GetASes(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var ases []db.ASEntry
+	if err := c.db.Where("site_id = ?", mux.Vars(r)["site"]).Find(&ases).Error; err != nil {
+		respondError(w, err, DBFindError, http.StatusBadRequest)
 		return
 	}
 	respondJSON(w, ases)
 }
 
-func (ac ASController) PostAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var asSct *db.AS
-	if err := json.NewDecoder(r.Body).Decode(&asSct); err != nil {
+func (c *Controller) PostAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var as *db.ASEntry
+	if err := json.NewDecoder(r.Body).Decode(&as); err != nil {
 		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
 		return
 	}
-	ia, err := asSct.ToAddrIA()
+	_, err := as.ToAddrIA()
 	if err != nil {
-		respondError(w, err, IAParseError, http.StatusBadRequest)
+		respondError(w, err, iaParseError, http.StatusBadRequest)
 		return
 	}
-	if err := ac.dbase.InsertAS(mux.Vars(r)["site"], asSct.Name, ia); err != nil {
-		respondError(w, err, "DB Error! Is the ISD-AS identifier unique?", 400)
+	var site db.Site
+	if !c.findOne(w, mux.Vars(r)["site"], &site) {
 		return
 	}
-	respondJSON(w, asSct)
-}
-
-func (ac ASController) DeleteAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	ia, msg, err := getIA(r)
-	if err != nil {
-		respondError(w, err, msg, http.StatusBadRequest)
-		return
-	}
-	if err := ac.dbase.DeleteAS(mux.Vars(r)["site"], *ia); err != nil {
-		respondError(w, err, "Unable to delete AS from database", 400)
-		return
-	}
-	respondEmpty(w)
-}
-
-func (ac ASController) GetAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	ia, msg, err := getIA(r)
-	if err != nil {
-		respondError(w, err, msg, 400)
-		return
-	}
-	as, err := ac.dbase.GetAS(mux.Vars(r)["site"], *ia)
-	if err != nil {
-		respondError(w, err, "Unable to get IA", 400)
+	as.SiteID = site.ID
+	if !c.createOne(w, &as) {
 		return
 	}
 	respondJSON(w, as)
 }
 
-func (ac ASController) UpdateAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	ia, msg, err := getIA(r)
-	if err != nil {
-		respondError(w, err, msg, http.StatusBadRequest)
-		return
-	}
-	var asSct *db.AS
-	if err := json.NewDecoder(r.Body).Decode(&asSct); err != nil {
-		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
-		return
-	}
-	if err := ac.dbase.UpdateAS(mux.Vars(r)["site"], asSct.Name, *ia); err != nil {
-		respondError(w, err, "DB Error! IS the ISD-AS identifier unique?", 400)
+func (c *Controller) DeleteAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	if err := c.db.Delete(&db.ASEntry{}, mux.Vars(r)["as"]).Error; err != nil {
+		respondError(w, err, DBDeleteError, http.StatusBadRequest)
 		return
 	}
 	respondEmpty(w)
 }
 
-func (ac ASController) UpdatePolicy(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	site := mux.Vars(r)["site"]
-	ia, msg, err := getIA(r)
-	if err != nil {
-		respondError(w, err, msg, http.StatusBadRequest)
+func (c *Controller) GetAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var as db.ASEntry
+	if !c.findOne(w, mux.Vars(r)["as"], &as) {
 		return
 	}
-	var policy Policy
-	if err := json.NewDecoder(r.Body).Decode(&policy); err != nil {
+	respondJSON(w, as)
+}
+
+func (c *Controller) UpdateAS(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var as *db.ASEntry
+	if err := json.NewDecoder(r.Body).Decode(&as); err != nil {
 		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
 		return
 	}
-	policies := map[addr.IA]string{
-		*ia: policy.Policy,
+	id, err := strconv.Atoi(mux.Vars(r)["as"])
+	if err != nil || int(as.ID) != id {
+		respondError(w, nil, IDChangeError, http.StatusBadRequest)
+		return
 	}
-	if str, err := ac.validatePolicies(site, policies); err != nil {
+	if err := c.db.Model(&as).Update("Name", as.Name).Error; err != nil {
+		respondError(w, err, DBUpdateError, http.StatusBadRequest)
+		return
+	}
+	respondEmpty(w)
+}
+
+func (c *Controller) UpdatePolicy(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var as, dbAS db.ASEntry
+	if err := json.NewDecoder(r.Body).Decode(&as); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
+	if !c.findOne(w, mux.Vars(r)["as"], &dbAS) {
+		return
+	}
+	dbAS.Policies = as.Policies
+	if str, err := c.validatePolicies(&dbAS); err != nil {
 		respondError(w, err, str, http.StatusBadRequest)
 		return
 	}
-	if err = ac.dbase.SetPolicy(site, *ia, policy.Policy); err != nil {
-		respondError(w, err, "DB Error! Unable to set Policy", 400)
+	if err := c.db.Model(&as).Update("Policies", as.Policies).Error; err != nil {
+		respondError(w, err, DBUpdateError, http.StatusBadRequest)
 		return
 	}
 	respondEmpty(w)
 }
 
-func (ac ASController) GetNetworks(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	ia, msg, err := getIA(r)
-	if err != nil {
-		respondError(w, err, msg, http.StatusBadRequest)
+func (c *Controller) GetNetworks(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var networks []db.Network
+	if err := c.db.Where("as_entry_id = ?", mux.Vars(r)["as"]).Find(&networks).Error; err != nil {
+		respondError(w, err, DBFindError, http.StatusBadRequest)
 		return
 	}
-	var networks map[int]*sigcfg.IPNet
-	if networks, err = ac.dbase.QueryNetworks(mux.Vars(r)["site"], *ia); err != nil {
-		respondError(w, err, "Unable to get networks", http.StatusBadRequest)
-		return
-	}
-	cidr := []CIDR{}
-	for id, network := range networks {
-		cidr = append(cidr, CIDR{ID: id, CIDR: network.String()})
-	}
-	respondJSON(w, cidr)
+	respondJSON(w, networks)
 }
 
-func (ac ASController) PostNetwork(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	ia, msg, err := getIA(r)
-	if err != nil {
-		respondError(w, err, msg, http.StatusBadRequest)
-		return
-	}
-	var cidrSct *CIDR
-	if err := json.NewDecoder(r.Body).Decode(&cidrSct); err != nil {
+func (c *Controller) PostNetwork(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var network db.Network
+	if err := json.NewDecoder(r.Body).Decode(&network); err != nil {
 		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
 		return
 	}
-	_, cidr, err := net.ParseCIDR(cidrSct.CIDR)
+	_, _, err := net.ParseCIDR(network.CIDR)
 	if err != nil {
-		respondError(w, err, "Unable to parse CIDR address", 400)
+		respondError(w, err, cidrParseError, 400)
 		return
 	}
-	if err := ac.dbase.InsertNetwork(mux.Vars(r)["site"], *ia, cidr); err != nil {
-		respondError(w, err, "DB Error!", 400)
+	var as db.ASEntry
+	if !c.findOne(w, mux.Vars(r)["as"], &as) {
 		return
 	}
-	respondJSON(w, cidrSct)
+	network.ASEntryID = as.ID
+	if !c.createOne(w, &network) {
+		return
+	}
+	respondJSON(w, network)
 }
 
-func (ac ASController) DeleteNetwork(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	ia, msg, err := getIA(r)
-	if err != nil {
-		respondError(w, err, msg, http.StatusBadRequest)
-		return
-	}
-	network, err := strconv.ParseInt(mux.Vars(r)["network"], 10, 32)
-	if err := ac.dbase.DeleteNetwork(mux.Vars(r)["site"], *ia, int(network)); err != nil {
-		respondError(w, err, "Unable to delete network", http.StatusBadRequest)
+func (c *Controller) DeleteNetwork(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	if err := c.db.Delete(&db.Network{}, mux.Vars(r)["network"]).Error; err != nil {
+		respondError(w, err, DBDeleteError, http.StatusBadRequest)
 		return
 	}
 	respondEmpty(w)
 }
 
-func (ac ASController) GetSIGs(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	ia, msg, err := getIA(r)
-	if err != nil {
-		respondError(w, err, msg, http.StatusBadRequest)
+func (c *Controller) GetSIGs(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var sigs []db.SIG
+	if err := c.db.Where("as_entry_id = ?", mux.Vars(r)["as"]).Find(&sigs).Error; err != nil {
+		respondError(w, err, DBFindError, http.StatusBadRequest)
 		return
-	}
-	var sigMap sigcfg.SIGSet
-	if sigMap, err = ac.dbase.QuerySIGs(mux.Vars(r)["site"], *ia); err != nil {
-		respondError(w, err, "Unable to get SIGs", 400)
-		return
-	}
-	sigs := []*SIG{}
-	for _, sig := range sigMap {
-		sigs = append(sigs, &SIG{ID: string(sig.Id), Addr: sig.Addr.String(),
-			CtrlPort: sig.CtrlPort, EncapPort: sig.EncapPort})
 	}
 	respondJSON(w, sigs)
 }
 
-func (ac ASController) PostSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	ia, msg, err := getIA(r)
-	if err != nil {
-		respondError(w, err, msg, http.StatusBadRequest)
-		return
-	}
-	var sigSct *SIG
-	if err := json.NewDecoder(r.Body).Decode(&sigSct); err != nil {
-		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
-		return
-	}
-	sig := sigcfg.SIG{}
-	sig.Id = siginfo.SigIdType(sigSct.ID)
-	if sig.Addr = net.ParseIP(sigSct.Addr); sig.Addr == nil {
-		respondError(w, err, "IP Address is not valid!", 400)
-		return
-	}
-	sig.CtrlPort = sigcmn.DefaultCtrlPort
-	sig.EncapPort = sigcmn.DefaultEncapPort
-	if err = ac.dbase.InsertSIG(mux.Vars(r)["site"], *ia, &sig); err != nil {
-		respondError(w, err, "DB Error! Is the name unique?", 400)
-		return
-	}
-	respondJSON(w, SIGFromSIGCfg(sig))
+func (c *Controller) GetDefaultSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	respondJSON(w, db.SIG{CtrlPort: sigcmn.DefaultCtrlPort, EncapPort: sigcmn.DefaultEncapPort})
 }
 
-func (ac ASController) UpdateSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	ia, msg, err := getIA(r)
-	if err != nil {
-		respondError(w, err, msg, http.StatusBadRequest)
-		return
-	}
-	var sigSct *SIG
-	if err := json.NewDecoder(r.Body).Decode(&sigSct); err != nil {
+func (c *Controller) PostSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var sig *db.SIG
+	if err := json.NewDecoder(r.Body).Decode(&sig); err != nil {
 		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
 		return
 	}
-	sig := sigcfg.SIG{}
-	sig.Id = siginfo.SigIdType(sigSct.ID)
-	if sig.Addr = net.ParseIP(sigSct.Addr); sig.Addr == nil {
-		respondError(w, err, "IP Address is not valid!", 400)
+	if addr := net.ParseIP(sig.Address); addr == nil {
+		respondError(
+			w, common.NewBasicError(IPParseError, nil, "address", sig.Address), IPParseError, 400)
 		return
 	}
-	sig.CtrlPort = sigSct.CtrlPort
-	sig.EncapPort = sigSct.EncapPort
-	if err = ac.dbase.UpdateSIG(mux.Vars(r)["site"], *ia, &sig); err != nil {
-		respondError(w, err, "DB Error! Unable to update SIG", 400)
+	var as db.ASEntry
+	if !c.findOne(w, mux.Vars(r)["as"], &as) {
+		return
+	}
+	sig.ASEntryID = as.ID
+	if !c.createOne(w, &sig) {
+		return
+	}
+	respondJSON(w, sig)
+}
+
+func (c *Controller) UpdateSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var sig *db.SIG
+	if err := json.NewDecoder(r.Body).Decode(&sig); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
+	if addr := net.ParseIP(sig.Address); addr == nil {
+		respondError(
+			w, common.NewBasicError(IPParseError, nil, "address", sig.Address), IPParseError, 400)
+		return
+	}
+	id, err := strconv.Atoi(mux.Vars(r)["sig"])
+	if err != nil || int(sig.ID) != id {
+		respondError(w, nil, IDChangeError, http.StatusBadRequest)
+		return
+	}
+	err = c.db.Model(&sig).Updates(
+		map[string]interface{}{
+			"Name":      sig.Name,
+			"Address":   sig.Address,
+			"CtrlPort":  sig.CtrlPort,
+			"EncapPort": sig.EncapPort,
+		}).Error
+	if err != nil {
+		respondError(w, err, DBUpdateError, http.StatusBadRequest)
 		return
 	}
 	respondEmpty(w)
 }
 
-func (ac ASController) DeleteSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	ia, msg, err := getIA(r)
-	if err != nil {
-		respondError(w, err, msg, http.StatusBadRequest)
-		return
-	}
-	if err = ac.dbase.DeleteSIG(mux.Vars(r)["site"], *ia, mux.Vars(r)["sig"]); err != nil {
-		respondError(w, err, "Unable to get AS for site", 400)
+func (c *Controller) DeleteSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	if err := c.db.Delete(&db.SIG{}, mux.Vars(r)["sig"]).Error; err != nil {
+		respondError(w, err, DBDeleteError, http.StatusBadRequest)
 		return
 	}
 	respondEmpty(w)

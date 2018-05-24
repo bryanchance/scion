@@ -2,68 +2,65 @@
 
 package db
 
-const (
-	SchemaVersion = 1
-	Schema        = `
-	CREATE TABLE Sites (
-		Name TEXT PRIMARY KEY NOT NULL,
-		MetricsPort INTEGER NOT NULL,
-		VHost TEXT NOT NULL
-	);
-
-	CREATE TABLE Hosts (
-		Name TEXT NOT NULL,
-		User TEXT NOT NULL,
-		Key TEXT NOT NULL,
-		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		PRIMARY KEY (Site, Name, User, Key)
-	);
-
-	CREATE TABLE ASEntries (
-		Name TEXT NOT NULL,
-		IsdID INTEGER NOT NULL,
-		AsID INTEGER NOT NULL,
-		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		Policy TEXT NOT NULL,
-		PRIMARY KEY (Site, IsdID, AsID)
-	);
-
-	CREATE TABLE ASConfig (
-		Name TEXT PRIMAY KEY NOT NULL,
-		Value TEXT NOT NULL,
-		IsdID INTEGER NOT NULL,
-		AsID INTEGER NOT NULL,
-		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		FOREIGN KEY (Site, IsdID, AsID) REFERENCES ASEntries ON DELETE CASCADE ON UPDATE CASCADE,
-		PRIMARY KEY (Site, IsdID, AsID, Name)
-	);
-
-	CREATE TABLE SIGs (
-		Name TEXT NOT NULL,
-		Address TEXT NOT NULL,
-		CtrlPort INTEGER NOT NULL,
-		EncapPort INTEGER NOT NULL,
-		Site TEXT REFERENCES Sites,
-		IsdID INTEGER NOT NULL,
-		AsID INTEGER NOT NULL,
-		FOREIGN KEY (Site, IsdID, AsID) REFERENCES ASEntries ON DELETE CASCADE ON UPDATE CASCADE,
-		PRIMARY KEY (Site, IsdID, AsID, Name)
-	);
-
-	CREATE TABLE Networks (
-		ID INTEGER PRIMARY KEY AUTOINCREMENT,
-		CIDR TEXT NOT NULL,
-		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		IsdID INTEGER NOT NULL,
-		AsID INTEGER NOT NULL,
-		FOREIGN KEY (Site, IsdID, AsID) REFERENCES ASEntries ON DELETE CASCADE ON UPDATE CASCADE,
-		UNIQUE (ID, Site, IsdID, AsID, CIDR)
-	);
-
-	CREATE TABLE Filters (
-		Name TEXT NOT NULL,
-		Filter TEXT NOT NULL,
-		Site TEXT REFERENCES Sites ON DELETE CASCADE ON UPDATE CASCADE,
-		PRIMARY KEY (Site, Name)
-	);`
+import (
+	"github.com/scionproto/scion/go/lib/addr"
 )
+
+type Site struct {
+	ID            uint
+	Name          string `gorm:"unique;not null"`
+	VHost         string
+	MetricsPort   uint16
+	Hosts         []Host         `gorm:"association_autoupdate:false;association_autocreate:false"`
+	ASEntries     []ASEntry      `json:",omitempty"`
+	PathSelectors []PathSelector `json:",omitempty"`
+}
+
+type Host struct {
+	ID     uint
+	Name   string
+	User   string
+	Key    string `gorm:"size:400"`
+	SiteID uint   `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name, user, key)" json:"-"`
+}
+
+type PathSelector struct {
+	ID     uint
+	Name   string
+	Filter string
+	SiteID uint `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name), UNIQUE (site_id, filter)" json:"-"`
+}
+
+type ASEntry struct {
+	ID       uint
+	Name     string
+	ISD      string    `gorm:"column:isd_id"`
+	AS       string    `gorm:"column:as_id"`
+	Policies string    `gorm:"column:policies"`
+	SiteID   uint      `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name, isd_id, as_id)" json:"-"`
+	SIGs     []SIG     `json:",omitempty"`
+	Networks []Network `json:",omitempty"`
+}
+
+func (ASEntry) TableName() string {
+	return "asentries"
+}
+
+func (as *ASEntry) ToAddrIA() (addr.IA, error) {
+	return addr.IAFromString(as.ISD + "-" + as.AS)
+}
+
+type SIG struct {
+	ID        uint
+	Name      string
+	Address   string
+	CtrlPort  uint16
+	EncapPort uint16
+	ASEntryID uint `sql:"type:integer REFERENCES asentries ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (name, as_entry_id)" json:"-"`
+}
+
+type Network struct {
+	ID        uint
+	CIDR      string `gorm:"column:cidr"`
+	ASEntryID uint   `sql:"type:integer REFERENCES asentries ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (cidr, as_entry_id)" json:"-"`
+}

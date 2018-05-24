@@ -1,19 +1,19 @@
 <mat-card *ngIf="success" class="success">{{success}}</mat-card>
 <mat-card *ngIf="error" class="error">{{error}}</mat-card>
 <div class="flex-container">
-  <div class="flex-container-left">
+  <div>
     <form #sigForm="ngForm" (submit)="onSubmit()" *ngIf="!formDisabled">
       <mat-form-field>
-        <input matInput name="name" [(ngModel)]="sig.ID" placeholder="Name" type="text" [disabled]="editing" required>
+        <input matInput name="name" [(ngModel)]="sig.Name" placeholder="Name" type="text" required>
       </mat-form-field>
       <mat-form-field>
-        <input matInput name="address" [(ngModel)]="sig.Addr" placeholder="Address" type="text" required>
+        <input matInput name="address" [(ngModel)]="sig.Address" placeholder="Address" type="text" required>
       </mat-form-field>
       <mat-form-field class="port">
-        <input matInput name="encapPort" [(ngModel)]="sig.EncapPort" [disabled]="!editing" placeholder="Encapsulation Port" type="number">
+        <input matInput name="encapPort" [(ngModel)]="sig.EncapPort" placeholder="Encapsulation Port" type="number">
       </mat-form-field>
       <mat-form-field class="port">
-        <input matInput name="ctrlPort" [(ngModel)]="sig.CtrlPort" [disabled]="!editing" placeholder="Control Port" type="number">
+        <input matInput name="ctrlPort" [(ngModel)]="sig.CtrlPort" placeholder="Control Port" type="number">
       </mat-form-field>
       <button mat-icon-button type="submit" *ngIf="!editing" [disabled]="sigForm.invalid">
         <mat-icon>add_box</mat-icon>
@@ -24,8 +24,8 @@
     </form>
     <mat-list>
       <mat-list-item *ngFor="let sig of sigs; let idx = index" class="mat-list-item">
-        <span>{{sig.ID}}</span>
-        <span>{{sig.Addr}}</span>
+        <span>{{sig.Name}}</span>
+        <span>{{sig.Address}}</span>
         <span class="port">{{sig.EncapPort}}</span>
         <span class="ctrl-port">{{sig.CtrlPort}}</span>
         <button *ngIf="!formDisabled" mat-icon-button (click)="edit(idx)">

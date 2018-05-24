@@ -8,8 +8,8 @@
 
     <mat-nav-list>
         <mat-list-item class="flex-container" *ngFor="let site of sites; let idx = index">
-            <a matLine routerLink="/sites/{{site.Name}}">{{ site.Name }}</a>
-            <button mat-icon-button routerLink="/sites/{{site.Name}}">
+            <a matLine routerLink="/sites/{{site.ID}}">{{ site.Name }}</a>
+            <button mat-icon-button routerLink="/sites/{{site.ID}}">
                 <mat-icon>settings</mat-icon>
             </button>
             <button *ngIf="!formDisabled" mat-icon-button (click)="delete(idx)">

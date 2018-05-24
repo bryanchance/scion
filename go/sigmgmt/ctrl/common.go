@@ -5,37 +5,24 @@ package ctrl
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
+
+	"github.com/jinzhu/gorm"
 
 	"github.com/scionproto/scion/go/lib/log"
-	sigcfg "github.com/scionproto/scion/go/sig/anaconfig"
 )
 
-var (
-	JSONDecodeError = "Error decoding JSON"
+const (
+	JSONDecodeError    = "Error decoding JSON"
+	IDChangeError      = "ID can not be changed"
+	IPParseError       = "IP Address is not valid"
+	DBFindError        = "Error finding object in DB"
+	DBCreateError      = "Error creating object in DB"
+	DBUniqueError      = "Unique Constraint Error"
+	DBUpdateError      = "Error updating object in DB"
+	DBDeleteError      = "Error deleting object in DB"
+	PathPredicateError = "Bad path selector string"
 )
-
-type (
-	Policy struct {
-		Policy string
-	}
-
-	CIDR struct {
-		ID   int
-		CIDR string
-	}
-
-	SIG struct {
-		ID        string
-		Addr      string
-		EncapPort uint16
-		CtrlPort  uint16
-	}
-)
-
-func SIGFromSIGCfg(sig sigcfg.SIG) *SIG {
-	return &SIG{ID: string(sig.Id), Addr: sig.Addr.String(),
-		EncapPort: sig.EncapPort, CtrlPort: sig.CtrlPort}
-}
 
 func respond(w http.ResponseWriter, data []byte, status int) {
 	w.Header().Set("Content-Type", "application/json")
@@ -72,4 +59,29 @@ func respondError(w http.ResponseWriter, err error, errStr string, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	w.Write(data)
+}
+
+func (c *Controller) findOne(w http.ResponseWriter, key string, entity interface{}) bool {
+	err := c.db.First(entity, key).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			respondNotFound(w)
+			return false
+		}
+		respondError(w, err, DBFindError, http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
+func (c *Controller) createOne(w http.ResponseWriter, entity interface{}) bool {
+	if err := c.db.Create(entity).Error; err != nil {
+		if strings.HasPrefix(err.Error(), "UNIQUE") {
+			respondError(w, err, DBUniqueError, http.StatusBadRequest)
+			return false
+		}
+		respondError(w, err, DBCreateError, http.StatusBadRequest)
+		return false
+	}
+	return true
 }

@@ -10,10 +10,9 @@ import { UserService } from './api/user.service'
 })
 export class AppComponent {
 
-  constructor(private router: Router, public userService: UserService) { }
+  constructor(public userService: UserService) { }
 
   logout() {
     this.userService.logout()
-    this.router.navigate(['/login'])
   }
 }

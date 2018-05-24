@@ -4,10 +4,10 @@
   <div class="flex-container-vertical">
     <form #pathForm="ngForm" (ngSubmit)="onSubmit()" *ngIf="!formDisabled">
       <mat-form-field>
-        <input matInput name="pathName" [(ngModel)]="pathSelector.Name" type="text" placeholder="Name" required [disabled]="editing">
+        <input matInput name="pathName" [(ngModel)]="pathSelector.Name" type="text" placeholder="Name" required>
       </mat-form-field>
       <mat-form-field class="predicate-form">
-        <input matInput name="filter" [(ngModel)]="pathSelector.PP" type="text" placeholder="Filter Predicate" required>
+        <input matInput name="filter" [(ngModel)]="pathSelector.Filter" type="text" placeholder="Filter Predicate" required>
         <mat-hint align="start">
           E.g. To select paths going through ISD-AS 1-ff00:0:110:
           <strong>1-ff00:0:110#0</strong>
@@ -23,7 +23,7 @@
     <mat-list>
       <mat-list-item *ngFor="let path of pathSelectors; let idx = index" class="path-list-row">
         <p class="name">{{path.Name}}</p>
-        <p class="predicate">{{path.PP}}</p>
+        <p class="predicate">{{path.Filter}}</p>
         <button *ngIf="!formDisabled && path.Name!='any'" mat-icon-button (click)="edit(idx)">
           <mat-icon>edit</mat-icon>
         </button>

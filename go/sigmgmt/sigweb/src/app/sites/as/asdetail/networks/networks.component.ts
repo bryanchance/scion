@@ -2,7 +2,7 @@ import { Component, Input, OnChanges, ViewChild } from '@angular/core'
 import { NgForm } from '@angular/forms'
 
 import { ApiService } from '../../../../api/api.service'
-import { CIDR, IA, Site } from '../../../models'
+import { CIDR, ASEntry, Site } from '../../../models'
 
 @Component({
   selector: 'ana-networks',
@@ -10,8 +10,7 @@ import { CIDR, IA, Site } from '../../../models'
   styleUrls: ['./networks.component.scss']
 })
 export class NetworksComponent implements OnChanges {
-  @Input() site: Site
-  @Input() ia: IA
+  @Input() ia: ASEntry
   success = ''
   error = ''
 
@@ -22,8 +21,8 @@ export class NetworksComponent implements OnChanges {
   constructor(private api: ApiService) { }
 
   ngOnChanges(): void {
-    if (this.site.Name && this.ia) {
-      this.api.getNetworks(this.site, this.ia).subscribe(
+    if (this.ia.ID) {
+      this.api.getNetworks(this.ia).subscribe(
         networks => this.networks = networks
       )
     }
@@ -31,9 +30,9 @@ export class NetworksComponent implements OnChanges {
 
   onSubmit() {
     this.error = ''
-    this.api.createNetwork(this.site, this.ia, this.network).subscribe(
+    this.api.createNetwork(this.ia, this.network).subscribe(
       network => {
-        this.networks.push({ ...network })
+        this.networks.push(network)
         this.form.resetForm()
       },
       error => this.error = error
@@ -41,7 +40,7 @@ export class NetworksComponent implements OnChanges {
   }
 
   delete(idx: number) {
-    this.api.deleteNetwork(this.site, this.ia, this.networks[idx]).subscribe(
+    this.api.deleteNetwork(this.ia, this.networks[idx]).subscribe(
       () => this.networks.splice(idx, 1)
     )
   }

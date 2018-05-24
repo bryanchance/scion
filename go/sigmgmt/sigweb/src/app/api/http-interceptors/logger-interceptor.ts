@@ -4,10 +4,13 @@ import { throwError } from 'rxjs'
 import { catchError, map } from 'rxjs/operators'
 
 import { environment } from '../../../environments/environment'
+import { UserService } from '../user.service'
 import { LogLevel } from './log-level'
 
 @Injectable()
 export class LoggerInterceptor implements HttpInterceptor {
+
+    constructor(private userService: UserService) { }
 
     logLevel = environment.logLevel
 
@@ -23,6 +26,9 @@ export class LoggerInterceptor implements HttpInterceptor {
                 this.error('error', err.error)
                 if (err instanceof HttpErrorResponse) {
                     this.error('HttpErrorResponse', err.status)
+                    if (err.status === 401) {
+                        this.userService.logout()
+                    }
                 }
                 if (err.error && err.error.error) {
                     return throwError(new Error(err.error.error))

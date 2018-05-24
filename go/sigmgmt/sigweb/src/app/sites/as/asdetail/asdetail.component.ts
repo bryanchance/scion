@@ -3,7 +3,7 @@ import { ActivatedRoute } from '@angular/router'
 import { forkJoin } from 'rxjs'
 
 import { ApiService } from '../../../api/api.service'
-import { IA, SIG, Site } from '../../models'
+import { ASEntry, SIG, Site } from '../../models'
 
 @Component({
   selector: 'ana-asdetail',
@@ -12,7 +12,7 @@ import { IA, SIG, Site } from '../../models'
 })
 export class ASDetailComponent implements OnInit {
   site = new Site
-  ia = new IA
+  ia = new ASEntry
   sigs: SIG[]
 
   constructor(
@@ -21,14 +21,13 @@ export class ASDetailComponent implements OnInit {
   ) { }
 
   ngOnInit() {
-    const siteParam = this.route.snapshot.params.site
-    const iaParam = this.route.snapshot.params.ia
+    const siteID = this.route.snapshot.params.site
+    const asID = this.route.snapshot.params.ia
 
-    if (siteParam && iaParam) {
-      [this.ia.ISD, this.ia.AS] = iaParam.split('-', 2)
+    if (siteID && asID) {
       forkJoin(
-        this.api.getSite(siteParam),
-        this.api.getIA(new Site(siteParam), this.ia)
+        this.api.getSite(siteID),
+        this.api.getAS(asID)
       ).subscribe(
         ([site, ia]) => {
           this.site = site

@@ -36,22 +36,27 @@ export class SiteConfigurationComponent implements OnChanges {
     this.clearMsg()
     if (this.newSite) {
       this.api.createSite(this.site).subscribe(
-        () => {
+        site => {
+          this.site = site
           this.newSite = false
           this.success = 'Successfully created Site.'
-          this.router.navigate(['/sites', this.site.Name])
+          this.router.navigate(['/sites', this.site.ID])
         },
         error => this.error = error
       )
     } else {
       this.api.updateSite(this.site).subscribe(
-        () => this.success = 'Successfully updated Site.',
+        site => {
+          this.site = site
+          this.success = 'Successfully updated Site.'
+        },
         error => this.error = error
       )
     }
   }
 
   saveHost() {
+    this.clearMsg()
     const site = { ...this.site }
     if (!this.editing) {
       const hosts = Object.assign([], this.site.Hosts)
@@ -60,7 +65,6 @@ export class SiteConfigurationComponent implements OnChanges {
     }
     this.api.updateSite(site).subscribe(
       () => {
-        this.clearMsg()
         this.success = 'Successfully updated Hosts.'
         this.host = new Host
         this.hostForm.resetForm()
@@ -68,7 +72,6 @@ export class SiteConfigurationComponent implements OnChanges {
         this.site = site
       },
       error => {
-        this.clearMsg()
         this.error = error
       }
     )
@@ -80,6 +83,7 @@ export class SiteConfigurationComponent implements OnChanges {
   }
 
   deleteHost(idx: number) {
+    this.clearMsg()
     this.site.Hosts.splice(idx, 1)
     this.api.updateSite(this.site).subscribe(
       () => this.success = 'Successfully updated Hosts.',

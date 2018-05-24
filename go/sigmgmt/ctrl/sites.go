@@ -6,51 +6,53 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/jinzhu/gorm"
 
 	"github.com/scionproto/scion/go/lib/spath/spathmeta"
 	"github.com/scionproto/scion/go/sigmgmt/config"
 	"github.com/scionproto/scion/go/sigmgmt/db"
 )
 
-type SiteController struct {
-	dbase *db.DB
-	cfg   *config.Global
+type Controller struct {
+	db  *gorm.DB
+	cfg *config.Global
 }
 
-func NewSiteController(dbase *db.DB, cfg *config.Global) *SiteController {
-	return &SiteController{
-		dbase: dbase,
-		cfg:   cfg,
+func NewController(db *gorm.DB, cfg *config.Global) *Controller {
+	return &Controller{
+		db:  db,
+		cfg: cfg,
 	}
 }
 
-func (sc *SiteController) GetSite(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var err error
-	var site *db.Site
-	name := mux.Vars(r)["site"]
-	if site, err = sc.dbase.GetSiteWithHosts(name); err != nil {
-		if site, err = sc.dbase.GetSite(name); err != nil {
-			respondError(w, err, "Unable to get site", http.StatusNotFound)
+func (c *Controller) GetSite(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var site db.Site
+	err := c.db.Preload("Hosts").First(&site, mux.Vars(r)["site"]).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			respondNotFound(w)
 			return
 		}
+		respondError(w, err, DBFindError, http.StatusBadRequest)
+		return
 	}
 	respondJSON(w, site)
 }
 
-func (sc *SiteController) GetSites(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var err error
+func (c *Controller) GetSites(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
 	var sites []*db.Site
-	if sites, err = sc.dbase.QuerySites(); err != nil {
-		respondError(w, err, "Unable to get sites", http.StatusNotFound)
+	if err := c.db.Find(&sites).Error; err != nil {
+		respondError(w, err, DBFindError, http.StatusInternalServerError)
 		return
 	}
 	respondJSON(w, sites)
 }
 
-func (sc *SiteController) PostSite(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+func (c *Controller) PostSite(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
 	site := db.Site{}
 	if err := json.NewDecoder(r.Body).Decode(&site); err != nil {
 		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
@@ -60,128 +62,148 @@ func (sc *SiteController) PostSite(w http.ResponseWriter, r *http.Request, _ htt
 		respondError(w, err, msg, http.StatusBadRequest)
 		return
 	}
-	if err := sc.dbase.InsertSite(&site); err != nil {
-		respondError(w, err, "DB Error! Is the name unique?", http.StatusBadRequest)
-		return
-	}
-	insSite, err := sc.dbase.GetSite(site.Name)
-	if err != nil {
-		respondError(w, err, "Unable to get site", http.StatusBadRequest)
-		return
-	}
-	// add default "any" path selector
-	pp, err := spathmeta.NewPathPredicate("0-0#0")
-	if err != nil {
-		respondError(w, err, "Bad path selector string", 400)
-		return
-	}
-	if err := sc.dbase.InsertFilter(site.Name, "any", pp); err != nil {
-		respondError(w, err, "DB Error!", 400)
-		return
-	}
-	respondJSON(w, &insSite)
-}
-
-func (sc *SiteController) PutSite(w http.ResponseWriter, r *http.Request, h http.HandlerFunc) {
-	site := db.Site{}
-	if err := json.NewDecoder(r.Body).Decode(&site); err != nil {
-		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
-		return
-	}
-	if mux.Vars(r)["site"] != site.Name {
-		respondError(w, errors.New("Names are not equal"), "Name cannot be changed.",
+	if !c.db.NewRecord(&site) {
+		respondError(w, errors.New("new record failed"), "DB Error! Name must be unique!",
 			http.StatusBadRequest)
 		return
 	}
+	if !c.createOne(w, &site) {
+		return
+	}
+	selector := db.PathSelector{Name: "any", SiteID: site.ID, Filter: "0-0#0"}
+	if !c.createOne(w, &selector) {
+		return
+	}
+	respondJSON(w, &site)
+}
+
+func (c *Controller) PutSite(w http.ResponseWriter, r *http.Request, h http.HandlerFunc) {
+	site := db.Site{}
+	if err := json.NewDecoder(r.Body).Decode(&site); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
 	if msg, err := validateSite(&site); err != nil {
 		respondError(w, err, msg, http.StatusBadRequest)
 		return
 	}
-	if err := sc.dbase.UpdateSite(&site); err != nil {
-		respondError(w, err, "DB Error! Unable to update site", http.StatusBadRequest)
+	id, err := strconv.Atoi(mux.Vars(r)["site"])
+	if err != nil || int(site.ID) != id {
+		respondError(w, nil, IDChangeError, http.StatusBadRequest)
+		return
+	}
+	// Update hosts
+	if err := c.updateHosts(site.Hosts, site.ID); err != nil {
+		respondError(w, err, "Could not update hosts", http.StatusBadRequest)
+		return
+	}
+	// Update fields
+	err = c.db.Model(&site).Updates(
+		map[string]interface{}{
+			"Name":        site.Name,
+			"VHost":       site.VHost,
+			"MetricsPort": site.MetricsPort,
+		}).Error
+	if err != nil {
+		respondError(w, err, DBUpdateError, http.StatusBadRequest)
+		return
+	}
+	c.GetSite(w, r, h)
+}
+
+func (c *Controller) DeleteSite(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	if err := c.db.Delete(&db.Site{}, mux.Vars(r)["site"]).Error; err != nil {
+		respondError(w, err, DBDeleteError, http.StatusBadRequest)
 		return
 	}
 	respondEmpty(w)
 }
 
-func (sc *SiteController) DeleteSite(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	if err := sc.dbase.DeleteSite(mux.Vars(r)["site"]); err != nil {
-		respondError(w, err, "Unable to delete site", http.StatusBadRequest)
-		return
-	}
-	respondEmpty(w)
-}
-
-func (sc *SiteController) ReloadConfig(w http.ResponseWriter, r *http.Request,
+func (c *Controller) ReloadConfig(w http.ResponseWriter, r *http.Request,
 	_ http.HandlerFunc) {
-	site, siteCfg, msg, err := sc.getAndValidateSiteCfg(mux.Vars(r)["site"])
+	siteID, err := strconv.Atoi(mux.Vars(r)["site"])
+	if err != nil {
+		respondError(w, err, "Bad SiteID", http.StatusBadRequest)
+	}
+	siteCfg, msg, err := c.getAndValidateSiteCfg(uint(siteID))
 	if err != nil {
 		respondError(w, err, msg, http.StatusBadRequest)
 		return
 	}
-	if msg, err := sc.writeConfig(site, siteCfg); err != nil {
+	if msg, err := c.writeConfig(uint(siteID), siteCfg); err != nil {
 		respondError(w, err, msg, http.StatusInternalServerError)
 		return
 	}
 }
 
-func (sc *SiteController) GetPathPredicates(w http.ResponseWriter, r *http.Request,
+func (c *Controller) GetPathSelectors(w http.ResponseWriter, r *http.Request,
 	_ http.HandlerFunc) {
-	actions, err := sc.dbase.QueryRawFilters(mux.Vars(r)["site"])
-	if err != nil {
-		respondError(w, err, "Unable to query path selectors", 400)
+	var selectors []db.PathSelector
+	if err := c.db.Where("site_id = ?", mux.Vars(r)["site"]).Find(&selectors).Error; err != nil {
+		respondError(w, err, DBFindError, http.StatusBadRequest)
 		return
 	}
-	respondJSON(w, actions)
+	respondJSON(w, selectors)
 }
 
-func (sc *SiteController) AddPathPredicate(w http.ResponseWriter, r *http.Request,
+func (c *Controller) PostPathSelector(w http.ResponseWriter, r *http.Request,
 	_ http.HandlerFunc) {
-	filterJSON := db.Filter{}
-	if err := json.NewDecoder(r.Body).Decode(&filterJSON); err != nil {
+	selector := db.PathSelector{}
+	if err := json.NewDecoder(r.Body).Decode(&selector); err != nil {
 		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
 		return
 	}
-	pp, err := spathmeta.NewPathPredicate(strings.TrimSpace(filterJSON.PP))
+	selector.Filter = strings.TrimSpace(selector.Filter)
+	_, err := spathmeta.NewPathPredicate(selector.Filter)
 	if err != nil {
-		respondError(w, err, "Bad path selector string", 400)
+		respondError(w, err, PathPredicateError, 400)
 		return
 	}
-	if err := sc.dbase.InsertFilter(mux.Vars(r)["site"], filterJSON.Name, pp); err != nil {
-		respondError(w, err, "DB Error! Is the name unique?", 400)
+	var site db.Site
+	if !c.findOne(w, mux.Vars(r)["site"], &site) {
+		return
+	}
+	selector.SiteID = site.ID
+	if !c.createOne(w, &selector) {
+		return
+	}
+	respondJSON(w, &selector)
+}
+
+func (c *Controller) PutPathSelector(w http.ResponseWriter, r *http.Request,
+	_ http.HandlerFunc) {
+	selector := db.PathSelector{}
+	if err := json.NewDecoder(r.Body).Decode(&selector); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
+	selector.Filter = strings.TrimSpace(selector.Filter)
+	_, err := spathmeta.NewPathPredicate(selector.Filter)
+	if err != nil {
+		respondError(w, err, PathPredicateError, 400)
+		return
+	}
+	id, err := strconv.Atoi(mux.Vars(r)["selector"])
+	if err != nil || int(selector.ID) != id {
+		respondError(w, nil, IDChangeError, http.StatusBadRequest)
+		return
+	}
+	err = c.db.Model(&selector).Updates(
+		map[string]interface{}{
+			"Name":   selector.Name,
+			"Filter": selector.Filter,
+		}).Error
+	if err != nil {
+		respondError(w, err, DBUpdateError, http.StatusBadRequest)
 		return
 	}
 	respondEmpty(w)
 }
 
-func (sc *SiteController) PutPathPredicate(w http.ResponseWriter, r *http.Request,
+func (c *Controller) DeletePathSelector(w http.ResponseWriter, r *http.Request,
 	_ http.HandlerFunc) {
-	filterSct := db.Filter{}
-	if err := json.NewDecoder(r.Body).Decode(&filterSct); err != nil {
-		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
-		return
-	}
-	if mux.Vars(r)["path"] != filterSct.Name {
-		respondError(w, errors.New("Names are not equal"), "Name cannot be changed.",
-			http.StatusBadRequest)
-		return
-	}
-	pp, err := spathmeta.NewPathPredicate(strings.TrimSpace(filterSct.PP))
-	if err != nil {
-		respondError(w, err, "Bad path selector string", 400)
-		return
-	}
-	if err := sc.dbase.UpdateFilter(mux.Vars(r)["site"], filterSct.Name, pp); err != nil {
-		respondError(w, err, "DB Error! Unable to update PathPredicate!", 400)
-		return
-	}
-	respondEmpty(w)
-}
-
-func (sc *SiteController) DeletePathPredicate(w http.ResponseWriter, r *http.Request,
-	_ http.HandlerFunc) {
-	if err := sc.dbase.DeleteFilter(mux.Vars(r)["site"], mux.Vars(r)["path"]); err != nil {
-		respondError(w, err, "Unable to delete Path selector from the database", 400)
+	if err := c.db.Delete(&db.PathSelector{}, mux.Vars(r)["selector"]).Error; err != nil {
+		respondError(w, err, DBDeleteError, http.StatusBadRequest)
 		return
 	}
 	respondEmpty(w)

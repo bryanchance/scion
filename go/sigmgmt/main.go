@@ -10,6 +10,8 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/urfave/negroni"
 
 	"github.com/scionproto/scion/go/lib/log"
@@ -37,10 +39,12 @@ func main() {
 	if err != nil {
 		fatal("Unable to load config file", "err", err)
 	}
-	dbase, err := db.New(cfg.DBPath)
+	dbase, err := gorm.Open("sqlite3", cfg.DBPath)
 	if err != nil {
 		fatal("Unable to connect to database", "err", err)
 	}
+	defer dbase.Close()
+	db.MigrateDB(dbase)
 
 	fmt.Printf("WebUI started, go to: https://%s\n", *bindAddress)
 	log.Debug("Started WebUI on", "address", *bindAddress)
@@ -54,64 +58,66 @@ func fatal(msg string, desc ...interface{}) {
 	os.Exit(1)
 }
 
-func configureRouter(cfg *config.Global, dbase *db.DB) http.Handler {
+func configureRouter(cfg *config.Global, dbase *gorm.DB) http.Handler {
 	r := mux.NewRouter()
 
 	jwtAuth := jwt.NewJWTAuth(cfg)
 	auth := ctrl.NewAuthController(cfg, jwtAuth)
 	r.HandleFunc("/api/auth", auth.GetToken).Methods("POST")
 
-	sc := ctrl.NewSiteController(dbase, cfg)
-	ac := ctrl.NewASController(dbase, cfg)
+	c := ctrl.NewController(dbase, cfg)
 
 	type methodMap map[string]func(http.ResponseWriter, *http.Request, http.HandlerFunc)
 	for path, methods := range map[string]methodMap{
 		"/api/sites": {
-			"GET":  sc.GetSites,
-			"POST": sc.PostSite,
+			"GET":  c.GetSites,
+			"POST": c.PostSite,
 		},
 		"/api/sites/{site}": {
-			"GET":    sc.GetSite,
-			"PUT":    sc.PutSite,
-			"DELETE": sc.DeleteSite,
+			"GET":    c.GetSite,
+			"PUT":    c.PutSite,
+			"DELETE": c.DeleteSite,
 		},
 		"/api/sites/{site}/reload-config": {
-			"GET": sc.ReloadConfig,
+			"GET": c.ReloadConfig,
 		},
 		"/api/sites/{site}/paths": {
-			"GET":  sc.GetPathPredicates,
-			"POST": sc.AddPathPredicate,
+			"GET":  c.GetPathSelectors,
+			"POST": c.PostPathSelector,
 		},
-		"/api/sites/{site}/paths/{path}": {
-			"PUT":    sc.PutPathPredicate,
-			"DELETE": sc.DeletePathPredicate,
+		"/api/paths/{selector}": {
+			"PUT":    c.PutPathSelector,
+			"DELETE": c.DeletePathSelector,
 		},
-		"/api/sites/{site}/ias": {
-			"GET":  ac.GetASes,
-			"POST": ac.PostAS,
+		"/api/sites/{site}/ases": {
+			"GET":  c.GetASes,
+			"POST": c.PostAS,
 		},
-		"/api/sites/{site}/ias/{ia}": {
-			"GET":    ac.GetAS,
-			"PUT":    ac.UpdateAS,
-			"DELETE": ac.DeleteAS,
+		"/api/ases/{as}": {
+			"GET":    c.GetAS,
+			"PUT":    c.UpdateAS,
+			"DELETE": c.DeleteAS,
 		},
-		"/api/sites/{site}/ias/{ia}/policies": {
-			"PUT": ac.UpdatePolicy,
+		"/api/ases/{as}/policies": {
+			"PUT": c.UpdatePolicy,
 		},
-		"/api/sites/{site}/ias/{ia}/networks": {
-			"GET":  ac.GetNetworks,
-			"POST": ac.PostNetwork,
+		"/api/ases/{as}/networks": {
+			"GET":  c.GetNetworks,
+			"POST": c.PostNetwork,
 		},
-		"/api/sites/{site}/ias/{ia}/networks/{network}": {
-			"DELETE": ac.DeleteNetwork,
+		"/api/networks/{network}": {
+			"DELETE": c.DeleteNetwork,
 		},
-		"/api/sites/{site}/ias/{ia}/sigs": {
-			"GET":  ac.GetSIGs,
-			"POST": ac.PostSIG,
+		"/api/ases/{as}/sigs": {
+			"GET":  c.GetSIGs,
+			"POST": c.PostSIG,
 		},
-		"/api/sites/{site}/ias/{ia}/sigs/{sig}": {
-			"PUT":    ac.UpdateSIG,
-			"DELETE": ac.DeleteSIG,
+		"/api/sigs/default": {
+			"GET": c.GetDefaultSIG,
+		},
+		"/api/sigs/{sig}": {
+			"PUT":    c.UpdateSIG,
+			"DELETE": c.DeleteSIG,
 		},
 		"/api/token/refresh": {
 			"POST": auth.RefreshToken,

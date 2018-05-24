@@ -5,8 +5,7 @@
   <div>
     <form #siteForm="ngForm" (ngSubmit)="onSubmit()">
       <mat-form-field>
-        <input matInput name="name" *ngIf="!newSite" [(ngModel)]="site.Name" disabled placeholder="Site Name">
-        <input matInput name="name" *ngIf="newSite" [(ngModel)]="site.Name" minlength="1" type="text" placeholder="Site Name" required>
+        <input matInput name="name" [(ngModel)]="site.Name" minlength="1" type="text" placeholder="Site Name" required>
         <mat-hint align="start">
           <strong>Unique identifier for the site</strong>
         </mat-hint>

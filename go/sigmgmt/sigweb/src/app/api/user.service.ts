@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core'
+import { Router } from '@angular/router'
+import { JwtHelperService } from '@auth0/angular-jwt'
 import { BehaviorSubject, Observable } from 'rxjs'
 import { tap } from 'rxjs/operators'
 
 import { ApiService } from './api.service'
 
-import { JwtHelperService } from '@auth0/angular-jwt'
 export class User {
   username: string
   password: string
@@ -39,7 +40,8 @@ export class UserService {
 
   constructor(
     private api: ApiService,
-    private jwt: JwtHelperService
+    private jwt: JwtHelperService,
+    private router: Router
   ) { }
 
   login(user: User): Observable<User> {
@@ -56,6 +58,7 @@ export class UserService {
   logout(): void {
     removeToken()
     this.isLoginSubject.next(false)
+    this.router.navigate(['/login'])
   }
 
   get isLoggedIn(): Observable<boolean> {

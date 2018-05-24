@@ -1,4 +1,5 @@
 export class Site {
+    ID: number
     Name = ''
     VHost: string
     Hosts: Host[] = []
@@ -9,6 +10,7 @@ export class Site {
 }
 
 export class Host {
+    ID: number
     Name: string
     User: string
     Key: string
@@ -19,15 +21,17 @@ export class Host {
 }
 
 export class PathSelector {
+    ID: string
     Name: string
-    PP: string
+    Filter: string
 }
 
-export class IA {
+export class ASEntry {
+    ID: number
     Name: string
     ISD: string
     AS: string
-    Policy: string
+    Policies: string
 }
 
 export class Policy {
@@ -43,8 +47,9 @@ export class CIDR {
 }
 
 export class SIG {
-    ID: string
-    Addr: string
+    ID: number
+    Name: string
+    Address: string
     EncapPort: number
     CtrlPort: number
 }

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core'
+import { Component, OnInit } from '@angular/core'
 
 import { ApiService } from '../api/api.service'
 import { UserService } from '../api/user.service'
@@ -9,7 +9,7 @@ import { Site } from './models'
   templateUrl: './sites.component.html',
   styleUrls: ['./sites.component.scss']
 })
-export class SitesComponent implements OnInit, OnDestroy {
+export class SitesComponent implements OnInit {
   sites: Site[]
 
   constructor(
@@ -21,10 +21,6 @@ export class SitesComponent implements OnInit, OnDestroy {
     this.api.getSites().subscribe(
       sites => this.sites = sites
     )
-  }
-
-  ngOnDestroy() {
-    this.api.getSites()
   }
 
   delete(idx: number) {

@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http'
 import { Injectable } from '@angular/core'
 
-import { CIDR, IA, PathSelector, Policy, SIG, Site } from '../sites/models'
+import { CIDR, ASEntry, PathSelector, Policy, SIG, Site } from '../sites/models'
 import { User } from './user.service'
 
 @Injectable()
@@ -18,8 +18,8 @@ export class ApiService {
     return this.http.get<Site[]>('sites')
   }
 
-  getSite(name: string) {
-    return this.http.get<Site>('sites/' + name)
+  getSite(site: string) {
+    return this.http.get<Site>('sites/' + site)
   }
 
   createSite(site: Site) {
@@ -27,108 +27,103 @@ export class ApiService {
   }
 
   updateSite(site: Site) {
-    return this.http.put<Site>('sites/' + site.Name, site)
+    return this.http.put<Site>('sites/' + site.ID, site)
   }
 
   deleteSite(site: Site) {
-    return this.http.delete('sites/' + site.Name)
+    return this.http.delete('sites/' + site.ID)
   }
 
-  reloadConfig(name: string) {
-    return this.http.get('sites/' + name + '/reload-config')
+  reloadConfig(id: number) {
+    return this.http.get('sites/' + id + '/reload-config')
   }
 
   /**
    * Path predicates / selectors
    */
   getPathSelectors(site: Site) {
-    return this.http.get<PathSelector[]>('sites/' + site.Name + '/paths')
+    return this.http.get<PathSelector[]>('sites/' + site.ID + '/paths')
   }
+
 
   createPathSelector(site: Site, ps: PathSelector) {
-    return this.http.post<PathSelector>('sites/' + site.Name + '/paths', ps)
+    return this.http.post<PathSelector>('sites/' + site.ID + '/paths', ps)
   }
 
-  updatePathSelector(site: Site, ps: PathSelector) {
-    return this.http.put('sites/' + site.Name + '/paths/' + ps.Name, ps)
+  updatePathSelector(ps: PathSelector) {
+    return this.http.put('paths/' + ps.ID, ps)
   }
 
   deletePathSelector(site: Site, ps: PathSelector) {
-    return this.http.delete('sites/' + site.Name + '/paths/' + ps.Name)
+    return this.http.delete('paths/' + ps.ID)
   }
 
   /**
    * Remote ASes
    */
-  getIAs(site: Site) {
-    return this.http.get<IA[]>('sites/' + site.Name + '/ias')
+  getASes(site: Site) {
+    return this.http.get<ASEntry[]>('sites/' + site.ID + '/ases')
   }
 
-  getIA(site: Site, ia: IA) {
-    return this.http.get<IA>(this.iaUrl(site, ia))
+  getAS(as: number) {
+    return this.http.get<ASEntry>('ases/' + as)
   }
 
-  createIA(site: Site, ia: IA) {
-    return this.http.post<IA>('sites/' + site.Name + '/ias', ia)
+  createAS(site: Site, as: ASEntry) {
+    return this.http.post<ASEntry>('sites/' + site.ID + '/ases', as)
   }
 
-  updateIA(site: Site, ia: IA) {
-    return this.http.put<string>(this.iaUrl(site, ia), ia)
+  updateAS(site: Site, as: ASEntry) {
+    return this.http.put<string>('ases/' + as.ID, as)
   }
 
-  updateIAPolicies(site: Site, ia: IA, policy: string) {
-    return this.http.put<string>(this.iaUrl(site, ia) + '/policies', { Policy: policy })
+  updateASPolicies(as: ASEntry) {
+    return this.http.put<string>('ases/' + as.ID + '/policies', as)
   }
 
-  deleteIA(site: Site, ia: IA) {
-    return this.http.delete(this.iaUrl(site, ia))
+  deleteAS(site: Site, as: ASEntry) {
+    return this.http.delete('ases/' + as.ID)
   }
 
   /**
    * AS Entries
    */
   /** Networks */
-  getNetworks(site: Site, ia: IA) {
-    return this.http.get<CIDR[]>(this.iaUrl(site, ia) + '/networks')
+  getNetworks(as: ASEntry) {
+    return this.http.get<CIDR[]>('ases/' + as.ID + '/networks')
   }
 
-  createNetwork(site: Site, ia: IA, network: CIDR) {
-    return this.http.post<CIDR>(this.iaUrl(site, ia) + '/networks', network)
+  createNetwork(as: ASEntry, network: CIDR) {
+    return this.http.post<CIDR>('ases/' + as.ID + '/networks', network)
   }
 
-  deleteNetwork(site: Site, ia: IA, network: CIDR) {
-    return this.http.delete(this.iaUrl(site, ia) + '/networks/' + network.ID)
+  deleteNetwork(as: ASEntry, network: CIDR) {
+    return this.http.delete('networks/' + network.ID)
   }
 
   /** SIGS */
-  getSIGs(site: Site, ia: IA) {
-    return this.http.get<SIG[]>(this.iaUrl(site, ia) + '/sigs')
+  getSIGs(as: ASEntry) {
+    return this.http.get<SIG[]>('ases/' + as.ID + '/sigs')
   }
 
-  createSIG(site: Site, ia: IA, sig: SIG) {
-    return this.http.post<SIG>(this.iaUrl(site, ia) + '/sigs', sig)
+  getDefaultSIG() {
+    return this.http.get<SIG>('sigs/default')
   }
 
-  updateSIG(site: Site, ia: IA, sig: SIG) {
-    return this.http.put<SIG>(this.iaUrl(site, ia) + '/sigs/' + sig.ID, sig)
+  createSIG(as: ASEntry, sig: SIG) {
+    return this.http.post<SIG>('ases/' + as.ID + '/sigs', sig)
   }
 
-  deleteSIG(site: Site, ia: IA, sig: SIG) {
-    return this.http.delete(this.iaUrl(site, ia) + '/sigs/' + sig.ID)
+  updateSIG(sig: SIG) {
+    return this.http.put<SIG>('sigs/' + sig.ID, sig)
+  }
+
+  deleteSIG(sig: SIG) {
+    return this.http.delete('sigs/' + sig.ID)
   }
 
   /** Authentication */
   obtainToken(user: User) {
     return this.http.post('auth', user)
-  }
-
-  /**
-   * Combine site and ia to a string
-   * @param site
-   * @param ia
-   * @returns {string}
-   */
-  private iaUrl(site: Site, ia: IA): string {
-    return 'sites/' + site.Name + '/ias/' + ia.ISD + '-' + ia.AS
   }
 }

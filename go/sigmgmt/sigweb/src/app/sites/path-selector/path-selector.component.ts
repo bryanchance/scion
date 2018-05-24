@@ -31,19 +31,19 @@ export class PathSelectorComponent implements OnInit {
   onSubmit() {
     this.error = ''
     if (this.editing) {
-      this.api.updatePathSelector(this.site, this.pathSelector).subscribe(
-        sig => {
+      this.api.updatePathSelector(this.pathSelector).subscribe(
+        () => {
           this.pathSelector = new PathSelector
           this.form.resetForm()
           this.editing = false
           this.success = 'Successfully updated PathSelector.'
-         },
+        },
         error => this.error = error
       )
     } else {
       this.api.createPathSelector(this.site, this.pathSelector).subscribe(
-        () => {
-          this.pathSelectors.push({ ...this.pathSelector })
+        selector => {
+          this.pathSelectors.push(selector)
           this.form.resetForm()
         },
         (error) => this.error = error
