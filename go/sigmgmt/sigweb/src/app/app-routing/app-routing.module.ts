@@ -5,6 +5,7 @@ import { RouterModule, Routes } from '@angular/router'
 import { AuthGuard } from '../auth.guard'
 import { ConfigComponent } from '../config/config.component'
 import { ContactComponent } from '../contact/contact.component'
+import { LicensesComponent } from '../licenses/licenses.component'
 import { LoginComponent } from '../login/login.component'
 import { ASDetailComponent } from '../sites/as/asdetail/asdetail.component'
 import { SiteDetailsComponent } from '../sites/site-details/site-details.component'
@@ -19,6 +20,7 @@ const appRoutes: Routes = [
   { path: 'config', component: ConfigComponent },
   { path: 'contact', component: ContactComponent },
   { path: 'login', component: LoginComponent },
+  { path: 'licenses', component: LicensesComponent },
 ]
 
 @NgModule({

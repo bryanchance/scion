@@ -28,3 +28,8 @@ Run `ng e2e` to execute the end-to-end tests via [Protractor](http://www.protrac
 
 To get more help on the Angular CLI use `ng help` or go check out the
 [Angular CLI README](https://github.com/angular/angular-cli/blob/master/README.md).
+
+## License Check
+
+Check for dependencies with licenses that need to be advertised in the application. Run
+`license-checker --json --exclude 'ISC, MIT, Apache-2.0, BSD-3-Clause, BSD-2-Clause' --out licenses.json`

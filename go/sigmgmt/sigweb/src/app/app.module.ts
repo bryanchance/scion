@@ -17,7 +17,8 @@ import { ContactComponent } from './contact/contact.component'
 import { LoginComponent } from './login/login.component'
 import { MaterialModule } from './material/material.module'
 import { SitesModule } from './sites/sites.module'
-import { environment } from '../environments/environment'
+import { environment } from '../environments/environment';
+import { LicensesComponent } from './licenses/licenses.component'
 
 @NgModule({
   declarations: [
@@ -25,6 +26,7 @@ import { environment } from '../environments/environment'
     ContactComponent,
     LoginComponent,
     ConfigComponent,
+    LicensesComponent,
   ],
   imports: [
     BrowserModule,
