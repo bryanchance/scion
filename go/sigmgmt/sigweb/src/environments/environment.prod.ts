@@ -5,5 +5,5 @@ export const environment = {
   production: true,
   logLevel: LogLevel.Error,
   domain: PROD_URL,
-  url: 'https://' + PROD_URL
+  url: PROD_URL === '' ? PROD_URL : 'https://' + PROD_URL
 }
