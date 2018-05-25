@@ -1,8 +1,0 @@
-#!/bin/bash
-
-set -e
-
-file="src/environments/prod-url.ts"
-[ -f file ] || touch $file
-url="${SIGMGMT_BIND:-localhost:8081}"
-echo "export const PROD_URL = '$url'" > $file
