@@ -12,9 +12,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 
-	"github.com/scionproto/scion/go/lib/spath/spathmeta"
 	"github.com/scionproto/scion/go/sigmgmt/config"
 	"github.com/scionproto/scion/go/sigmgmt/db"
+	"github.com/scionproto/scion/go/sigmgmt/parser"
 )
 
 type Controller struct {
@@ -154,8 +154,7 @@ func (c *Controller) PostPathSelector(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	selector.Filter = strings.TrimSpace(selector.Filter)
-	_, err := spathmeta.NewPathPredicate(selector.Filter)
-	if err != nil {
+	if err := parser.ValidatePredicate(selector.Filter); err != nil {
 		respondError(w, err, PathPredicateError, 400)
 		return
 	}
@@ -178,8 +177,7 @@ func (c *Controller) PutPathSelector(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	selector.Filter = strings.TrimSpace(selector.Filter)
-	_, err := spathmeta.NewPathPredicate(selector.Filter)
-	if err != nil {
+	if err := parser.ValidatePredicate(selector.Filter); err != nil {
 		respondError(w, err, PathPredicateError, 400)
 		return
 	}

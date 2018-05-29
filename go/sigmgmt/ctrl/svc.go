@@ -120,7 +120,7 @@ func (c *Controller) getSiteConfig(siteID uint) (*config.Cfg, *db.Site, string, 
 	}
 	actions, err := db.ActionMapFromSelectors(site.PathSelectors)
 	if err != nil {
-		return nil, nil, "Could not convert Networks", err
+		return nil, nil, "Could not parse Path Predicates", err
 	}
 	cfg.Actions = actions
 	return cfg, &site, "", nil

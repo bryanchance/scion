@@ -21,7 +21,7 @@ const (
 	DBUniqueError      = "Unique Constraint Error"
 	DBUpdateError      = "Error updating object in DB"
 	DBDeleteError      = "Error deleting object in DB"
-	PathPredicateError = "Bad path selector string"
+	PathPredicateError = "Bad Path Predicate"
 )
 
 func respond(w http.ResponseWriter, data []byte, status int) {

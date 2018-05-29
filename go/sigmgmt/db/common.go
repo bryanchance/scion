@@ -7,9 +7,9 @@ import (
 
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/pktcls"
-	"github.com/scionproto/scion/go/lib/spath/spathmeta"
 	"github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sig/siginfo"
+	"github.com/scionproto/scion/go/sigmgmt/parser"
 )
 
 // SIGSetFromSIGs converts a slice of sigs to a SIGSet
@@ -47,12 +47,11 @@ func IPNetsFromNetworks(networks []Network) ([]*config.IPNet, error) {
 func ActionMapFromSelectors(selectors []PathSelector) (pktcls.ActionMap, error) {
 	actionMap := make(pktcls.ActionMap)
 	for _, selector := range selectors {
-		pp, err := spathmeta.NewPathPredicate(selector.Filter)
+		condTree, err := parser.BuildPredicateTree(selector.Filter)
 		if err != nil {
 			return nil, err
 		}
-		actionMap[selector.Name] = pktcls.NewActionFilterPaths(selector.Name,
-			pktcls.NewCondPathPredicate(pp))
+		actionMap[selector.Name] = pktcls.NewActionFilterPaths(selector.Name, condTree)
 	}
 	return actionMap, nil
 }

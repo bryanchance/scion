@@ -33,16 +33,29 @@
       </mat-list-item>
     </mat-list>
   </div>
-  <mat-card class="help">
-    <mat-card-header>
-      <mat-card-title>Path selectors</mat-card-title>
-    </mat-card-header>
-    <mat-card-content>
-      <p>
-        Path selectors can be used to choose a subset of paths from a larger set. For example, if a SIG can reach a remote AS via
-        two paths, one through ISD-AS 1-ff00:0:110 and one through ISD-AS 1-ff00:0:111, a path selector can be used to tell
-        the SIG to always prefer the one through ASff00:0:111. A filter is a comma separated string of ISD-AS#IFID tokens,
-        each token representing a condition. Wildcards can be specified for via a 0 value for an ISD, AS or IFID.</p>
-    </mat-card-content>
-  </mat-card>
+  <div class="flex-container-vertical">
+    <mat-card class="help">
+      <mat-card-header>
+        <mat-card-title>Path Predicate</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>A path predicate is a condition predicate built from `ANY`, `ALL`, `NOT` and path selectors. E.g. `ALL(selector1,
+          selector1)`. Predicates can be arbitrarily nested,
+          <a routerLink="/config" fragment="path-selectors">more details</a>.</p>
+      </mat-card-content>
+    </mat-card>
+    <br>
+    <mat-card class="help">
+      <mat-card-header>
+        <mat-card-title>Path Selector</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>
+          Path selectors can be used to choose a subset of paths from a larger set. For example, if a SIG can reach a remote AS via
+          two paths, one through ISD-AS 1-ff00:0:110 and one through ISD-AS 1-ff00:0:111, a path selector can be used to
+          tell the SIG to always prefer the one through ASff00:0:111. A filter is a comma separated string of ISD-AS#IFID
+          tokens, each token representing a condition. Wildcards can be specified for via a 0 value for an ISD, AS or IFID.</p>
+      </mat-card-content>
+    </mat-card>
+  </div>
 </div>
