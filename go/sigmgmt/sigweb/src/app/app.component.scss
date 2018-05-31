@@ -1,4 +1,4 @@
-@import '../assets/styles/base';
+@import "../assets/styles/base";
 
 mat-toolbar {
     justify-content: space-between;
@@ -15,34 +15,59 @@ mat-toolbar {
 }
 
 main {
-  margin: 0 10px;
-  margin-bottom: 60px;
+    margin: 0 10px;
+    margin-bottom: 60px;
+}
+
+.menu {
+    height: 50px;
+    .buttons {
+        margin-top: 8px;
+        height: 35px;
+        float: left;
+    }
+
+    .logo-container {
+        float: right;
+        background-size: cover;
+        background-image: url("../assets/images/logo.png");
+        margin: 5px 0 10px 10px;
+        width: 110px;
+        height: 40px;
+        a {
+            padding-left: 0;
+            div {
+                width: 110px;
+                height: 40px;
+            }
+        }
+    }
 }
 
 footer {
-  position: fixed;
-  bottom: 0;
-  height: 50px;
-  width: 100vw;
-  background-color: mat-color($anapaya-primary);
-  color: white;
-
-  a {
+    position: fixed;
+    bottom: 0;
+    height: 50px;
+    width: 100vw;
+    background-color: mat-color($anapaya-primary);
     color: white;
-    text-decoration: none;
-  }
 
-  a:hover {
-    text-decoration: underline;
-  }
-
-  div {
-    display: flex;
-    justify-content: center;
-    padding: 15px 40px;
-
-    span {
-      padding: 0 20px;
+    a {
+        color: white;
+        text-decoration: none;
     }
-  }
+
+    a:hover {
+        text-decoration: underline;
+    }
+
+    div {
+        display: flex;
+        justify-content: center;
+        padding: 15px 40px;
+
+        span {
+            padding: 0 20px;
+        }
+    }
 }

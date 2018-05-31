@@ -19,6 +19,7 @@ import (
 	"github.com/scionproto/scion/go/sigmgmt/config"
 	"github.com/scionproto/scion/go/sigmgmt/ctrl"
 	"github.com/scionproto/scion/go/sigmgmt/db"
+	"github.com/scionproto/scion/go/sigmgmt/util"
 )
 
 var (
@@ -135,14 +136,18 @@ func configureRouter(cfg *config.Global, dbase *gorm.DB) http.Handler {
 	}
 
 	r.PathPrefix("/doc/").Handler(http.FileServer(http.Dir(cfg.WebAssetRoot)))
-	// TODO(worxli): check if files exist, otherwise serve index.html - or use nginx instead!
-	r.PathPrefix("/").Handler(http.FileServer(http.Dir(cfg.WebAssetRoot + "webui")))
+	r.PathPrefix("/app/").Handler(http.StripPrefix("/app/",
+		http.FileServer(http.Dir(cfg.WebAssetRoot+"webui"))))
+	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, cfg.WebAssetRoot+"webui/index.html")
+	})
 
-	handler := handlers.CORS(
+	corsHandler := handlers.CORS(
 		handlers.AllowedMethods([]string{"POST", "PUT", "OPTIONS", "DELETE", "GET", "HEAD"}),
 		handlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),
 		handlers.AllowedOrigins([]string{"*"}),
 	)(r)
+	logHandler := handlers.LoggingHandler(&util.AccessLogger{}, corsHandler)
 
-	return handler
+	return logHandler
 }

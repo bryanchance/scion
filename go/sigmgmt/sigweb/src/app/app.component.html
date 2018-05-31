@@ -1,13 +1,17 @@
 <mat-toolbar color="primary">
   <span>SIGWeb: Policy Configurator</span>
-  <div>
-    <button mat-button color="accent" routerLink="/sites">Sites</button>
-    <button mat-button color="accent" routerLink="/config">Config Doc</button>
-    <button mat-button color="accent" routerLink="/contact">Contact</button>
-    <button mat-button color="accent" *ngIf="userService.isLoggedIn | async" (click)="logout()" s>Logout</button>
-    <a href="https://www.anapaya.net" target="_blank">
-      <img src="assets/images/logo.png">
-    </a>
+  <div class="menu">
+    <div class="buttons">
+      <button mat-button color="accent" routerLink="/sites">Sites</button>
+      <button mat-button color="accent" routerLink="/config">Config Doc</button>
+      <button mat-button color="accent" routerLink="/contact">Contact</button>
+      <button mat-button color="accent" *ngIf="userService.isLoggedIn | async" (click)="logout()" s>Logout</button>
+    </div>
+    <div class="logo-container">
+      <a href="https://www.anapaya.net" target="_blank" class="logo">
+        <div></div>
+      </a>
+    </div>
   </div>
 </mat-toolbar>
 
