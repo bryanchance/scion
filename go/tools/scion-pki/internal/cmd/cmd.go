@@ -33,6 +33,12 @@ var RootCmd = &cobra.Command{
 	Short: "Scion Public Key Infrastructure Management Tool",
 	Long: `scion-pki is a tool to generate keys, certificates, and trust
 root configuration files used in the SCION control plane PKI.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Initialize global OutDir if not set on the cmdline.
+		if pkicmn.OutDir == "" {
+			pkicmn.OutDir = pkicmn.RootDir
+		}
+	},
 }
 
 const (
@@ -58,19 +64,19 @@ var autoCompleteCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		if zsh {
 			RootCmd.GenZshCompletionFile(zshCompletionScript)
-			fmt.Printf("Generated %s\n", zshCompletionScript)
-			fmt.Println(zshInstruction)
+			pkicmn.QuietPrint("Generated %s\n", zshCompletionScript)
+			pkicmn.QuietPrint(zshInstruction)
 		} else {
 			RootCmd.GenBashCompletionFile(bashCompletionScript)
-			fmt.Printf("Generated %s\n", bashCompletionScript)
-			fmt.Println(bashInstruction)
+			pkicmn.QuietPrint("Generated %s\n", bashCompletionScript)
+			pkicmn.QuietPrint(bashInstruction)
 		}
 	},
 }
 
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
-		fmt.Println(err)
+		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
 }
@@ -81,7 +87,12 @@ func init() {
 	RootCmd.PersistentFlags().BoolVarP(&pkicmn.Force, "force", "f", false,
 		"Overwrite existing keys/certs/trcs")
 	RootCmd.PersistentFlags().StringVarP(&pkicmn.RootDir, "root", "d", ".",
-		"root directory of all certificates and keys")
+		"Root directory where scion-pki looks for configuration files. Is also used as output "+
+			"directory if -out/-o is not specified.")
+	RootCmd.PersistentFlags().StringVarP(&pkicmn.OutDir, "out", "o", "",
+		"Output directory where certificates and keys will be placed. Defaults to -root/-d.")
+	RootCmd.PersistentFlags().BoolVarP(&pkicmn.Quiet, "quiet", "q", false,
+		"Quiet mode, i.e., only errors will be printed.")
 	autoCompleteCmd.PersistentFlags().BoolVarP(&zsh, "zsh", "z", false,
 		"Generate autocompletion script for zsh")
 

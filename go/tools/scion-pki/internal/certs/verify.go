@@ -41,11 +41,11 @@ func runVerify(args []string) {
 			continue
 		}
 		if err = verifyChain(chain, chain.Leaf.Subject); err != nil {
-			fmt.Printf("Verification of %s FAILED. Reason: %s\n", certPath, err)
+			pkicmn.QuietPrint("Verification of %s FAILED. Reason: %s\n", certPath, err)
 			exitStatus = 2
 			continue
 		}
-		fmt.Printf("Verification of %s SUCCEEDED.\n", certPath)
+		pkicmn.QuietPrint("Verification of %s SUCCEEDED.\n", certPath)
 	}
 	os.Exit(exitStatus)
 }
@@ -61,7 +61,7 @@ func verifyChain(chain *cert.Chain, subject addr.IA) error {
 
 func loadTRC(subject addr.IA, version uint64) (*trc.TRC, error) {
 	fname := fmt.Sprintf(pkicmn.TrcNameFmt, subject.I, version)
-	trcPath := filepath.Join(pkicmn.RootDir, fmt.Sprintf("ISD%d", subject.I), pkicmn.TRCsDir, fname)
+	trcPath := filepath.Join(pkicmn.GetIsdPath(pkicmn.OutDir, subject.I), pkicmn.TRCsDir, fname)
 	trcRaw, err := ioutil.ReadFile(trcPath)
 	if err != nil {
 		return nil, err

@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"hash"
+	"io"
 
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/util"
@@ -30,8 +31,8 @@ type HopField struct {
 	ForwardOnly bool
 	Recurse     bool
 	ExpTime     uint8
-	Ingress     common.IFIDType
-	Egress      common.IFIDType
+	ConsIngress common.IFIDType
+	ConsEgress  common.IFIDType
 	Mac         common.RawBytes
 	length      int
 }
@@ -49,12 +50,17 @@ func NewHopField(b common.RawBytes, in common.IFIDType, out common.IFIDType) *Ho
 	h := &HopField{}
 	h.data = b
 	h.ExpTime = DefaultHopFExpiry
-	h.Ingress = in
-	h.Egress = out
+	h.ConsIngress = in
+	h.ConsEgress = out
 	h.Write()
 	return h
 }
 
+// HopFFromRaw returns a HopField object from the raw content in b.
+//
+// The new HopField object takes ownership of the first HopFieldLength bytes in
+// b. Changing fields in the new object and calling Write will mutate the
+// initial bytes in b.
 func HopFFromRaw(b []byte) (*HopField, error) {
 	if len(b) < HopFieldLength {
 		return nil, common.NewBasicError(ErrorHopFTooShort, nil,
@@ -71,8 +77,8 @@ func HopFFromRaw(b []byte) (*HopField, error) {
 	h.ExpTime = h.data[offset]
 	offset += 1
 	// Interface IDs are 12b each, encoded into 3B
-	h.Ingress = common.IFIDType(int(h.data[offset])<<4 | int(h.data[offset+1])>>4)
-	h.Egress = common.IFIDType((int(h.data[offset+1])&0xF)<<8 | int(h.data[offset+2]))
+	h.ConsIngress = common.IFIDType(int(h.data[offset])<<4 | int(h.data[offset+1])>>4)
+	h.ConsEgress = common.IFIDType((int(h.data[offset+1])&0xF)<<8 | int(h.data[offset+2]))
 	offset += 3
 	h.Mac = h.data[offset:]
 	h.length = common.LineLen
@@ -101,16 +107,16 @@ func (h *HopField) Write() {
 	h.data[0] = flags
 	h.data[1] = h.ExpTime
 	// Interface IDs are 12b each, encoded into 3B
-	h.data[2] = byte(h.Ingress >> 4)
-	h.data[3] = byte((h.Ingress&0x0F)<<4 | h.Egress>>8)
-	h.data[4] = byte(h.Egress & 0xFF)
+	h.data[2] = byte(h.ConsIngress >> 4)
+	h.data[3] = byte((h.ConsIngress&0x0F)<<4 | h.ConsEgress>>8)
+	h.data[4] = byte(h.ConsEgress & 0xFF)
 	copy(h.data[5:], h.Mac)
 }
 
 func (h *HopField) String() string {
-	return fmt.Sprintf(
-		"Ingress: %v Egress: %v ExpTime: %v Xover: %v VerifyOnly: %v ForwardOnly: %v Mac: %v",
-		h.Ingress, h.Egress, h.ExpTime, h.Xover, h.VerifyOnly, h.ForwardOnly, h.Mac)
+	return fmt.Sprintf("ConsIngress: %v ConsEgress: %v ExpTime: %v Xover: %v VerifyOnly: %v "+
+		"ForwardOnly: %v Mac: %v",
+		h.ConsIngress, h.ConsEgress, h.ExpTime, h.Xover, h.VerifyOnly, h.ForwardOnly, h.Mac)
 }
 
 func (h *HopField) Verify(mac hash.Hash, tsInt uint32, prev common.RawBytes) error {
@@ -132,4 +138,11 @@ func (h *HopField) CalcMac(mac hash.Hash, tsInt uint32,
 	copy(all[9:], prev)
 	tag, err := util.Mac(mac, all)
 	return tag[:MacLen], err
+}
+
+// WriteTo implements the io.WriterTo interface.
+func (h *HopField) WriteTo(w io.Writer) (int64, error) {
+	h.Write()
+	n, err := w.Write(h.data)
+	return int64(n), err
 }

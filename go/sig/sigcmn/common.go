@@ -70,7 +70,7 @@ func Init(ia addr.IA, ip net.IP) error {
 	}
 	MgmtAddr = mgmt.NewAddr(Host, uint16(*CtrlPort), uint16(*EncapPort))
 	if *sciondPath == "" {
-		*sciondPath = fmt.Sprintf("/run/shm/sciond/sd%s.sock", ia.FileFmt(false))
+		*sciondPath = sciond.GetDefaultSCIONDPath(&ia)
 	}
 	// Initialize custom network context.
 	timers := &pathmgr.Timers{
@@ -80,8 +80,7 @@ func Init(ia addr.IA, ip net.IP) error {
 	if PathMgr, err = pathmgr.New(sd, timers, log.Root()); err != nil {
 		return common.NewBasicError("Error creating path manager", err)
 	}
-	network := snet.NewNetworkBasic(ia, *sciondPath, *dispatcherPath)
-	network.SetPathResolver(PathMgr)
+	network := snet.NewNetworkWithPR(ia, *sciondPath, PathMgr)
 	// Initialize SCION local networking module
 	err = snet.InitWithNetwork(network)
 	if err != nil {

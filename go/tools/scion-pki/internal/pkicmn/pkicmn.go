@@ -40,7 +40,9 @@ const (
 
 var (
 	RootDir string
+	OutDir  string
 	Force   bool
+	Quiet   bool
 )
 
 // ProcessSelector processes the given selector and returns a mapping from ISD id to ASes
@@ -134,7 +136,7 @@ func WriteToFile(raw common.RawBytes, path string, perm os.FileMode) error {
 	// Check if file already exists.
 	if _, err := os.Stat(path); err == nil {
 		if !Force {
-			fmt.Printf("%s already exists. Use -f to overwrite.\n", path)
+			QuietPrint("%s already exists. Use -f to overwrite.\n", path)
 			return nil
 		}
 		// Nuke file to ensure correct permissions.
@@ -145,19 +147,25 @@ func WriteToFile(raw common.RawBytes, path string, perm os.FileMode) error {
 	if err := ioutil.WriteFile(path, append(raw, "\n"...), perm); err != nil {
 		return err
 	}
-	fmt.Println("Successfully written", path)
+	QuietPrint("Successfully written %s\n", path)
 	return nil
 }
 
-func GetAsPath(ia addr.IA) string {
-	return filepath.Join(RootDir, fmt.Sprintf("ISD%d/AS%s", ia.I, ia.A.FileFmt()))
+func GetAsPath(baseDir string, ia addr.IA) string {
+	return filepath.Join(baseDir, fmt.Sprintf("ISD%d/AS%s", ia.I, ia.A.FileFmt()))
 }
 
-func GetIsdPath(isd addr.ISD) string {
-	return filepath.Join(RootDir, fmt.Sprintf("ISD%d", isd))
+func GetIsdPath(baseDir string, isd addr.ISD) string {
+	return filepath.Join(baseDir, fmt.Sprintf("ISD%d", isd))
 }
 
 func ErrorAndExit(format string, a ...interface{}) {
 	fmt.Fprintf(os.Stderr, format, a...)
 	os.Exit(2)
+}
+
+func QuietPrint(format string, a ...interface{}) {
+	if !Quiet {
+		fmt.Printf(format, a...)
+	}
 }

@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	MaxTTL      = 24 * 60 * 60 // One day in seconds
-	ExpTimeUnit = MaxTTL / (1 << 8)
-	macInputLen = 16
+	MaxTTL       = 24 * 60 * 60 // One day in seconds
+	ExpTimeUnit  = MaxTTL / (1 << 8)
+	macInputLen  = 16
+	MaxTimestamp = ^uint32(0)
 )
 
 type Path struct {
@@ -80,7 +81,7 @@ func (p *Path) Reverse() error {
 			p.InfOff = revOff
 		}
 		infoF := infoFs[i]
-		infoF.Up = !infoF.Up // Reverse Up flag
+		infoF.ConsDir = !infoF.ConsDir // Reverse ConsDir flag
 		infoF.Write(revRaw[revOff:])
 		infoF, _ = InfoFFromRaw(revRaw[revOff:])
 		revOff += InfoFieldLength

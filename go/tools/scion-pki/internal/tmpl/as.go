@@ -14,7 +14,6 @@
 package tmpl
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/scionproto/scion/go/lib/addr"
@@ -27,9 +26,9 @@ func runGenAsTmpl(args []string) {
 	if err != nil {
 		pkicmn.ErrorAndExit("Error: %s\n", err)
 	}
-	fmt.Println("Generating cert config templates.")
+	pkicmn.QuietPrint("Generating cert config templates.\n")
 	for isd, ases := range asMap {
-		iconf, err := conf.LoadIsdConf(pkicmn.GetIsdPath(isd))
+		iconf, err := conf.LoadIsdConf(pkicmn.GetIsdPath(pkicmn.RootDir, isd))
 		if err != nil {
 			pkicmn.ErrorAndExit("Error reading %s: %s\n", conf.IsdConfFileName, err)
 		}
@@ -45,7 +44,7 @@ func runGenAsTmpl(args []string) {
 func genAsTmpl(ia addr.IA, isdConf *conf.Isd) error {
 	core := pkicmn.Contains(isdConf.Trc.CoreIAs, ia)
 	a := conf.NewTemplateAsConf(ia, isdConf.Trc.Version, core)
-	dir := pkicmn.GetAsPath(ia)
+	dir := pkicmn.GetAsPath(pkicmn.RootDir, ia)
 	fpath := filepath.Join(dir, conf.AsConfFileName)
 	if err := a.Write(fpath, pkicmn.Force); err != nil {
 		return err
