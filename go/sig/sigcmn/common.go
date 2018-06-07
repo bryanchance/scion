@@ -80,7 +80,7 @@ func Init(ia addr.IA, ip net.IP) error {
 	if PathMgr, err = pathmgr.New(sd, timers, log.Root()); err != nil {
 		return common.NewBasicError("Error creating path manager", err)
 	}
-	network := snet.NewNetworkWithPR(ia, *sciondPath, PathMgr)
+	network := snet.NewNetworkWithPR(ia, *dispatcherPath, PathMgr)
 	// Initialize SCION local networking module
 	err = snet.InitWithNetwork(network)
 	if err != nil {
