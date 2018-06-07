@@ -86,13 +86,13 @@ func (cfg *Cfg) postprocess() error {
 type ASEntry struct {
 	// Common with open source ASEntry
 
-	Nets []*config.IPNet
-	Sigs config.SIGSet
+	Nets []*config.IPNet `json:",omitempty"`
+	Sigs config.SIGSet   `json:",omitempty"`
 
 	// Anapaya specific
 
-	Sessions    SessionMap
-	PktPolicies []*PktPolicy
+	Sessions    SessionMap   `json:",omitempty"`
+	PktPolicies []*PktPolicy `json:",omitempty"`
 }
 
 type SessionMap map[mgmt.SessionType]string

@@ -1,8 +1,6 @@
 {
     "ASes": {
         "1-1": {
-            "Nets": null,
-            "Sigs": null,
             "Sessions": {
                 "0": "foo",
                 "1": "bar",
@@ -26,9 +24,6 @@
             ]
         },
         "2-2": {
-            "Nets": null,
-            "Sigs": null,
-            "Sessions": {},
             "PktPolicies": [
                 {
                     "ClassName": "class-2-2-0",
