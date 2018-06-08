@@ -57,13 +57,11 @@ type ASEntry struct {
 
 func newASEntry(ia addr.IA) (*ASEntry, error) {
 	ae := &ASEntry{
-		Logger:            log.New("ia", ia),
-		IA:                ia,
-		IAString:          ia.String(),
-		Nets:              make(map[string]*net.IPNet),
-		Sigs:              &siginfo.SigMap{},
-		sigMgrStop:        make(chan struct{}),
-		healthMonitorStop: make(chan struct{}),
+		Logger:   log.New("ia", ia),
+		IA:       ia,
+		IAString: ia.String(),
+		Nets:     make(map[string]*net.IPNet),
+		Sigs:     &siginfo.SigMap{},
 	}
 	ae.PktPolicies = egress.NewSyncPktPols()
 	ae.Sessions = make(egress.SessionSet)
@@ -140,9 +138,7 @@ func (ae *ASEntry) AddNet(ipnet *net.IPNet) error {
 func (ae *ASEntry) addNet(ipnet *net.IPNet) error {
 	if ae.egressRing == nil {
 		// Ensure that the network setup is done
-		if err := ae.setupNet(); err != nil {
-			return err
-		}
+		ae.setupNet()
 	}
 	key := ipnet.String()
 	if _, ok := ae.Nets[key]; ok {
@@ -161,6 +157,11 @@ func (ae *ASEntry) addNet(ipnet *net.IPNet) error {
 		Added:    true,
 	}
 	NetworkChanged(params)
+	if len(ae.Nets) == 1 {
+		go egress.NewDispatcher(ae.IA, ae.egressRing, ae.PktPolicies).Run()
+		ae.sigMgrStop = make(chan struct{})
+		go ae.sigMgr()
+	}
 	ae.Info("Added network", "net", ipnet)
 	return nil
 }
@@ -190,6 +191,11 @@ func (ae *ASEntry) delNet(ipnet *net.IPNet) error {
 		Added:    false,
 	}
 	NetworkChanged(params)
+	if len(ae.Nets) == 0 {
+		ae.egressRing.Close()
+		ae.egressRing = nil
+		ae.sigMgrStop <- struct{}{}
+	}
 	ae.Info("Removed network", "net", ipnet)
 	return nil
 }
@@ -337,14 +343,14 @@ func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 		}
 	}
 	if len(ae.Sessions) == 1 {
-		go egress.NewDispatcher(ae.IA, ae.egressRing, ae.PktPolicies).Run()
-		go ae.sigMgr()
+		ae.healthMonitorStop = make(chan struct{})
 		go ae.monitorHealth()
 	}
 	return nil
 }
 
 // TODO(kormat): add DelSession
+// len(ae.Sessions) == 0 { ae.healthMonitorStop <- struct{}{} }
 
 func (ae *ASEntry) buildNewPktPolicies(cfgPktPols []*config.PktPolicy,
 	classes pktcls.ClassMap) []*egress.PktPolicy {
@@ -406,6 +412,7 @@ Top:
 		}
 	}
 	close(ae.sigMgrStop)
+	ae.sigMgrStop = nil
 	ae.Info("sigMgr stopping")
 }
 
@@ -426,6 +433,7 @@ Top:
 		}
 	}
 	close(ae.healthMonitorStop)
+	ae.healthMonitorStop = nil
 	ae.Info("Health monitor stopping")
 }
 
@@ -495,9 +503,8 @@ func (ae *ASEntry) cleanSessions() {
 	}
 }
 
-func (ae *ASEntry) setupNet() error {
+func (ae *ASEntry) setupNet() {
 	ae.egressRing = ringbuf.New(64, nil, "egress",
 		prometheus.Labels{"ringId": ae.IAString, "sessId": ""})
 	ae.Info("Network setup done")
-	return nil
 }
