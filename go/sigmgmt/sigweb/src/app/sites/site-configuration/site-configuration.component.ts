@@ -42,7 +42,7 @@ export class SiteConfigurationComponent implements OnChanges {
           this.success = 'Successfully created Site.'
           this.router.navigate(['/sites', this.site.ID])
         },
-        error => this.error = error
+        error => this.error = error.msg
       )
     } else {
       this.api.updateSite(this.site).subscribe(
@@ -50,7 +50,7 @@ export class SiteConfigurationComponent implements OnChanges {
           this.site = site
           this.success = 'Successfully updated Site.'
         },
-        error => this.error = error
+        error => this.error = error.msg
       )
     }
   }
@@ -72,7 +72,7 @@ export class SiteConfigurationComponent implements OnChanges {
         this.site = site
       },
       error => {
-        this.error = error
+        this.error = error.msg
       }
     )
   }
@@ -87,7 +87,7 @@ export class SiteConfigurationComponent implements OnChanges {
     this.site.Hosts.splice(idx, 1)
     this.api.updateSite(this.site).subscribe(
       () => this.success = 'Successfully updated Hosts.',
-      error => this.error = error
+      error => this.error = error.msg
     )
   }
 

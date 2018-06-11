@@ -38,7 +38,7 @@ export class PathSelectorComponent implements OnInit {
           this.editing = false
           this.success = 'Successfully updated PathSelector.'
         },
-        error => this.error = error
+        error => this.error = error.msg
       )
     } else {
       this.api.createPathSelector(this.site, this.pathSelector).subscribe(
@@ -46,7 +46,7 @@ export class PathSelectorComponent implements OnInit {
           this.pathSelectors.push(selector)
           this.form.resetForm()
         },
-        (error) => this.error = error
+        error => this.error = error.msg
       )
     }
   }

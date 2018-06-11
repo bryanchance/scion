@@ -28,7 +28,14 @@
       it has loaded the correct config.</p>
     <mat-spinner [diameter]="40" *ngIf="loadingConfig" color="accent"></mat-spinner>
     <span *ngIf="reloadSuccess" class="success">Config successfully reloaded!</span>
-    <span *ngIf="reloadError" class="error">{{reloadError}}</span>
+    <div *ngIf="reloadError">
+      <span class="error">{{reloadError}}</span>
+      <div *ngFor="let k of errorKeys" class="hosts">
+        <span>{{k}}</span>
+        <mat-icon class="error" *ngIf="reloadErrorDesc[k]">error</mat-icon>
+        <mat-icon class="success" *ngIf="!reloadErrorDesc[k]">done</mat-icon>
+      </div>
+    </div>
     <mat-action-row>
       <button (click)="reloadConfig()" mat-button>Push and Reload Config</button>
     </mat-action-row>

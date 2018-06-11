@@ -35,7 +35,7 @@ export class NetworksComponent implements OnChanges {
         this.networks.push(network)
         this.form.resetForm()
       },
-      error => this.error = error
+      error => this.error = error.msg
     )
   }
 

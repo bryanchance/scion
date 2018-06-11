@@ -130,10 +130,16 @@ func (c *Controller) ReloadConfig(w http.ResponseWriter, r *http.Request,
 		respondError(w, err, msg, http.StatusBadRequest)
 		return
 	}
-	if msg, err := c.writeConfig(uint(siteID), siteCfg); err != nil {
+	msg, err, errs := c.writeConfig(uint(siteID), siteCfg)
+	if err != nil {
 		respondError(w, err, msg, http.StatusInternalServerError)
 		return
 	}
+	if errs != nil {
+		respondError(w, errs, msg, http.StatusInternalServerError)
+		return
+	}
+	respondEmpty(w)
 }
 
 func (c *Controller) GetPathSelectors(w http.ResponseWriter, r *http.Request,

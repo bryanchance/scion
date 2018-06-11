@@ -3,6 +3,7 @@ import { ActivatedRoute } from '@angular/router'
 
 import { ApiService } from '../../api/api.service'
 import { Site } from '../models'
+import { AnaError } from '../../api/http-interceptors/logger-interceptor'
 
 @Component({
   selector: 'ana-site-details',
@@ -15,6 +16,8 @@ export class SiteDetailsComponent implements OnInit {
   reloadSuccess = false
   loadingConfig = false
   reloadError = ''
+  reloadErrorDesc: any
+  errorKeys: string[]
 
   constructor(
     private route: ActivatedRoute,
@@ -34,6 +37,7 @@ export class SiteDetailsComponent implements OnInit {
 
   reloadConfig() {
     this.reloadError = ''
+    this.reloadSuccess = false
     this.loadingConfig = true
     this.api.reloadConfig(this.site.ID).subscribe(
       () => {
@@ -41,7 +45,10 @@ export class SiteDetailsComponent implements OnInit {
         this.loadingConfig = false
       },
       error => {
-        this.reloadError = error
+        this.reloadError = error.msg
+        this.errorKeys = Object.keys(error.desc).filter(k =>
+          k === this.site.VHost || this.site.Hosts.map(host => host.Name).includes(k))
+        this.reloadErrorDesc = error.desc
         this.loadingConfig = false
       }
     )

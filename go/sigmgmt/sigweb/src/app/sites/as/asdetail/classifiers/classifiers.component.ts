@@ -29,7 +29,7 @@ export class ClassifiersComponent implements OnChanges {
     this.error = ''
     this.api.updateASPolicies(this.ia).subscribe(
       () => this.success = 'Policies successfully updated!',
-      error => this.error = error
+      error => this.error = error.msg
     )
   }
 }

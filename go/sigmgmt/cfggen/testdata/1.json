@@ -6,6 +6,7 @@
             },
             "PktPolicies": [
                 {
+                    "Name": "",
                     "ClassName": "audio",
                     "SessIds": [
                         0

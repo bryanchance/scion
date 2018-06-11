@@ -57,7 +57,7 @@ export class SigsComponent implements OnChanges {
           this.editing = false
           this.success = 'Successfully updated SIG.'
         },
-        error => this.error = error
+        error => this.error = error.msg
       )
     } else {
       this.api.createSIG(this.ia, this.sig).subscribe(
@@ -66,7 +66,7 @@ export class SigsComponent implements OnChanges {
           this.form.resetForm()
           this.setDefaultPorts()
         },
-        error => this.error = error
+        error => this.error = error.msg
       )
     }
   }

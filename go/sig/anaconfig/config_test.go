@@ -204,6 +204,7 @@ func TestLoadFromFile(t *testing.T) {
 						},
 						PktPolicies: []*PktPolicy{
 							{
+								Name:      "policy-transit-1",
 								ClassName: "transit-isd-1",
 								SessIds:   []mgmt.SessionType{0x03},
 							},

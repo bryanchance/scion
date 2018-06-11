@@ -19,15 +19,22 @@ const (
 	TimeForHTTPRequest             = 2 * time.Second
 )
 
+// CopyFileToSite copies the config file to all hosts,
+// returns a boolean indicating if all copies were successful and a corresponding map of
+// host name to error
 func CopyFileToSite(ctx context.Context, spath string, site *db.Site, dpath string,
-	logger log.Logger) error {
-
+	logger log.Logger) (bool, map[string]error) {
+	ok := true
+	errMap := map[string]error{}
 	for _, host := range site.Hosts {
-		if err := CopyFileToHost(ctx, spath, &host, dpath, logger); err != nil {
-			return common.NewBasicError("Unable to copy configuration to host:", err)
+		errMap[host.Name] = nil
+		if err := copyFileToHost(ctx, spath, &host, dpath, logger); err != nil {
+			logger.Info("Unable to copy configuration to host", "err", err)
+			errMap[host.Name] = err
+			ok = false
 		}
 	}
-	return nil
+	return ok, errMap
 }
 
 func defaultSSHParams(ctx context.Context, host *db.Host) []string {
@@ -50,62 +57,48 @@ func defaultSSHParams(ctx context.Context, host *db.Host) []string {
 	}
 	return args
 }
-func CopyFileToHost(ctx context.Context, spath string, host *db.Host, dpath string,
-	logger log.Logger) error {
 
+func copyFileToHost(ctx context.Context, spath string, host *db.Host, dpath string,
+	logger log.Logger) error {
 	// scp [ -i *sshKey ] spath [*sshUser@]host:dpath
 	args := defaultSSHParams(ctx, host)
 	args = append(args, spath)
-
-	if host.User == "" {
-		args = append(args, fmt.Sprintf("%s:%s", host.Name, dpath))
-	} else {
-		args = append(args, fmt.Sprintf("%s@%s:%s", host.User, host.Name, dpath))
-	}
+	args = append(args, fmt.Sprintf("%s@%s:%s", host.User, host.Name, dpath))
 	scpCommand := exec.CommandContext(ctx, "scp", args...)
 	logger.Info("Copying SIG config file via scp", "args", args)
 	return runCommand(scpCommand)
 }
 
-func ReloadSite(ctx context.Context, site *db.Site, logger log.Logger) error {
-	errors := make(chan error, len(site.Hosts))
-	for _, host := range site.Hosts {
-		host := host
-		go func() {
-			errors <- ReloadHost(ctx, &host, logger)
-		}()
+// ReloadSite reloads the VHost if present or all hosts otherwise,
+// returns a boolean indicating if all reloads were successful and a map of host name to error
+func ReloadSite(ctx context.Context, site *db.Site, logger log.Logger) (bool, map[string]error) {
+	errMap := map[string]error{}
+	if site.VHost != "" {
+		host := &db.Host{Name: site.VHost, Key: site.Hosts[0].Key, User: site.Hosts[0].User}
+		if err := reloadHost(ctx, host, logger); err != nil {
+			logger.Info("SIG reload error", "err", err)
+			errMap[site.VHost] = err
+			return false, errMap
+		}
+		return true, errMap
 	}
-
-	// Take the result from each goroutine
-	ok := false
-Loop:
-	for range site.Hosts {
-		select {
-		case err := <-errors:
-			if err == nil {
-				ok = true
-				break Loop
-			} else {
-				logger.Info("SIG reload error", "err", err)
-			}
-		case <-ctx.Done():
-			return common.NewBasicError("context expired", nil, "site", site.Name)
+	// No VHost specified, reload all hosts
+	ok := true
+	for _, host := range site.Hosts {
+		errMap[host.Name] = nil
+		if err := reloadHost(ctx, &host, logger); err != nil {
+			logger.Info("SIG reload error", "err", err)
+			errMap[host.Name] = err
+			ok = false
 		}
 	}
-	if !ok {
-		return common.NewBasicError("SIG could not be reloaded", nil, "site", site.Name)
-	}
-	return nil
+	return ok, errMap
 }
 
-func ReloadHost(ctx context.Context, host *db.Host, logger log.Logger) error {
+func reloadHost(ctx context.Context, host *db.Host, logger log.Logger) error {
 	// ssh [ -i *sshKey ] [*sshUser@]host sudo systemctl --signal=SIGHUP kill sig.service
 	args := defaultSSHParams(ctx, host)
-	if host.User == "" {
-		args = append(args, fmt.Sprintf("%s", host.Name))
-	} else {
-		args = append(args, fmt.Sprintf("%s@%s", host.User, host.Name))
-	}
+	args = append(args, fmt.Sprintf("%s@%s", host.User, host.Name))
 	args = append(args, "sudo systemctl reload sig.service")
 	sshCommand := exec.CommandContext(ctx, "ssh", args...)
 	logger.Info("Sending SIG reload signal via ssh", "args", args)
@@ -119,43 +112,40 @@ func runCommand(cmd *exec.Cmd) error {
 	return nil
 }
 
+// VerifyConfigVersion checks the config version on the Vhost if specified or on all hosts
+// otherwise, returns a boolean indicating if all config verifications were successful
+// and a map of host name to error
 func VerifyConfigVersion(ctx context.Context, site *db.Site, version uint64,
-	logger log.Logger) error {
-
-	errors := make(chan error, len(site.Hosts))
-	for _, host := range site.Hosts {
-		host := host
-		go func() {
-			errors <- verifyConfigVersionHost(ctx, &host, site.MetricsPort, version, logger)
-		}()
+	logger log.Logger) (bool, map[string]error) {
+	errMap := map[string]error{}
+	if site.VHost != "" {
+		host := &db.Host{Name: site.VHost, Key: site.Hosts[0].Key, User: site.Hosts[0].User}
+		if err := verifyConfigVersionHost(ctx, host, site.MetricsPort,
+			version, logger); err != nil {
+			logger.Info("SIG Config Version verification error", "err", err)
+			errMap[site.VHost] = err
+			return false, errMap
+		}
+		return true, errMap
 	}
-	// Take the result from each goroutine
-	ok := false
-Loop:
-	for range site.Hosts {
-		select {
-		case err := <-errors:
-			if err == nil {
-				ok = true
-				break Loop
-			} else {
-				logger.Info("host verification error", "err", err)
-			}
-		case <-ctx.Done():
-			return common.NewBasicError("context done", ctx.Err(), "site", site.Name)
+	// No VHost specified, check all hosts
+	ok := true
+	for _, host := range site.Hosts {
+		errMap[host.Name] = nil
+		if err := verifyConfigVersionHost(ctx, &host, site.MetricsPort,
+			version, logger); err != nil {
+			logger.Info("SIG config verification error", "err", err)
+			errMap[host.Name] = err
+			ok = false
 		}
 	}
-	if !ok {
-		return common.NewBasicError("no host could be verified", nil)
-	}
-	return nil
+	return ok, errMap
 }
 
 // verifyConfigVersionHost attempts multiple version verifications until one
 // suceeds, for as long as ctx allows.
 func verifyConfigVersionHost(ctx context.Context, host *db.Host, port uint16, version uint64,
 	logger log.Logger) error {
-
 	url := fmt.Sprintf("http://%s:%d/configversion", host.Name, port)
 	log.Debug("Trying to fetch metric page", "url", url)
 	for try := 0; ; try++ {

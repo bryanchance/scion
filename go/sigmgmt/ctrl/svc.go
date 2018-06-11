@@ -53,45 +53,47 @@ func (c *Controller) getAndValidateSiteCfg(siteID uint) (*config.Cfg, string, er
 	return siteCfg, "", nil
 }
 
-func (c *Controller) writeConfig(siteID uint, siteCfg *config.Cfg) (string, error) {
+func (c *Controller) writeConfig(siteID uint, siteCfg *config.Cfg) (string, error,
+	map[string]error) {
 	ctx, cancelF := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancelF()
 
 	jsonStrNew, err := json.MarshalIndent(siteCfg, "", "    ")
 	if err != nil {
-		return "Error building json config file", err
+		return "Error building json config file", err, nil
 	}
 	// writeJSONFile
 	fname := fmt.Sprintf("/sig-config-%d.json", siteCfg.ConfigVersion)
 	path := filepath.Join(c.cfg.OutputDir, fname)
 	if err := ioutil.WriteFile(path, jsonStrNew, 0644); err != nil {
 		log.Error(jsonSaveError, "file", path, "err", err)
-		return jsonSaveError, err
+		return jsonSaveError, err, nil
 	}
 	log.Info("Generated JSON config", "file", path)
 	var site db.Site
 	if err = c.db.Preload("Hosts").Where("id = ?", siteID).Find(&site).Error; err != nil {
-		return "Could not get site", err
+		return "Could not get site", err, nil
 	}
 	if len(site.Hosts) == 0 {
-		return "No hosts specified", common.NewBasicError("Empty hosts list", nil)
+		return "No hosts specified", common.NewBasicError("Empty hosts list", nil), nil
 	}
-	if err := netcopy.CopyFileToSite(ctx, path, &site, c.cfg.SIGCfgPath, log.Root()); err != nil {
-		log.Error(configCopyError, "site", site.Name, "err", err)
-		return configCopyError, err
+	if ok, errs := netcopy.CopyFileToSite(ctx, path, &site, c.cfg.SIGCfgPath, log.Root()); !ok {
+		log.Error(configCopyError, "site", site.Name, "errs", errs)
+		return configCopyError, nil, errs
 	}
 	log.Info("SIG config copy to remote site successful", "site", site.Name)
-	if err := netcopy.ReloadSite(ctx, &site, log.Root()); err != nil {
-		return "Unable to reload SIG on remote site", err
+	if ok, errs := netcopy.ReloadSite(ctx, &site, log.Root()); !ok {
+		return "Unable to reload SIG on remote site", nil, errs
 	}
-	log.Debug("SIG configuration reload triggered successfully", "vhost", site.VHost)
-	if err := netcopy.VerifyConfigVersion(ctx, &site, siteCfg.ConfigVersion,
-		log.Root()); err != nil {
-		return "Unable to verify version of reloaded config", err
+	log.Debug("SIG configuration reload triggered successfully", "vhost", site.VHost,
+		"name", site.Name)
+	if ok, errs := netcopy.VerifyConfigVersion(ctx, &site, siteCfg.ConfigVersion,
+		log.Root()); !ok {
+		return "Unable to verify version of reloaded config", nil, errs
 	}
-	log.Info("SIG Config version verification successful", "vhost", site.VHost,
+	log.Info("SIG Config version verification successful", "vhost", site.VHost, "name", site.Name,
 		"version", siteCfg.ConfigVersion)
-	return "", nil
+	return "", nil, nil
 }
 
 func (c *Controller) getSiteConfig(siteID uint) (*config.Cfg, *db.Site, string, error) {
@@ -190,8 +192,10 @@ func parseHosts(hosts []db.Host) error {
 }
 
 func validateSite(site *db.Site) (string, error) {
-	if err := util.ValidateIdentifier(site.VHost); err != nil {
-		return "Bad VHost", err
+	if site.VHost != "" {
+		if err := util.ValidateIdentifier(site.VHost); err != nil {
+			return "Bad VHost", err
+		}
 	}
 	if err := parseHosts(site.Hosts); err != nil {
 		return "Bad hosts", err

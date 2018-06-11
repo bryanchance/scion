@@ -7,6 +7,7 @@
             },
             "PktPolicies": [
                 {
+                    "Name": "",
                     "ClassName": "audio",
                     "SessIds": [
                         0,
@@ -21,6 +22,7 @@
             },
             "PktPolicies": [
                 {
+                    "Name": "",
                     "ClassName": "video",
                     "SessIds": [
                         0

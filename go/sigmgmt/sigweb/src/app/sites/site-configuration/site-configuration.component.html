@@ -14,7 +14,7 @@
         <input matInput name="port" [(ngModel)]="site.MetricsPort" type="number" placeholder="Metrics Port" required [disabled]="formDisabled">
       </mat-form-field>
       <mat-form-field>
-        <input matInput name="vhost" [(ngModel)]="site.VHost" type="text" placeholder="VHost" required [disabled]="formDisabled">
+        <input matInput name="vhost" [(ngModel)]="site.VHost" type="text" placeholder="VHost" [disabled]="formDisabled">
       </mat-form-field>
       <button [disabled]="siteForm.invalid || formDisabled || site.MetricsPort > 65535" type="submit" mat-button>
         <mat-icon>save</mat-icon>
@@ -28,7 +28,7 @@
             <input matInput name="hostName" [(ngModel)]="host.Name" type="text" placeholder="Name" required>
           </mat-form-field>
           <mat-form-field>
-            <input matInput name="hostUser" [(ngModel)]="host.User" type="text" placeholder="SSH User">
+            <input matInput name="hostUser" [(ngModel)]="host.User" type="text" placeholder="SSH User" required>
           </mat-form-field>
           <mat-form-field>
             <input matInput name="hostKey" [(ngModel)]="host.Key" type="text" placeholder="SSH Key Path">

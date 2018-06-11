@@ -98,6 +98,7 @@ type ASEntry struct {
 type SessionMap map[mgmt.SessionType]string
 
 type PktPolicy struct {
+	Name      string
 	ClassName string
 	SessIds   []mgmt.SessionType
 }

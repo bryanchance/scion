@@ -39,7 +39,7 @@ export class ASListComponent implements OnChanges {
           this.editing = false
           this.success = 'Successfully updated AS.'
         },
-        error => this.error = error
+        error => this.error = error.msg
       )
     } else {
       this.api.createAS(this.site, this.ia).subscribe(
@@ -47,7 +47,7 @@ export class ASListComponent implements OnChanges {
           this.ias.push(ia)
           this.form.resetForm()
         },
-        error => this.error = error
+        error => this.error = error.msg
       )
     }
   }

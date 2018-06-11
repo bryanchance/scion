@@ -23,12 +23,14 @@
             },
             "PktPolicies": [
                 {
+                    "Name": "policy-transit-1",
                     "ClassName": "transit-isd-1",
                     "SessIds": [
                         3
                     ]
                 },
                 {
+                    "Name": "",
                     "ClassName": "transit-isd-2",
                     "SessIds": [
                         3,

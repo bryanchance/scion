@@ -21,7 +21,7 @@ type Host struct {
 	Name   string
 	User   string
 	Key    string `gorm:"size:400"`
-	SiteID uint   `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name, user, key)" json:"-"`
+	SiteID uint   `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name)" json:"-"`
 }
 
 type PathSelector struct {

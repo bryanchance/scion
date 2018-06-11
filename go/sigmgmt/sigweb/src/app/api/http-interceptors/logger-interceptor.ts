@@ -7,6 +7,10 @@ import { environment } from '../../../environments/environment'
 import { UserService } from '../user.service'
 import { LogLevel } from './log-level'
 
+export class AnaError {
+    constructor(public msg: string, public desc: any = '') { }
+}
+
 @Injectable()
 export class LoggerInterceptor implements HttpInterceptor {
 
@@ -31,9 +35,12 @@ export class LoggerInterceptor implements HttpInterceptor {
                     }
                 }
                 if (err.error && err.error.error) {
-                    return throwError(new Error(err.error.error))
+                    if (err.error.description) {
+                        return throwError(new AnaError(err.error.error, err.error.description))
+                    }
+                    return throwError(new AnaError(err.error.error))
                 } else {
-                    return throwError(new Error('Something went wrong!'))
+                    return throwError(new AnaError('Something went wrong!'))
                 }
             })
         )

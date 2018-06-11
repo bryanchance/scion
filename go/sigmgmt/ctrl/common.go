@@ -47,9 +47,9 @@ func respondNotFound(w http.ResponseWriter) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func respondError(w http.ResponseWriter, err error, errStr string, status int) {
+func respondError(w http.ResponseWriter, err interface{}, errStr string, status int) {
 	log.Error("Error handling request", "err", err, "message", errStr)
-	errorMsg := map[string]string{"error": errStr}
+	errorMsg := map[string]interface{}{"error": errStr, "description": err}
 	data, err := json.Marshal(errorMsg)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
