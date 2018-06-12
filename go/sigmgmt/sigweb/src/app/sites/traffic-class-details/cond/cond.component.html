@@ -1,0 +1,30 @@
+<div class="flex-container" (mouseover)="overDelete = true" (mouseleave)="overDelete = false">
+  <div class="cond" *ngIf="cond" [ngSwitch]="cond.Type()">
+    <ana-any *ngSwitchCase="anyType" [cond]="cond"></ana-any>
+    <ana-all *ngSwitchCase="allType" [cond]="cond"></ana-all>
+    <ana-not *ngSwitchCase="notType" [cond]="cond"></ana-not>
+    <ana-ipv4 *ngSwitchCase="ipv4Type" [predicate]="cond"></ana-ipv4>
+    <ana-src *ngSwitchCase="srcType" [predicate]="cond"></ana-src>
+    <ana-dst *ngSwitchCase="dstType" [predicate]="cond"></ana-dst>
+    <ana-dscp *ngSwitchCase="dscpType" [predicate]="cond"></ana-dscp>
+    <ana-class *ngSwitchCase="classType" [cond]="cond"></ana-class>
+    <p *ngSwitchDefault>
+      Condition not found
+    </p>
+  </div>
+  <div class="popover-wrapper">
+    <div class="add-menu" *ngIf="cond && showInsert">
+      <button mat-button (click)="insert.emit('any'); showInsert = false">ANY</button>
+      <button mat-button (click)="insert.emit('all'); showInsert = false">ALL</button>
+      <button mat-button *ngIf="cond.Type() != notType" (click)="insert.emit('not'); showInsert = false">NOT</button>
+    </div>
+  </div>
+  <div class="flex-container button-container">
+    <button class="insert" *ngIf="cond && showDelete && overDelete" mat-icon-button (click)="showInsert =!showInsert">
+      <mat-icon>fast_forward</mat-icon>
+    </button>
+    <button class="delete" *ngIf="cond && showDelete && overDelete" mat-icon-button (click)="deleted.emit()">
+      <mat-icon>delete</mat-icon>
+    </button>
+  </div>
+</div>

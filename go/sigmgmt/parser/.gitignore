@@ -1,5 +1,3 @@
-PathPredicate.interp
-PathPredicate.tokens
-PathPredicateLexer.interp
-PathPredicateLexer.tokens
-.antlr/*
+*.interp
+*.tokens
+.antlr/

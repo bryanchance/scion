@@ -1,3 +1,10 @@
+<div class="flex-container">
+  <h2 class="mat-h2">Remote ASes</h2>
+  <button color="primary" routerLink="/sites/{{site?.ID}}" mat-button>
+    <mat-icon>arrow_back</mat-icon>
+  </button>
+</div>
+
 <mat-card *ngIf="success" class="success">{{success}}</mat-card>
 <mat-card *ngIf="error" class="error">{{error}}</mat-card>
 <div class="flex-container">
@@ -21,12 +28,12 @@
     </form>
     <mat-nav-list>
       <mat-list-item *ngFor="let ia of ias; let idx = index">
-        <a matLine routerLink="/sites/{{site.ID}}/ias/{{ia.ID}}">
+        <a matLine routerLink="/sites/{{site.ID}}/ases/{{ia.ID}}">
           <span class="name">{{ia.Name}}</span>
           <span class="isd-name">{{ia.ISD}}</span>
           <span class="as-name">{{ia.AS}}</span>
         </a>
-        <button mat-icon-button routerLink="/sites/{{site.ID}}/ias/{{ia.ID}}">
+        <button mat-icon-button routerLink="/sites/{{site.ID}}/ases/{{ia.ID}}">
           <mat-icon>settings</mat-icon>
         </button>
         <button *ngIf="!formDisabled" mat-icon-button (click)="edit(idx)">

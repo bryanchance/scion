@@ -1,17 +1,18 @@
-import { Component, Input, OnChanges, ViewChild } from '@angular/core'
+import { Component, Input, OnInit, ViewChild } from '@angular/core'
 import { NgForm } from '@angular/forms'
 
 import { ApiService } from '../../../api/api.service'
 import { UserService } from '../../../api/user.service'
-import { ASEntry, Site } from '../../models'
+import { ASEntry, Site } from '../../models/models'
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'ana-aslist',
   templateUrl: './aslist.component.html',
   styleUrls: ['./aslist.component.scss']
 })
-export class ASListComponent implements OnChanges {
-  @Input() site: Site
+export class ASListComponent implements OnInit {
+  site: Site
   ia = new ASEntry
   ias: ASEntry[] = []
   success = ''
@@ -19,12 +20,22 @@ export class ASListComponent implements OnChanges {
   editing = false
   @ViewChild('iaForm') form: NgForm
 
-  constructor(private api: ApiService, private userService: UserService) { }
+  constructor(
+    private api: ApiService,
+    private route: ActivatedRoute,
+    private userService: UserService) { }
 
-  ngOnChanges() {
-    if (this.site.ID) {
-      this.api.getASes(this.site).subscribe(
-        (ias: ASEntry[]) => this.ias = ias
+  ngOnInit() {
+    const siteID = this.route.snapshot.params.site
+
+    if (siteID) {
+      this.api.getSite(siteID).subscribe(
+        site => {
+          this.site = site
+          this.api.getASes(this.site).subscribe(
+            (ias: ASEntry[]) => this.ias = ias
+          )
+        }
       )
     }
   }

@@ -2,8 +2,7 @@ import { Component, OnInit } from '@angular/core'
 import { ActivatedRoute } from '@angular/router'
 
 import { ApiService } from '../../api/api.service'
-import { Site } from '../models'
-import { AnaError } from '../../api/http-interceptors/logger-interceptor'
+import { Site } from '../models/models'
 
 @Component({
   selector: 'ana-site-details',
@@ -11,7 +10,7 @@ import { AnaError } from '../../api/http-interceptors/logger-interceptor'
   styleUrls: ['./site-details.component.scss']
 })
 export class SiteDetailsComponent implements OnInit {
-  site = new Site
+  site: Site
   newSite = true
   reloadSuccess = false
   loadingConfig = false

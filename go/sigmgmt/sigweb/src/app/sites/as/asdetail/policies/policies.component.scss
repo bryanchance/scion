@@ -1,0 +1,53 @@
+.policy-form {
+    width: 400px;
+    display: flex;
+    ng-select {
+        width: 180px;
+    }
+}
+
+mat-card.success,
+mat-card.error {
+    margin-bottom: 40px;
+}
+
+.mat-list {
+    margin-left: -16px;
+    .name {
+        width: 265px;
+    }
+}
+
+.mat-list .mat-list-item {
+    min-height: 48px;
+    height: auto;
+}
+
+.selectors {
+    margin-left: 10px;
+    margin-top: -20px;
+    p {
+        margin-right: 10px;
+        margin-bottom: 0;
+        &.inline {
+            margin-top: 35px;
+        }
+    }
+    .mat-list {
+        margin-left: -25px;
+    }
+}
+
+.policies {
+    margin-top: 20px;
+    border-top: 1px solid lightgray;
+    .name {
+        width: 180px;
+        .small {
+            font-size: 12px;
+        }
+    }
+    .traffic-class {
+        width: 140px;
+    }
+}

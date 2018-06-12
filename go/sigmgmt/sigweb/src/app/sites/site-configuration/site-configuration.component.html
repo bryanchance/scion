@@ -3,7 +3,7 @@
 
 <div class="flex-container">
   <div>
-    <form #siteForm="ngForm" (ngSubmit)="onSubmit()">
+    <form #siteForm="ngForm" (ngSubmit)="onSubmit()" *ngIf="site">
       <mat-form-field>
         <input matInput name="name" [(ngModel)]="site.Name" minlength="1" type="text" placeholder="Site Name" required>
         <mat-hint align="start">

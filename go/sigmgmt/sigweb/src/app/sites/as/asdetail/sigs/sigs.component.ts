@@ -3,7 +3,7 @@ import { NgForm } from '@angular/forms'
 
 import { ApiService } from '../../../../api/api.service'
 import { UserService } from '../../../../api/user.service'
-import { ASEntry, SIG, Site } from '../../../models'
+import { ASEntry, SIG, Site } from '../../../models/models'
 
 @Component({
   selector: 'ana-sigs',

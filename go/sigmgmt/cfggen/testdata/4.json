@@ -1,0 +1,197 @@
+{
+    "ASes": {
+        "1-1": {
+            "Sessions": {
+                "0": "foo",
+                "1": "bar",
+                "2": "baz",
+                "3": "bad"
+            },
+            "PktPolicies": [
+                {
+                    "Name": "",
+                    "ClassName": "class-1",
+                    "SessIds": [
+                        0,
+                        1
+                    ]
+                },
+                {
+                    "Name": "",
+                    "ClassName": "class-2",
+                    "SessIds": [
+                        1,
+                        2
+                    ]
+                },
+                {
+                    "Name": "",
+                    "ClassName": "class-3",
+                    "SessIds": [
+                        3,
+                        1
+                    ]
+                }
+            ]
+        },
+        "2-2": {
+            "Sessions": {
+                "0": "bax",
+                "1": "baz",
+                "2": "bar",
+                "3": "foo"
+            },
+            "PktPolicies": [
+                {
+                    "Name": "",
+                    "ClassName": "class-3",
+                    "SessIds": [
+                        0,
+                        1
+                    ]
+                },
+                {
+                    "Name": "",
+                    "ClassName": "class-5",
+                    "SessIds": [
+                        2,
+                        3
+                    ]
+                },
+                {
+                    "Name": "",
+                    "ClassName": "class-4",
+                    "SessIds": [
+                        3,
+                        1
+                    ]
+                }
+            ]
+        }
+    },
+    "Classes": {
+        "class-1": {
+            "CondIPv4": {
+                "MatchSource": {
+                    "Net": "12.12.127.0/24"
+                }
+            }
+        },
+        "class-2": {
+            "CondNot": {
+                "CondIPv4": {
+                    "MatchDestination": {
+                        "Net": "124.124.153.0/24"
+                    }
+                }
+            }
+        },
+        "class-3": {
+            "CondAllOf": [
+                {
+                    "CondIPv4": {
+                        "MatchSource": {
+                            "Net": "12.1.1.0/24"
+                        }
+                    }
+                },
+                {
+                    "CondNot": {
+                        "CondIPv4": {
+                            "MatchDestination": {
+                                "Net": "124.124.153.0/24"
+                            }
+                        }
+                    }
+                }
+            ]
+        },
+        "class-4": {
+            "CondAnyOf": [
+                {
+                    "CondIPv4": {
+                        "MatchToS": {
+                            "TOS": "0x34"
+                        }
+                    }
+                },
+                {
+                    "CondIPv4": {
+                        "MatchSource": {
+                            "Net": "1.1.1.0/28"
+                        }
+                    }
+                }
+            ]
+        },
+        "class-5": {
+            "CondAllOf": [
+                {
+                    "CondNot": {
+                        "CondIPv4": {
+                            "MatchSource": {
+                                "Net": "12.12.127.0/24"
+                            }
+                        }
+                    }
+                },
+                {
+                    "CondAnyOf": [
+                        {
+                            "CondIPv4": {
+                                "MatchToS": {
+                                    "TOS": "0x34"
+                                }
+                            }
+                        },
+                        {
+                            "CondIPv4": {
+                                "MatchSource": {
+                                    "Net": "1.1.1.0/28"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    "Actions": {
+        "bad": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "4-4#4"
+                }
+            }
+        },
+        "bar": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "2-2#2"
+                }
+            }
+        },
+        "bax": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "5-4#4"
+                }
+            }
+        },
+        "baz": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "3-3#3"
+                }
+            }
+        },
+        "foo": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "1-1#1"
+                }
+            }
+        }
+    },
+    "ConfigVersion": 0
+}

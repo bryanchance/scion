@@ -1,0 +1,9 @@
+<div class="match-elem" anaMouseover>
+    <span>MatchDst:&nbsp;</span>
+    <form #dstForm="ngForm" (ngSubmit)="save()">
+        <mat-form-field>
+            <input autofocus matInput name="name" [(ngModel)]="predicate.Net" placeholder="dst CIDR" type="text" required>
+        </mat-form-field>
+    </form>
+    <p class="error" *ngIf="error">Invalid CIDR</p>
+</div>

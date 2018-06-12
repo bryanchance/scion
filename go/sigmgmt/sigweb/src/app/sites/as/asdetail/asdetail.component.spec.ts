@@ -4,9 +4,9 @@ import { ActivatedRoute } from '@angular/router'
 
 import { TestingModule } from '../../../testing/testing.module'
 import { ASDetailComponent } from './asdetail.component'
-import { ClassifiersComponent } from './classifiers/classifiers.component'
 import { NetworksComponent } from './networks/networks.component'
 import { SigsComponent } from './sigs/sigs.component'
+import { PoliciesComponent } from './policies/policies.component'
 
 describe('AsdetailComponent', () => {
   let component: ASDetailComponent
@@ -23,7 +23,7 @@ describe('AsdetailComponent', () => {
             }
           }
         }],
-      declarations: [ASDetailComponent, SigsComponent, NetworksComponent, ClassifiersComponent]
+      declarations: [ASDetailComponent, SigsComponent, NetworksComponent, PoliciesComponent]
     })
       .compileComponents()
   }))

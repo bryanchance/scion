@@ -35,6 +35,7 @@ function removeToken(): void {
 @Injectable()
 export class UserService {
 
+  online =  new BehaviorSubject<boolean>(true)
   private user: User
   private isLoginSubject = new BehaviorSubject<boolean>(this.token != null && !this.jwt.isTokenExpired())
 

@@ -23,6 +23,7 @@ export class LoggerInterceptor implements HttpInterceptor {
             map(resp => {
                 if (resp instanceof HttpResponse) {
                     this.debug('Response', resp)
+                    this.userService.online.next(true)
                     return resp
                 }
             }),
@@ -33,14 +34,20 @@ export class LoggerInterceptor implements HttpInterceptor {
                     if (err.status === 401) {
                         this.userService.logout()
                     }
-                }
-                if (err.error && err.error.error) {
-                    if (err.error.description) {
-                        return throwError(new AnaError(err.error.error, err.error.description))
+                    if (err.status === 0) {
+                        // Network error
+                        this.userService.online.next(false)
                     }
-                    return throwError(new AnaError(err.error.error))
+                    if (err.error && err.error.error) {
+                        if (err.error.description) {
+                            return throwError(new AnaError(err.error.error, err.error.description))
+                        }
+                        return throwError(new AnaError(err.error.error))
+                    } else {
+                        return throwError(new AnaError('Something went wrong!'))
+                    }
                 } else {
-                    return throwError(new AnaError('Something went wrong!'))
+                    this.error('Unknown error!', err)
                 }
             })
         )

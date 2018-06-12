@@ -1,0 +1,111 @@
+<div class="flex-container">
+  <h2 *ngIf="trClass?.ID" class="mat-h2">Traffic Class: {{trClass.Name}}</h2>
+  <h2 *ngIf="!trClass?.ID" class="mat-h2">New Traffic Class</h2>
+  <button color="primary" routerLink="/sites/{{siteID}}/classes" mat-button>
+    <mat-icon>arrow_back</mat-icon>
+  </button>
+</div>
+
+<mat-card *ngIf="error" class="error">{{error}}</mat-card>
+
+<form #classForm="ngForm" (ngSubmit)="onSubmit()">
+  <div class="flex-container">
+    <mat-form-field>
+      <input matInput name="name" [(ngModel)]="trClass.Name" placeholder="Traffic Class Name" type="text" required>
+    </mat-form-field>
+    <div class="autosave">
+      <span *ngIf="saving">Saving...</span>
+      <span *ngIf="saved">All changes saved.</span>
+      <button class="submit" mat-button type="submit" [disabled]="classForm.invalid || !trClass.Cond || saving">
+        <mat-icon>save</mat-icon>
+      </button>
+    </div>
+  </div>
+
+</form>
+<mat-card *ngIf="trClass.Name && (trClass.Cond || rawEditing)">
+  <mat-card-subtitle (click)="enableRawEdit()" *ngIf="!rawEditing">
+    <div class="flex-container">
+      <span>{{trClass.condString}}</span>
+      <button mat-icon-button (click)="enableRawEdit()">
+        <mat-icon>edit</mat-icon>
+      </button>
+    </div>
+  </mat-card-subtitle>
+  <mat-card-title *ngIf="rawEditing">
+    <form #rawCondForm="ngForm" (ngSubmit)="onSubmit()" class="flex-container">
+      <mat-form-field>
+        <input matInput name="condString" [(ngModel)]="trClass.CondStr" placeholder="Raw Traffic Class" type="text" required>
+      </mat-form-field>
+      <button mat-icon-button type="button" (click)="onSubmit(true)">
+        <mat-icon>done</mat-icon>
+      </button>
+    </form>
+  </mat-card-title>
+</mat-card>
+<div class="flex-container">
+  <div class="full">
+    <ana-cond class="cond" *ngIf="trClass.Cond && !rawEditing" (deleted)="delete()" (insert)="insert($event)" [cond]="trClass.Cond"></ana-cond>
+    <div *ngIf="!trClass.Cond && trClass.Name && !rawEditing">
+      <div class="base-add">
+        <p>Base condition</p>
+        <button mat-raised-button (click)="addAny() ">ANY</button>
+        <button mat-raised-button (click)="addAll() ">ALL</button>
+        <button mat-raised-button (click)="addNot() ">NOT</button>
+        <button mat-raised-button (click)="addSrc() ">SRC</button>
+        <button mat-raised-button (click)="addDst() ">DST</button>
+        <button mat-raised-button (click)="addDscp() ">DSCP</button>
+        <button mat-raised-button (click)="enableRawEdit() ">Raw Edit</button>
+      </div>
+    </div>
+  </div>
+  <mat-card class="help">
+    <mat-card-header>
+      <mat-card-title>Traffic Class</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div>
+        <mat-icon>add_box</mat-icon>
+        <p>Add a new subcondition</p>
+      </div>
+      <div>
+        <mat-icon>fast_forward</mat-icon>
+        <p>Add a new parent condition</p>
+      </div>
+      <div>
+        <mat-icon>delete</mat-icon>
+        <p>Delete condition and its children</p>
+      </div>
+      <div>
+        <span>AND</span>
+        <p>List of subconditions, returns true if all subconditions yield true</p>
+      </div>
+      <div>
+        <span>ANY</span>
+        <p>List of subconditions, returns true if at least one subcondition yields true</p>
+      </div>
+      <div>
+        <span>NOT</span>
+        <p>Returns the negation of the subcondition</p>
+      </div>
+      <div>
+        <span>CLASS</span>
+        <br>
+        <p>Reference to another Traffic Class</p>
+      </div>
+      <div>
+        <span>SRC</span>
+        <p>Checks whether the source address of the packet is within the network</p>
+      </div>
+      <div>
+        <span>DST</span>
+        <p>Checks whether the destination address of the packet is within the network</p>
+      </div>
+      <div>
+        <span>DSCP</span>
+        <p>Checks whether the ToS/DSCP fields of the packet exactly match</p>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+</div>

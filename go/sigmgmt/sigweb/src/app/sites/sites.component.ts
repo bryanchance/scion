@@ -2,7 +2,7 @@ import { Component, OnInit } from '@angular/core'
 
 import { ApiService } from '../api/api.service'
 import { UserService } from '../api/user.service'
-import { Site } from './models'
+import { Site } from './models/models'
 
 @Component({
   selector: 'ana-sites',

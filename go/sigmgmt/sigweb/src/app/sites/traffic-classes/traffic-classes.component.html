@@ -1,0 +1,25 @@
+<div class="flex-container">
+    <h2 class="mat-h2">Traffic Classes</h2>
+    <button color="primary" routerLink="/sites/{{site?.ID}}" mat-button>
+        <mat-icon>arrow_back</mat-icon>
+    </button>
+</div>
+
+<mat-nav-list>
+    <mat-list-item class="add" routerLink="/sites/{{site?.ID}}/classes/new">
+        <a matLine>Add a new Traffic Class...</a>
+        <button mat-icon-button>
+            <mat-icon>add_box</mat-icon>
+        </button>
+    </mat-list-item>
+    <mat-list-item class="flex-container" *ngFor="let class of trafficClasses; let idx = index" routerLink="/sites/{{site.ID}}/classes/{{class.ID}}">
+        <a class="name" matLine>{{ class.Name }}</a>
+        <p class="cond">{{class.condString}}</p>
+        <button mat-icon-button>
+            <mat-icon>edit</mat-icon>
+        </button>
+        <button mat-icon-button (click)="delete(idx)">
+            <mat-icon>delete</mat-icon>
+        </button>
+    </mat-list-item>
+</mat-nav-list>

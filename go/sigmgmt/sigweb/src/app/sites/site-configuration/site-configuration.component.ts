@@ -1,17 +1,17 @@
-import { ChangeDetectorRef, Component, EventEmitter, Input, OnChanges, Output, ViewChild } from '@angular/core'
+import { ChangeDetectorRef, Component, EventEmitter, Input, OnChanges, Output, ViewChild, OnInit } from '@angular/core'
 import { NgForm } from '@angular/forms'
 import { Router } from '@angular/router'
 
 import { ApiService } from '../../api/api.service'
 import { UserService } from '../../api/user.service'
-import { Host, Site } from '../models'
+import { Host, Site } from '../models/models'
 
 @Component({
   selector: 'ana-site-configuration',
   templateUrl: './site-configuration.component.html',
   styleUrls: ['./site-configuration.component.scss']
 })
-export class SiteConfigurationComponent implements OnChanges {
+export class SiteConfigurationComponent implements OnChanges, OnInit {
   @Input() site: Site
   @Input() newSite: boolean
   @ViewChild('hostForm') hostForm: NgForm
@@ -27,6 +27,12 @@ export class SiteConfigurationComponent implements OnChanges {
     private cd: ChangeDetectorRef,
     private router: Router
   ) { }
+
+  ngOnInit() {
+    if (!this.site) {
+      this.site = new Site(0)
+    }
+  }
 
   ngOnChanges() {
     this.cd.detectChanges()

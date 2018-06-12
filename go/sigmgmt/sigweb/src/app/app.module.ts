@@ -7,18 +7,19 @@ import { RouterModule } from '@angular/router'
 import { JwtModule } from '@auth0/angular-jwt'
 import { MarkdownModule, MarkedOptions } from 'ngx-markdown'
 
+import { environment } from '../environments/environment'
 import { ApiModule } from './api/api.module'
 import { getToken } from './api/user.service'
 import { AppRoutingModule } from './app-routing/app-routing.module'
-import { AppComponent } from './app.component'
+import { AppComponent, OfflineDialogComponent } from './app.component'
 import { AuthGuard } from './auth.guard'
 import { ConfigComponent } from './config/config.component'
 import { ContactComponent } from './contact/contact.component'
+import { LicensesComponent } from './licenses/licenses.component'
 import { LoginComponent } from './login/login.component'
 import { MaterialModule } from './material/material.module'
 import { SitesModule } from './sites/sites.module'
-import { environment } from '../environments/environment';
-import { LicensesComponent } from './licenses/licenses.component'
+import './utils/swap'
 
 @NgModule({
   declarations: [
@@ -27,6 +28,7 @@ import { LicensesComponent } from './licenses/licenses.component'
     LoginComponent,
     ConfigComponent,
     LicensesComponent,
+    OfflineDialogComponent,
   ],
   imports: [
     BrowserModule,
@@ -54,6 +56,9 @@ import { LicensesComponent } from './licenses/licenses.component'
   ],
   providers: [
     AuthGuard
+  ],
+  entryComponents: [
+    OfflineDialogComponent
   ],
   bootstrap: [AppComponent]
 })

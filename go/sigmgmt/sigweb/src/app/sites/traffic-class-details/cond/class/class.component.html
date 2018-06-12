@@ -1,0 +1,11 @@
+<div class="match-elem" anaMouseover>
+  <span>Traffic Class:&nbsp;</span>
+  <form #clsForm="ngForm" (ngSubmit)="onSubmit(cond.TrafficClass)">
+    <ng-select matInput placeholder="Traffic Class" name="trafficClass" [items]="trafficClasses$ | async" bindLabel="Name" bindValue="ID"
+      (add)="onSubmit($event)" [(ngModel)]="cond.TrafficClass" required>
+      <ng-template ng-option-tmp let-item="item">
+        {{item.Name}}: {{item.condString}}
+      </ng-template>
+    </ng-select>
+  </form>
+</div>

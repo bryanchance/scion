@@ -3,15 +3,10 @@
 // Package cfggen can be used to populate a SIG configuration with classes and
 // packet policies derived from text policy rules.
 //
-// One policy rule is supported:
-//   name=NAME [ src=NETWORK ]  [ dst=NETWORK ] [ dscp=DSCP ] selectors=SELECTORS
-//
 // See the static markdown documentation for more information about the fields.
 package cfggen
 
 import (
-	"fmt"
-	"net"
 	"strconv"
 	"strings"
 
@@ -20,23 +15,50 @@ import (
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sig/mgmt"
-	"github.com/scionproto/scion/go/sigmgmt/util"
+	"github.com/scionproto/scion/go/sigmgmt/db"
+	"github.com/scionproto/scion/go/sigmgmt/parser"
 )
 
+type Command struct {
+	Name      string
+	Condition pktcls.Cond
+	Selectors []string
+}
+
 // Compile inserts the rules specified by policies into cfg. Any overwrites happen silently.
-func Compile(cfg *config.Cfg, policies map[addr.IA]string) error {
+func Compile(cfg *config.Cfg, policies map[addr.IA][]db.Policy,
+	trafficClasses map[uint]db.TrafficClass, selectors []db.PathSelector) error {
 	if cfg.Classes == nil {
 		cfg.Classes = make(pktcls.ClassMap)
+	}
+	actions, err := db.ActionMapFromSelectors(selectors)
+	if err != nil {
+		return err
+	}
+	cfg.Actions = actions
+	// Create ID to name map
+	selectorIDMap := map[string]string{}
+	for _, selector := range selectors {
+		selectorIDMap[strconv.Itoa(int(selector.ID))] = selector.Name
 	}
 
 	for ia, asEntry := range cfg.ASes {
 		var commands []*Command
-		for _, commandStr := range strings.Split(policies[ia], "\n") {
-			command, err := NewCommand(commandStr)
+		for _, policy := range policies[ia] {
+			if _, ok := trafficClasses[policy.TrafficClass]; !ok {
+				return common.NewBasicError("Referenced TrafficClass cannot be found", nil,
+					"class", policy.TrafficClass)
+			}
+			cond, err := parser.BuildClassTree(trafficClasses[policy.TrafficClass].CondStr)
 			if err != nil {
 				return err
 			}
-			commands = append(commands, command)
+			selectorIDs := []string{}
+			for _, selectorID := range strings.Split(policy.Selectors, ",") {
+				selectorIDs = append(selectorIDs, selectorIDMap[selectorID])
+			}
+			commands = append(commands, &Command{Name: trafficClasses[policy.TrafficClass].Name,
+				Condition: cond, Selectors: selectorIDs})
 		}
 
 		// Determine which path selectors are used by the current remote AS
@@ -47,15 +69,9 @@ func Compile(cfg *config.Cfg, policies map[addr.IA]string) error {
 			}
 		}
 
-		for i, command := range commands {
-			var className = fmt.Sprintf("class-%v-%d", ia, i)
-			if command.Name != nil {
-				className = *command.Name
-			}
-
-			cfg.Classes[className] = pktcls.NewClass(
-				className,
-				pktcls.NewCondAllOf(command.Conditions...))
+		for _, command := range commands {
+			name := command.Name
+			cfg.Classes[name] = pktcls.NewClass(name, command.Condition)
 			// Add sessionIDs based on path selectors
 			var sessIds []mgmt.SessionType
 			for _, selector := range command.Selectors {
@@ -64,7 +80,7 @@ func Compile(cfg *config.Cfg, policies map[addr.IA]string) error {
 			asEntry.PktPolicies = append(
 				asEntry.PktPolicies,
 				&config.PktPolicy{
-					ClassName: className,
+					ClassName: name,
 					SessIds:   sessIds,
 				})
 			// Add the necessary sessions themselves
@@ -106,72 +122,4 @@ func (s *sessionMapper) Add(references []string) error {
 		}
 	}
 	return nil
-}
-
-type Command struct {
-	Name       *string
-	Conditions []pktcls.Cond
-	Selectors  []string
-}
-
-func NewCommand(command string) (*Command, error) {
-	cmd := &Command{}
-	for _, kvToken := range strings.Fields(command) {
-		key, value, err := kvSplit(kvToken)
-		if err != nil {
-			return nil, err
-		}
-		switch key {
-		case "name":
-			if err := util.ValidateIdentifier(value); err != nil {
-				return nil, err
-			}
-			otherValue := value
-			cmd.Name = &otherValue
-		case "src":
-			msrc := &pktcls.IPv4MatchSource{}
-			_, msrc.Net, err = net.ParseCIDR(value)
-			if err != nil {
-				return nil, err
-			}
-			cmd.Conditions = append(cmd.Conditions, pktcls.NewCondIPv4(msrc))
-		case "dst":
-			mdst := &pktcls.IPv4MatchDestination{}
-			_, mdst.Net, err = net.ParseCIDR(value)
-			if err != nil {
-				return nil, err
-			}
-			cmd.Conditions = append(cmd.Conditions, pktcls.NewCondIPv4(mdst))
-		case "tos":
-			mtos := &pktcls.IPv4MatchToS{}
-			tos, err := strconv.ParseUint(value, 0, 8)
-			if err != nil {
-				return nil, err
-			}
-			mtos.TOS = uint8(tos)
-			cmd.Conditions = append(cmd.Conditions, pktcls.NewCondIPv4(mtos))
-		case "dscp":
-			mdscp := &pktcls.IPv4MatchDSCP{}
-			dscp, err := strconv.ParseUint(value, 0, 8)
-			if err != nil {
-				return nil, err
-			}
-			mdscp.DSCP = uint8(dscp)
-			cmd.Conditions = append(cmd.Conditions, pktcls.NewCondIPv4(mdscp))
-		case "selectors":
-			cmd.Selectors = strings.Split(value, ",")
-		default:
-			return nil, common.NewBasicError("unknown key", nil, "key", key)
-		}
-	}
-	return cmd, nil
-}
-
-// kvSplit splits a "key=value" formatted token into its components.
-func kvSplit(token string) (key, value string, err error) {
-	items := strings.Split(token, "=")
-	if len(items) != 2 {
-		return "", "", common.NewBasicError("Bad token: ", nil, "token", token)
-	}
-	return items[0], items[1], nil
 }

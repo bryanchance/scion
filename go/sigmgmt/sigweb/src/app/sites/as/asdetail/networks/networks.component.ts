@@ -2,7 +2,7 @@ import { Component, Input, OnChanges, ViewChild } from '@angular/core'
 import { NgForm } from '@angular/forms'
 
 import { ApiService } from '../../../../api/api.service'
-import { CIDR, ASEntry, Site } from '../../../models'
+import { CIDR, ASEntry, Site } from '../../../models/models'
 
 @Component({
   selector: 'ana-networks',

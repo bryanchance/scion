@@ -1,19 +1,43 @@
 <div class="flex-container">
-  <h2 class="mat-h2">Site Details</h2>
+  <h2 class="mat-h2">Site Details: {{ site?.Name }}</h2>
   <button color="primary" routerLink="/sites" mat-button>
     <mat-icon>arrow_back</mat-icon>
   </button>
 </div>
 
+<div class="flex-container cards" *ngIf="!newSite">
+  <a routerLink="/sites/{{site?.ID}}/selectors">
+    <mat-card>
+      <mat-card-title>
+        <p>Path Selectors</p>
+        <button mat-icon-button>
+          <mat-icon>settings</mat-icon>
+        </button>
+      </mat-card-title>
+    </mat-card>
+  </a>
+  <a routerLink="/sites/{{site?.ID}}/classes">
+    <mat-card>
+      <mat-card-title>
+        <p>Traffic Classes</p>
+        <button mat-icon-button>
+          <mat-icon>settings</mat-icon>
+        </button>
+      </mat-card-title>
+    </mat-card>
+  </a>
+  <a routerLink="/sites/{{site?.ID}}/ases">
+    <mat-card>
+      <mat-card-title>
+        <p>Remote ASes</p>
+        <button mat-icon-button>
+          <mat-icon>settings</mat-icon>
+        </button>
+      </mat-card-title>
+    </mat-card>
+  </a>
+</div>
 <mat-accordion>
-  <mat-expansion-panel [expanded]="true">
-    <mat-expansion-panel-header>
-      <mat-panel-title>
-        Site Configuration
-      </mat-panel-title>
-    </mat-expansion-panel-header>
-    <ana-site-configuration [newSite]="newSite" [site]="site"></ana-site-configuration>
-  </mat-expansion-panel>
   <mat-expansion-panel *ngIf="!newSite">
     <mat-expansion-panel-header>
       <mat-panel-title>
@@ -40,21 +64,12 @@
       <button (click)="reloadConfig()" mat-button>Push and Reload Config</button>
     </mat-action-row>
   </mat-expansion-panel>
-  <mat-expansion-panel *ngIf="!newSite">
+  <mat-expansion-panel [expanded]="true">
     <mat-expansion-panel-header>
       <mat-panel-title>
-        Remote ASes
+        Site Configuration
       </mat-panel-title>
     </mat-expansion-panel-header>
-    <ana-aslist [site]="site"></ana-aslist>
-  </mat-expansion-panel>
-  <mat-expansion-panel *ngIf="!newSite">
-    <mat-expansion-panel-header>
-      <mat-panel-title>
-        Path Selectors
-      </mat-panel-title>
-    </mat-expansion-panel-header>
-    <ana-path-selector [site]="site"></ana-path-selector>
-
+    <ana-site-configuration [newSite]="newSite" [site]="site"></ana-site-configuration>
   </mat-expansion-panel>
 </mat-accordion>

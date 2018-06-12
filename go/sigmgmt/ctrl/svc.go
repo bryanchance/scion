@@ -8,7 +8,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
+
+	"github.com/jinzhu/gorm"
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
@@ -17,7 +22,7 @@ import (
 	"github.com/scionproto/scion/go/sigmgmt/cfggen"
 	"github.com/scionproto/scion/go/sigmgmt/db"
 	"github.com/scionproto/scion/go/sigmgmt/netcopy"
-	"github.com/scionproto/scion/go/sigmgmt/util"
+	"github.com/scionproto/scion/go/sigmgmt/parser"
 )
 
 const (
@@ -36,17 +41,22 @@ func (c *Controller) getAndValidateSiteCfg(siteID uint) (*config.Cfg, string, er
 	if len(site.ASEntries) == 0 {
 		return nil, "No remote AS configured", common.NewBasicError("Empty ASEntries", nil)
 	}
-	policies := make(map[addr.IA]string)
+	policies := make(map[addr.IA][]db.Policy)
 	for _, as := range site.ASEntries {
 		ia, err := as.ToAddrIA()
 		if err != nil {
 			return nil, "Could not convert AS to addr.IA", err
 		}
-		if as.Policies != "" {
-			policies[ia] = as.Policies
-		}
+		policies[ia] = as.Policy
 	}
-	if err = cfggen.Compile(siteCfg, policies); err != nil {
+	trafficClasses := make(map[uint]db.TrafficClass)
+	for _, tc := range site.TrafficClasses {
+		if substituteTrafficClasses(&tc, c.db); err != nil {
+			return nil, "Could not substitute traffic classes", err
+		}
+		trafficClasses[tc.ID] = tc
+	}
+	if err = cfggen.Compile(siteCfg, policies, trafficClasses, site.PathSelectors); err != nil {
 		return nil, "Config compiler error", err
 	}
 	siteCfg.ConfigVersion = uint64(time.Now().Unix())
@@ -99,8 +109,9 @@ func (c *Controller) writeConfig(siteID uint, siteCfg *config.Cfg) (string, erro
 func (c *Controller) getSiteConfig(siteID uint) (*config.Cfg, *db.Site, string, error) {
 	cfg := &config.Cfg{}
 	var site db.Site
-	err := c.db.Preload("ASEntries").Preload("PathSelectors").Preload("ASEntries.Networks").
-		Preload("ASEntries.SIGs").Where("id = ?", siteID).Find(&site).Error
+	err := c.db.Preload("ASEntries").Preload("PathSelectors").Preload("TrafficClasses").
+		Preload("ASEntries.Networks").Preload("ASEntries.Policy").Preload("ASEntries.SIGs").
+		Where("id = ?", siteID).Find(&site).Error
 	if err != nil {
 		return nil, nil, "Could not get site", err
 	}
@@ -120,22 +131,32 @@ func (c *Controller) getSiteConfig(siteID uint) (*config.Cfg, *db.Site, string, 
 		}
 		cfg.ASes[ia] = &config.ASEntry{Nets: networks, Sigs: sigs}
 	}
-	actions, err := db.ActionMapFromSelectors(site.PathSelectors)
-	if err != nil {
-		return nil, nil, "Could not parse Path Predicates", err
-	}
-	cfg.Actions = actions
 	return cfg, &site, "", nil
 }
 
-func (c *Controller) validatePolicies(as *db.ASEntry) (string, error) {
-	cfg, _, msg, err := c.getSiteConfig(as.SiteID)
-	if err != nil {
-		return "Unable to read site config from database: " + msg, err
+// validateSubTrafficClasses checks if the traffic classes referenced
+// in `cond` do exist in the database
+func (c *Controller) validateSubTrafficClasses(cls *db.TrafficClass) error {
+	re, _ := regexp.Compile("cls=([0-9]+)")
+	for _, match := range re.FindAllString(cls.CondStr, -1) {
+		id := match[4:]
+		if id == strconv.Itoa(int(cls.ID)) {
+			return common.NewBasicError("Cannot self-reference!", nil)
+		}
+		err := c.db.First(&db.TrafficClass{}, id).Error
+		if err != nil {
+			return err
+		}
 	}
-	currIA, _ := as.ToAddrIA()
-	if err = cfggen.Compile(cfg, map[addr.IA]string{currIA: as.Policies}); err != nil {
+	return nil
+}
+
+func (c *Controller) validateTrafficClass(class *db.TrafficClass) (string, error) {
+	if err := parser.ValidateTrafficClass(class.CondStr); err != nil {
 		return err.Error(), err
+	}
+	if err := c.validateSubTrafficClasses(class); err != nil {
+		return TrafficClassError, err
 	}
 	return "", nil
 }
@@ -176,29 +197,27 @@ func (c *Controller) updateHosts(newHosts []db.Host, siteID uint) error {
 	return nil
 }
 
-func parseHosts(hosts []db.Host) error {
-	for _, host := range hosts {
-		if err := util.ValidateIdentifier(host.Name); err != nil {
+// substituteTrafficClasses replaces `cls=xx` by the corresponding class
+func substituteTrafficClasses(tc *db.TrafficClass, dbase *gorm.DB) error {
+	IDs := map[uint]struct{}{tc.ID: {}}
+	re, _ := regexp.Compile("cls=([0-9]+)")
+	match := re.FindString(tc.CondStr)
+	for match != "" {
+		id := match[4:]
+		uID, _ := strconv.Atoi(id)
+		// make sure there is no cicular dependency
+		if _, ok := IDs[uint(uID)]; !ok {
+			IDs[uint(uID)] = struct{}{}
+		} else {
+			return common.NewBasicError("Circle reference detected", nil, "ID", id, "IDs", IDs)
+		}
+		cls := db.TrafficClass{}
+		if err := dbase.First(&cls, id).Error; err != nil {
 			return err
 		}
-		if err := util.ValidateUser(host.User); host.User != "" && err != nil {
-			return err
-		}
-		if err := util.ValidateKey(host.Key); host.Key != "" && err != nil {
-			return err
-		}
+		// replace `cls=xx` by corresponding condStr
+		tc.CondStr = strings.Replace(tc.CondStr, match, cls.CondStr, 1)
+		match = re.FindString(tc.CondStr)
 	}
 	return nil
-}
-
-func validateSite(site *db.Site) (string, error) {
-	if site.VHost != "" {
-		if err := util.ValidateIdentifier(site.VHost); err != nil {
-			return "Bad VHost", err
-		}
-	}
-	if err := parseHosts(site.Hosts); err != nil {
-		return "Bad hosts", err
-	}
-	return "", nil
 }

@@ -7,6 +7,10 @@ img {
     max-width: 60%;
 }
 
+.mat-button {
+    height: 36px;
+}
+
 .flex-container {
     display: flex;
     width: 100%;
@@ -51,8 +55,86 @@ mat-card {
         width: 300px;
         height: fit-content;
     }
+    .mat-card-header-text {
+        margin: 0;
+    }
 }
 
 mat-card-title {
     font-weight: 500 !important;
+}
+
+.mat-list-item.add {
+    border: 0.5px solid rgba(0, 0, 0, 0.1);
+}
+
+.indented {
+    padding: 2px 5px;
+}
+
+.popover-wrapper {
+    position: relative;
+    .mat-icon-button {
+        margin-left: -10px;
+    }
+}
+
+.add-menu {
+    width: 88px;
+    background-color: white;
+    border: 0.5px solid #dbdbdb;
+    border-radius: 5px;
+    position: absolute;
+    z-index: 1;
+    top: 5px;
+    left: 45px;
+    button:hover {
+        background-color: rgba(241, 241, 241, 1);
+    }
+}
+
+.match-elem {
+    height: 35px;
+    display: flex;
+    justify-content: left;
+    form {
+        margin-left: 10px;
+        margin-top: -5px;
+    }
+    &>span {
+        margin-top: 10px;
+        width: 85px;
+    }
+    .text {
+        margin-left: 10px;
+        margin-top: 10px;
+    }
+}
+
+div[anaMouseover] {
+    border: 0.5px solid #f2f2f2;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+div[anaMouseover]:hover {
+    background-color: rgba(241, 241, 241, 0.2);
+    border: 0.5px solid #dbdbdb !important;
+}
+
+.mat-snack-bar-container {
+    color: #101824 !important;
+    border: 0.5px solid #101824 !important;
+    background-color: white !important;
+}
+
+.ng-select .ng-select-container {
+    height: 39px;
+    min-height: 39px !important;
+}
+
+.subtitle {
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.54);
+    margin-bottom: 8px !important;
 }

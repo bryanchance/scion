@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/scionproto/scion/go/lib/pktcls"
+
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 
@@ -145,7 +147,8 @@ func (c *Controller) ReloadConfig(w http.ResponseWriter, r *http.Request,
 func (c *Controller) GetPathSelectors(w http.ResponseWriter, r *http.Request,
 	_ http.HandlerFunc) {
 	var selectors []db.PathSelector
-	if err := c.db.Where("site_id = ?", mux.Vars(r)["site"]).Find(&selectors).Error; err != nil {
+	if err := c.db.Order("id asc").Where("site_id = ?", mux.Vars(r)["site"]).
+		Find(&selectors).Error; err != nil {
 		respondError(w, err, DBFindError, http.StatusBadRequest)
 		return
 	}
@@ -161,7 +164,7 @@ func (c *Controller) PostPathSelector(w http.ResponseWriter, r *http.Request,
 	}
 	selector.Filter = strings.TrimSpace(selector.Filter)
 	if err := parser.ValidatePredicate(selector.Filter); err != nil {
-		respondError(w, err, PathPredicateError, 400)
+		respondError(w, err, PathPredicateError, http.StatusBadRequest)
 		return
 	}
 	var site db.Site
@@ -184,7 +187,7 @@ func (c *Controller) PutPathSelector(w http.ResponseWriter, r *http.Request,
 	}
 	selector.Filter = strings.TrimSpace(selector.Filter)
 	if err := parser.ValidatePredicate(selector.Filter); err != nil {
-		respondError(w, err, PathPredicateError, 400)
+		respondError(w, err, PathPredicateError, http.StatusBadRequest)
 		return
 	}
 	id, err := strconv.Atoi(mux.Vars(r)["selector"])
@@ -207,6 +210,123 @@ func (c *Controller) PutPathSelector(w http.ResponseWriter, r *http.Request,
 func (c *Controller) DeletePathSelector(w http.ResponseWriter, r *http.Request,
 	_ http.HandlerFunc) {
 	if err := c.db.Delete(&db.PathSelector{}, mux.Vars(r)["selector"]).Error; err != nil {
+		respondError(w, err, DBDeleteError, http.StatusBadRequest)
+		return
+	}
+	respondEmpty(w)
+}
+
+func (c *Controller) GetTrafficClasses(w http.ResponseWriter, r *http.Request,
+	_ http.HandlerFunc) {
+	var classes []*db.TrafficClass
+	if err := c.db.Order("id asc").Where("site_id = ?", mux.Vars(r)["site"]).
+		Find(&classes).Error; err != nil {
+		respondError(w, err, DBFindError, http.StatusBadRequest)
+		return
+	}
+	for _, class := range classes {
+		cond, err := parser.BuildClassTree(class.CondStr)
+		if err != nil {
+			respondError(w, err, TrafficClassError, http.StatusBadRequest)
+		}
+		class.Cond = map[string]pktcls.Cond{
+			cond.Type(): cond,
+		}
+		class.CondStr = ""
+	}
+	respondJSON(w, classes)
+}
+
+func (c *Controller) GetTrafficClass(w http.ResponseWriter, r *http.Request,
+	_ http.HandlerFunc) {
+	var class db.TrafficClass
+	err := c.db.First(&class, mux.Vars(r)["class"]).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			respondNotFound(w)
+			return
+		}
+		respondError(w, err, DBFindError, http.StatusBadRequest)
+		return
+	}
+	cond, err := parser.BuildClassTree(class.CondStr)
+	if err != nil {
+		respondError(w, err, TrafficClassError, http.StatusBadRequest)
+	}
+	class.Cond = map[string]pktcls.Cond{
+		cond.Type(): cond,
+	}
+	class.CondStr = ""
+	respondJSON(w, class)
+}
+
+func (c *Controller) PostTrafficClass(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	class := db.TrafficClass{}
+	if err := json.NewDecoder(r.Body).Decode(&class); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
+	if msg, err := c.validateTrafficClass(&class); err != nil {
+		respondError(w, err, msg, http.StatusBadRequest)
+		return
+	}
+	var site db.Site
+	if !c.findOne(w, mux.Vars(r)["site"], &site) {
+		return
+	}
+	class.SiteID = site.ID
+	if !c.createOne(w, &class) {
+		return
+	}
+	cond, err := parser.BuildClassTree(class.CondStr)
+	if err != nil {
+		respondError(w, err, TrafficClassError, http.StatusBadRequest)
+	}
+	class.CondStr = ""
+	class.Cond = map[string]pktcls.Cond{
+		cond.Type(): cond,
+	}
+	respondJSON(w, &class)
+}
+
+func (c *Controller) PutTrafficClass(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	class := db.TrafficClass{}
+	if err := json.NewDecoder(r.Body).Decode(&class); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
+	if msg, err := c.validateTrafficClass(&class); err != nil {
+		respondError(w, err, msg, http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(mux.Vars(r)["class"])
+	if err != nil || int(class.ID) != id {
+		respondError(w, nil, IDChangeError, http.StatusBadRequest)
+		return
+	}
+	err = c.db.Model(&class).Updates(
+		map[string]interface{}{
+			"Name":    class.Name,
+			"CondStr": class.CondStr,
+		}).Error
+	if err != nil {
+		respondError(w, err, DBUpdateError, http.StatusBadRequest)
+		return
+	}
+	cond, err := parser.BuildClassTree(class.CondStr)
+	if err != nil {
+		respondError(w, err, TrafficClassError, http.StatusBadRequest)
+	}
+	class.CondStr = ""
+	class.Cond = map[string]pktcls.Cond{
+		cond.Type(): cond,
+	}
+	respondJSON(w, &class)
+}
+
+func (c *Controller) DeleteTrafficClass(w http.ResponseWriter, r *http.Request,
+	_ http.HandlerFunc) {
+	if err := c.db.Delete(&db.TrafficClass{}, mux.Vars(r)["class"]).Error; err != nil {
 		respondError(w, err, DBDeleteError, http.StatusBadRequest)
 		return
 	}

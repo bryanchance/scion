@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/scionproto/scion/go/sigmgmt/util"
+
 	"github.com/gorilla/mux"
 
 	"github.com/scionproto/scion/go/lib/common"
@@ -22,7 +24,7 @@ const (
 
 func (c *Controller) GetASes(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
 	var ases []db.ASEntry
-	if err := c.db.Where("site_id = ?", mux.Vars(r)["site"]).Find(&ases).Error; err != nil {
+	if err := c.db.Order("id asc").Where("site_id = ?", mux.Vars(r)["site"]).Find(&ases).Error; err != nil {
 		respondError(w, err, DBFindError, http.StatusBadRequest)
 		return
 	}
@@ -85,22 +87,101 @@ func (c *Controller) UpdateAS(w http.ResponseWriter, r *http.Request, _ http.Han
 	respondEmpty(w)
 }
 
-func (c *Controller) UpdatePolicy(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var as, dbAS db.ASEntry
-	if err := json.NewDecoder(r.Body).Decode(&as); err != nil {
+func (c *Controller) GetPolicies(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var policies []*db.Policy
+	if err := c.db.Where("as_entry_id = ?", mux.Vars(r)["as"]).Find(&policies).Error; err != nil {
+		respondError(w, err, DBFindError, http.StatusBadRequest)
+		return
+	}
+	for _, policy := range policies {
+		selIDs, err := stringToIntSlice(policy.Selectors)
+		if err != nil {
+			respondError(w, err,
+				"Could not convert string to array", http.StatusInternalServerError)
+		}
+		policy.SelectorIDs = selIDs
+	}
+	respondJSON(w, policies)
+}
+
+func (c *Controller) PostPolicy(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var policy db.Policy
+	if err := json.NewDecoder(r.Body).Decode(&policy); err != nil {
 		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
 		return
 	}
-	if !c.findOne(w, mux.Vars(r)["as"], &dbAS) {
+	if err := util.ValidateIdentifier(policy.Name); err != nil {
+		respondError(w, err, err.Error(), http.StatusBadRequest)
 		return
 	}
-	dbAS.Policies = as.Policies
-	if str, err := c.validatePolicies(&dbAS); err != nil {
-		respondError(w, err, str, http.StatusBadRequest)
+	// Check if traffic class exists
+	var trafficClass db.TrafficClass
+	if !c.findOne(w, strconv.Itoa(int(policy.TrafficClass)), &trafficClass) {
+		respondNotFound(w)
 		return
 	}
-	if err := c.db.Model(&as).Update("Policies", as.Policies).Error; err != nil {
+	// Make sure selectors exist
+	var selectors []db.PathSelector
+	if err := c.db.Where("id in (?)", policy.SelectorIDs).Find(&selectors).Error; err != nil {
+		respondError(w, err, DBFindError, http.StatusBadRequest)
+		return
+	}
+	policy.Selectors = intSliceToString(policy.SelectorIDs)
+	var as db.ASEntry
+	if !c.findOne(w, mux.Vars(r)["as"], &as) {
+		return
+	}
+	policy.ASEntryID = as.ID
+	if !c.createOne(w, &policy) {
+		return
+	}
+	respondJSON(w, policy)
+}
+
+func (c *Controller) UpdatePolicy(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	var policy db.Policy
+	if err := json.NewDecoder(r.Body).Decode(&policy); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
+	if err := util.ValidateIdentifier(policy.Name); err != nil {
+		respondError(w, err, err.Error(), http.StatusBadRequest)
+		return
+	}
+	// Check if traffic class exists
+	var trafficClass db.TrafficClass
+	if !c.findOne(w, strconv.Itoa(int(policy.TrafficClass)), &trafficClass) {
+		respondNotFound(w)
+		return
+	}
+	// Make sure selectors exist
+	var selectors []db.PathSelector
+	if err := c.db.Where("id in (?)", policy.SelectorIDs).Find(&selectors).Error; err != nil {
+		respondError(w, err, DBFindError, http.StatusBadRequest)
+		return
+	}
+	// Update the rest
+	id, err := strconv.Atoi(mux.Vars(r)["policy"])
+	if err != nil || int(policy.ID) != id {
+		respondError(w, nil, IDChangeError, http.StatusBadRequest)
+		return
+	}
+	err = c.db.Model(&policy).Updates(
+		map[string]interface{}{
+			"Name":         policy.Name,
+			"TrafficClass": policy.TrafficClass,
+			"Selectors":    intSliceToString(policy.SelectorIDs),
+		}).Error
+	if err != nil {
 		respondError(w, err, DBUpdateError, http.StatusBadRequest)
+		return
+	}
+	respondEmpty(w)
+}
+
+func (c *Controller) DeletePolicy(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	if err := c.db.Delete(&db.Policy{}, mux.Vars(r)["policy"]).Error; err != nil {
+		respondError(w, err, DBDeleteError, http.StatusBadRequest)
 		return
 	}
 	respondEmpty(w)

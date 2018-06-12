@@ -2,7 +2,7 @@
 <mat-card *ngIf="error" class="error">{{error}}</mat-card>
 <div class="flex-container">
   <div>
-    <form #sigForm="ngForm" (submit)="onSubmit()" *ngIf="!formDisabled">
+    <form #sigForm="ngForm" (ngSubmit)="onSubmit()" *ngIf="!formDisabled">
       <mat-form-field>
         <input matInput name="name" [(ngModel)]="sig.Name" placeholder="Name" type="text" required>
       </mat-form-field>

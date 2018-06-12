@@ -1,7 +1,9 @@
 import { HttpClient } from '@angular/common/http'
 import { Injectable } from '@angular/core'
+import { map } from 'rxjs/operators'
 
-import { CIDR, ASEntry, PathSelector, Policy, SIG, Site } from '../sites/models'
+import { ASEntry, CIDR, PathSelector, SIG, Site, Policy } from '../sites/models/models'
+import { TrafficClass, TrafficClassFromJSON } from '../sites/models/models'
 import { User } from './user.service'
 
 @Injectable()
@@ -45,7 +47,6 @@ export class ApiService {
     return this.http.get<PathSelector[]>('sites/' + site.ID + '/paths')
   }
 
-
   createPathSelector(site: Site, ps: PathSelector) {
     return this.http.post<PathSelector>('sites/' + site.ID + '/paths', ps)
   }
@@ -56,6 +57,48 @@ export class ApiService {
 
   deletePathSelector(site: Site, ps: PathSelector) {
     return this.http.delete('paths/' + ps.ID)
+  }
+
+  /**
+   * Traffic Classes
+   */
+  getTrafficClasses(site: Site) {
+    return this.http.get<TrafficClass[]>('sites/' + site.ID + '/classes').pipe(
+      map(classes => classes.map(tc => TrafficClassFromJSON(tc)))
+    )
+  }
+
+  getTrafficClass(cls: string) {
+    return this.http.get<TrafficClass>('classes/' + cls).pipe(
+      map(tc => TrafficClassFromJSON(tc))
+    )
+  }
+
+  createTrafficClass(site: Site, tc: TrafficClass) {
+    const rawTc = Object.assign(new TrafficClass, tc)
+    if (!tc.CondStr || tc.CondStr === '') {
+      rawTc.CondStr = tc.condString
+    } else {
+      rawTc.CondStr = tc.CondStr
+    }
+    delete rawTc.Cond
+    return this.http.post<TrafficClass>('sites/' + site.ID + '/classes', rawTc)
+  }
+
+  updateTrafficClass(tc: TrafficClass) {
+    const rawTc = Object.assign(new TrafficClass, tc)
+    if (!tc.CondStr || tc.CondStr === '') {
+      rawTc.CondStr = tc.condString
+    } else {
+      rawTc.CondStr = tc.CondStr
+    }
+    delete rawTc.Cond
+    return this.http.put<TrafficClass>('classes/' + tc.ID, rawTc).pipe(
+      map(ntc => TrafficClassFromJSON(ntc)))
+  }
+
+  deleteTrafficClass(site: Site, tc: TrafficClass) {
+    return this.http.delete('classes/' + tc.ID)
   }
 
   /**
@@ -83,6 +126,23 @@ export class ApiService {
 
   deleteAS(site: Site, as: ASEntry) {
     return this.http.delete('ases/' + as.ID)
+  }
+
+  /** Policies */
+  getPolicies(as: ASEntry) {
+    return this.http.get<Policy[]>('ases/' + as.ID + '/policies')
+  }
+
+  createPolicy(as: ASEntry, policy: Policy) {
+    return this.http.post<Policy>('ases/' + as.ID + '/policies', policy)
+  }
+
+  updatePolicy(policy: Policy) {
+    return this.http.put<Policy>('policies/' + policy.ID, policy)
+  }
+
+  deletePolicy(policy: Policy) {
+    return this.http.delete('policies/' + policy.ID)
   }
 
   /**

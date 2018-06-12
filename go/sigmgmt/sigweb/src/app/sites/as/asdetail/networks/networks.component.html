@@ -2,7 +2,7 @@
 <mat-card *ngIf="error" class="error">{{error}}</mat-card>
 <div class="flex-container">
   <div class="flex-container-vertical">
-    <form #networkForm="ngForm" (submit)="onSubmit()">
+    <form #networkForm="ngForm" (ngSubmit)="onSubmit()">
       <mat-form-field>
         <input matInput name="cidr" [(ngModel)]="network.CIDR" placeholder="CIDR" type="text" required>
         <mat-hint>

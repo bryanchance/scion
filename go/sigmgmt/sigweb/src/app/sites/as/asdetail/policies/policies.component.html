@@ -1,0 +1,91 @@
+<mat-card *ngIf="success" class="success">{{success}}</mat-card>
+<mat-card *ngIf="error" class="error">{{error}}</mat-card>
+<div class="flex-container">
+  <div class="flex-container-vertical">
+    <div class="flex-container">
+      <div>
+        <form class="policy-form" #policyForm="ngForm" (ngSubmit)="onSubmit()" *ngIf="!formDisabled">
+          <mat-form-field>
+            <input matInput name="name" [(ngModel)]="policy.Name" placeholder="Name" type="text" required>
+          </mat-form-field>
+          <ng-select matInput placeholder="Traffic Class" name="trafficClass" [items]="trafficClasses" bindLabel="Name" bindValue="ID"
+            [(ngModel)]="policy.TrafficClass" required>
+            <ng-template ng-option-tmp let-item="item">
+              {{item.Name}}: {{item.condString}}
+            </ng-template>
+          </ng-select>
+          <button mat-icon-button type="submit" *ngIf="!editing" [disabled]="policyForm.invalid || !policy.Selectors.length">
+            <mat-icon>add_box</mat-icon>
+          </button>
+          <button mat-icon-button type="submit" *ngIf="editing" [disabled]="policyForm.invalid || !policy.Selectors.length">
+            <mat-icon>save</mat-icon>
+          </button>
+        </form>
+        <p class="subtitle">Path Selectors</p>
+        <mat-list dense>
+          <mat-list-item *ngFor="let selID of policy.Selectors; let idx = index">
+            <span class="name">{{idx+1}}: {{ getSelector(selID).Name }} - {{ getSelector(selID).Filter }}</span>
+            <button mat-icon-button (click)="removeSelector(idx)">
+              <mat-icon>delete</mat-icon>
+            </button>
+            <button mat-icon-button (click)="policy.Selectors.swap(idx, idx-1)" *ngIf="idx != 0">
+              <mat-icon>keyboard_arrow_up</mat-icon>
+            </button>
+            <button mat-icon-button (click)="policy.Selectors.swap(idx, idx+1)" *ngIf="idx != policy.Selectors.length-1 && policy.Selectors.length>1">
+              <mat-icon>keyboard_arrow_down</mat-icon>
+            </button>
+          </mat-list-item>
+        </mat-list>
+      </div>
+      <div class="selectors">
+        <div class="flex-container-left">
+          <p [ngClass]="{'inline': selectors?.length<=5}">Add Path Selectors</p>
+          <mat-form-field *ngIf="selectors?.length>5">
+            <input matInput name="selectors" (ngModelChange)="searchSel = $event; searchSelector()" [(ngModel)]="searchSel" placeholder="Search"
+              type="text">
+          </mat-form-field>
+        </div>
+        <mat-list dense>
+          <mat-list-item *ngFor="let selector of filteredSelectors | slice:0:5">
+            <button mat-icon-button (click)="addSelector(selector.ID)">
+              <mat-icon>add_box</mat-icon>
+            </button>
+            <span>{{ selector.Name }} - {{ selector.Filter }}</span>
+          </mat-list-item>
+        </mat-list>
+      </div>
+    </div>
+
+    <mat-list class="policies">
+      <mat-list-item *ngFor="let policy of policies; let idx = index">
+        <div class="name">
+          <span>{{policy.Name}}</span>
+          <br>
+          <span class="small">Selectors: &nbsp;</span>
+          <span class="small" *ngFor="let selector of policy.Selectors; last as isLast">
+            <span>{{getSelector(selector).Name}}</span>
+            <span *ngIf="!isLast">,&nbsp;</span>
+          </span>
+        </div>
+        <span class="traffic-class">{{getTrafficClass(policy.TrafficClass)?.Name}}</span>
+        <button *ngIf="!formDisabled" mat-icon-button (click)="edit(idx)">
+          <mat-icon>edit</mat-icon>
+        </button>
+        <button *ngIf="!formDisabled" mat-icon-button (click)="delete(idx)">
+          <mat-icon>delete</mat-icon>
+        </button>
+      </mat-list-item>
+    </mat-list>
+
+  </div>
+  <mat-card class="help">
+    <mat-card-header>
+      <mat-card-title>Traffic Policies</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+
+      <p>A traffic policy references a traffic class and specifies a list of SCION path selectors in descending priority. If
+        a path selector is not available (i.e., due to no paths matching the path selector), the next selector is used.</p>
+    </mat-card-content>
+  </mat-card>
+</div>

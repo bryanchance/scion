@@ -1,9 +1,10 @@
-import { Component, Input, OnInit, ViewChild } from '@angular/core'
+import { Component, OnInit, ViewChild } from '@angular/core'
 import { NgForm } from '@angular/forms'
 
 import { ApiService } from '../../api/api.service'
 import { UserService } from '../../api/user.service'
-import { PathSelector, Site } from '../models'
+import { PathSelector, Site } from '../models/models'
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'ana-path-selector',
@@ -11,7 +12,7 @@ import { PathSelector, Site } from '../models'
   styleUrls: ['./path-selector.component.scss']
 })
 export class PathSelectorComponent implements OnInit {
-  @Input() site: Site
+  site: Site
   pathSelector = new PathSelector
   pathSelectors: PathSelector[]
   success = ''
@@ -19,13 +20,25 @@ export class PathSelectorComponent implements OnInit {
   editing = false
   @ViewChild('pathForm') form: NgForm
 
-  constructor(private api: ApiService, private userService: UserService) { }
+  constructor(
+    private api: ApiService,
+    private route: ActivatedRoute,
+    private userService: UserService) { }
 
   ngOnInit() {
-    this.api.getPathSelectors(this.site).subscribe(
-      ps => this.pathSelectors = ps,
-      () => { }
-    )
+    const siteID = this.route.snapshot.params.site
+
+    if (siteID ) {
+      this.api.getSite(siteID).subscribe(
+        site => {
+          this.site = site
+          this.api.getPathSelectors(this.site).subscribe(
+            ps => this.pathSelectors = ps,
+            () => { }
+          )
+        }
+      )
+    }
   }
 
   onSubmit() {

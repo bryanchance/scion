@@ -90,6 +90,15 @@ func configureRouter(cfg *config.Global, dbase *gorm.DB) http.Handler {
 			"PUT":    c.PutPathSelector,
 			"DELETE": c.DeletePathSelector,
 		},
+		"/api/sites/{site}/classes": {
+			"GET":  c.GetTrafficClasses,
+			"POST": c.PostTrafficClass,
+		},
+		"/api/classes/{class}": {
+			"GET":    c.GetTrafficClass,
+			"PUT":    c.PutTrafficClass,
+			"DELETE": c.DeleteTrafficClass,
+		},
 		"/api/sites/{site}/ases": {
 			"GET":  c.GetASes,
 			"POST": c.PostAS,
@@ -100,7 +109,12 @@ func configureRouter(cfg *config.Global, dbase *gorm.DB) http.Handler {
 			"DELETE": c.DeleteAS,
 		},
 		"/api/ases/{as}/policies": {
-			"PUT": c.UpdatePolicy,
+			"GET":  c.GetPolicies,
+			"POST": c.PostPolicy,
+		},
+		"/api/policies/{policy}": {
+			"PUT":    c.UpdatePolicy,
+			"DELETE": c.DeletePolicy,
 		},
 		"/api/ases/{as}/networks": {
 			"GET":  c.GetNetworks,

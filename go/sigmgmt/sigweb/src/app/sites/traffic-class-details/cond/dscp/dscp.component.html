@@ -1,0 +1,9 @@
+<div class="match-elem" anaMouseover>
+    <span>MatchDSCP:&nbsp;</span>
+    <form #dscpForm="ngForm" (ngSubmit)="save()">
+        <mat-form-field>
+            <input autofocus matInput name="name" [(ngModel)]="predicate.DSCP" placeholder="DSCP (0x12)" type="text" required>
+        </mat-form-field>
+    </form>
+    <p class="error" *ngIf="error">Invalid DSCP</p>
+</div>

@@ -9,7 +9,7 @@
             "PktPolicies": [
                 {
                     "Name": "",
-                    "ClassName": "audio",
+                    "ClassName": "class-1",
                     "SessIds": [
                         0,
                         1
@@ -17,7 +17,7 @@
                 },
                 {
                     "Name": "",
-                    "ClassName": "video",
+                    "ClassName": "class-2",
                     "SessIds": [
                         1,
                         2
@@ -25,41 +25,22 @@
                 }
             ]
         },
-        "2-2": {
-            "PktPolicies": [
-                {
-                    "Name": "",
-                    "ClassName": "class-2-2-0",
-                    "SessIds": null
-                }
-            ]
-        }
+        "2-2": {}
     },
     "Classes": {
-        "audio": {
-            "CondAllOf": [
-                {
-                    "CondIPv4": {
-                        "MatchDSCP": {
-                            "DSCP": "0x12"
-                        }
-                    }
+        "class-1": {
+            "CondIPv4": {
+                "MatchDSCP": {
+                    "DSCP": "0x12"
                 }
-            ]
+            }
         },
-        "class-2-2-0": {
-            "CondAllOf": null
-        },
-        "video": {
-            "CondAllOf": [
-                {
-                    "CondIPv4": {
-                        "MatchToS": {
-                            "TOS": "0x34"
-                        }
-                    }
+        "class-2": {
+            "CondIPv4": {
+                "MatchToS": {
+                    "TOS": "0x34"
                 }
-            ]
+            }
         }
     },
     "Actions": {

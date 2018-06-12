@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	hostValErrorMsg = "bad host, must only contain alphanumeric characters, '.', '_', and '-'"
+	nameErrorMsg    = "bad string, must only contain alphanumeric characters, '.', '_', and '-'"
 	userValErrorMsg = "bad user, must only contain alphanumeric characters"
 	keyValErrorMsg  = "bad key, must only contain alphanumeric characters, '.', '/', '_', and '-'"
 )
@@ -30,7 +30,7 @@ func init() {
 func ValidateIdentifier(str string) error {
 	matched := validateHostRe.MatchString(str)
 	if !matched {
-		return common.NewBasicError(hostValErrorMsg, nil, "token", str)
+		return common.NewBasicError(nameErrorMsg, nil, "token", str)
 	}
 	return nil
 }

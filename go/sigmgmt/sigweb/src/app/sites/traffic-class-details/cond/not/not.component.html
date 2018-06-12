@@ -1,0 +1,22 @@
+<div anaMouseover>
+  <span>NOT</span>
+  <div class="indented popover-wrapper" *ngIf="!cond.Operand">
+    <button mat-icon-button (click)="showAdd = !showAdd" *ngIf="!showAdd">
+      <mat-icon>add_box</mat-icon>
+    </button>
+    <button mat-icon-button (click)="showAdd = !showAdd" *ngIf="showAdd">
+      <mat-icon>indeterminate_check_box</mat-icon>
+    </button>
+    <div class="add-menu" *ngIf="showAdd">
+      <button mat-button (click)="addAny()">ANY</button>
+      <button mat-button (click)="addAll()">ALL</button>
+      <button mat-button (click)="addSrc()">SRC</button>
+      <button mat-button (click)="addDst()">DST</button>
+      <button mat-button (click)="addDscp()">DSCP</button>
+      <button mat-button (click)="addCls()">CLASS</button>
+    </div>
+  </div>
+  <div class="indented">
+    <ana-cond [cond]="cond.Operand" (deleted)="delete()" (insert)="insert($event)"></ana-cond>
+  </div>
+</div>
