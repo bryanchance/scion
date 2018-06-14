@@ -3,8 +3,6 @@
 package rpkt
 
 import (
-	"strconv"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/scionproto/scion/go/border/extn/aclextn"
@@ -12,7 +10,6 @@ import (
 	"github.com/scionproto/scion/go/border/rcmn"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/ctrl/extn"
-	//"github.com/scionproto/scion/go/lib/log"
 )
 
 // processExtnACL processes Push ACL messages received from a neighboring router
@@ -25,13 +22,8 @@ func (rp *RtrPkt) processExtnACL(extnData common.RawBytes) (HookResult, error) {
 		return HookError, common.NewBasicError("Bad packet direction", nil,
 			"actual", rp.DirFrom, "expected", rcmn.DirExternal)
 	}
-	if len(rp.Ingress.IfIDs) != 1 {
-		return HookError, common.NewBasicError("Unexpected IFIDs count for external packet", nil,
-			"IFIDs", rp.Ingress.IfIDs, "actual", len(rp.Ingress.IfIDs), "expected", 1)
-	}
 	// Set ACL for the outgoing socket corresponding to the IFID on which we received it
-	ifid := rp.Ingress.IfIDs[0]
-	aclextn.Map().Store(ifid, acl.ACL())
+	aclextn.Map().Store(rp.Ingress.IfID, acl.ACL())
 	return HookFinish, nil
 }
 
@@ -40,18 +32,29 @@ func (rp *RtrPkt) RegisterACLHook() {
 }
 
 func (rp *RtrPkt) validateACLHook() (HookResult, error) {
-	intf := *rp.ifCurr
-	if acl, _ := aclextn.Map().Load(intf); len(acl) > 0 {
+	if rp.DirTo != rcmn.DirExternal {
+		// We only care about egress packets.
+		return HookContinue, nil
+	}
+	// srcIA is not guaranteed to be set at this stage
+	if _, err := rp.SrcIA(); err != nil {
+		return HookError, common.NewBasicError("Unable to determine source IA for ACL", nil,
+			"rpkt", rp)
+	}
+	if rp.srcIA.Eq(rp.Ctx.Conf.IA) {
+		// Always allow packets from the local IA, which may not have a path header anyway.
+		return HookContinue, nil
+	}
+	if rp.ifCurr == nil {
+		return HookError, common.NewBasicError("Unable to determine current interface for ACL", nil,
+			"rpkt", rp)
+	}
+	ifid := *rp.ifCurr
+	if acl, _ := aclextn.Map().Load(ifid); len(acl) > 0 {
 		// Filtering is enabled, only allow matching packets through
-		// srcIA is not guaranteed to be set at this stage
-		ia, err := rp.SrcIA()
-		if err != nil {
-			return HookError, common.NewBasicError("Unable to determine source IA for ACL", nil,
-				"rpkt", rp)
-		}
-		if !acl.Match(ia) {
-			//log.Debug("Packet dropped due to ACL", "srcIA", rp.srcIA, "acl", acl)
-			metrics.ACLDroppedPkts.With(prometheus.Labels{"ifid": strconv.Itoa(int(intf))}).Inc()
+		if !acl.Match(rp.srcIA) {
+			//rp.Debug("Packet dropped due to ACL", "srcIA", rp.srcIA, "acl", acl, "ifid", ifid)
+			metrics.ACLDroppedPkts.With(prometheus.Labels{"ifid": ifid.String()}).Inc()
 			return HookError, nil
 		}
 	}

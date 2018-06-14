@@ -18,7 +18,6 @@ package rpkt
 
 import (
 	"github.com/scionproto/scion/go/lib/addr"
-	"github.com/scionproto/scion/go/lib/assert"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/scmp"
 )
@@ -35,12 +34,16 @@ const (
 // and no error. If validation failed due to some exceptional event, returns an
 // error.
 func (rp *RtrPkt) Validate() (bool, error) {
-	if assert.On {
-		assert.Mustf(rp.ifCurr != nil, rp.ErrStr, "rp.ifCurr must not be nil")
-	}
-	intf, ok := rp.Ctx.Conf.Net.IFs[*rp.ifCurr]
-	if !ok {
-		return false, common.NewBasicError(errCurrIntfInvalid, nil, "ifid", *rp.ifCurr)
+	// XXX ifCurr would be nil if the packet was received in the internal interface and had no HopF.
+	var mtu int
+	if rp.ifCurr != nil {
+		intf, ok := rp.Ctx.Conf.Net.IFs[*rp.ifCurr]
+		if !ok {
+			return false, common.NewBasicError(errCurrIntfInvalid, nil, "ifid", *rp.ifCurr)
+		}
+		mtu = intf.MTU
+	} else {
+		mtu = rp.Ctx.Conf.Topo.MTU
 	}
 	// XXX(kormat): the rest of the common header is checked by the parsing phase.
 	if !addr.HostTypeCheck(rp.CmnHdr.DstType) {
@@ -57,13 +60,11 @@ func (rp *RtrPkt) Validate() (bool, error) {
 		return false, common.NewBasicError(
 			"Total length specified in common header doesn't match bytes received",
 			scmp.NewError(scmp.C_CmnHdr, scmp.T_C_BadPktLen,
-				&scmp.InfoPktSize{Size: uint16(len(rp.Raw)), MTU: uint16(intf.MTU)}, nil),
+				&scmp.InfoPktSize{Size: uint16(len(rp.Raw)), MTU: uint16(mtu)}, nil),
 			"totalLen", rp.CmnHdr.TotalLen, "actual", len(rp.Raw),
 		)
 	}
-	if err := rp.validateIFMatch(); err != nil {
-		return false, err
-	}
+	// ValidatePath checks that ifCurr is valid
 	if err := rp.validatePath(rp.DirFrom); err != nil {
 		return false, err
 	}
@@ -87,17 +88,4 @@ func (rp *RtrPkt) Validate() (bool, error) {
 		}
 	}
 	return true, nil
-}
-
-func (rp *RtrPkt) validateIFMatch() error {
-	for _, ifid := range rp.Ingress.IfIDs {
-		if *rp.ifCurr == ifid {
-			return nil
-		}
-	}
-	return common.NewBasicError(
-		"Interface in packet not in set of expected interfaces",
-		scmp.NewError(scmp.C_Path, scmp.T_P_BadIF, rp.mkInfoPathOffsets(), nil),
-		"expected", rp.Ingress.IfIDs, "actual", *rp.ifCurr,
-	)
 }
