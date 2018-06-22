@@ -12,31 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package egress
+// Package dispatcher reads from input ring buffer, decides on a Session and
+// puts data on the ring buffer of the Session.
+package dispatcher
 
 import (
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/log"
-	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/lib/ringbuf"
+	"github.com/scionproto/scion/go/sig/egress"
 	"github.com/scionproto/scion/go/sig/metrics"
 	"github.com/scionproto/scion/go/sig/mgmt"
 )
+
+var _ egress.Runner = (*egressDispatcher)(nil)
 
 type egressDispatcher struct {
 	log.Logger
 	ia               addr.IA
 	ring             *ringbuf.Ring
-	syncPktPols      *SyncPktPols
+	sessionSelector  egress.SessionSelector
 	pktsRecvCounters map[metrics.CtrPairKey]metrics.CtrPair
 }
 
-func NewDispatcher(ia addr.IA, ring *ringbuf.Ring, spp *SyncPktPols) *egressDispatcher {
+func NewDispatcher(ia addr.IA, ring *ringbuf.Ring, ss egress.SessionSelector) *egressDispatcher {
 	return &egressDispatcher{
 		Logger:           log.New("ia", ia.String()),
 		ring:             ring,
-		syncPktPols:      spp,
+		sessionSelector:  ss,
 		pktsRecvCounters: make(map[metrics.CtrPairKey]metrics.CtrPair),
 	}
 }
@@ -44,7 +48,7 @@ func NewDispatcher(ia addr.IA, ring *ringbuf.Ring, spp *SyncPktPols) *egressDisp
 func (ed *egressDispatcher) Run() {
 	defer log.LogPanicAndExit()
 	ed.Info("EgressDispatcher: starting")
-	bufs := make(ringbuf.EntryList, egressBufPkts)
+	bufs := make(ringbuf.EntryList, egress.EgressBufPkts)
 	for {
 		n, _ := ed.ring.Read(bufs, true)
 		if n < 0 {
@@ -52,37 +56,19 @@ func (ed *egressDispatcher) Run() {
 		}
 		for i := 0; i < n; i++ {
 			buf := bufs[i].(common.RawBytes)
-			sess := ed.chooseSess(buf)
+			sess := ed.sessionSelector.ChooseSess(buf)
 			if sess == nil {
 				// Release buffer back to free buffer pool
-				egressFreePkts.Write(ringbuf.EntryList{buf}, true)
+				egress.EgressFreePkts.Write(ringbuf.EntryList{buf}, true)
 				// FIXME(kormat): replace with metric.
 				ed.Debug("EgressDispatcher: unable to find session")
 				continue
 			}
-			sess.ring.Write(ringbuf.EntryList{buf}, true)
-			ed.updateMetrics(sess.IA.IAInt(), sess.SessId, len(buf))
+			sess.Ring().Write(ringbuf.EntryList{buf}, true)
+			ed.updateMetrics(sess.IA().IAInt(), sess.ID(), len(buf))
 		}
 	}
 	ed.Info("EgressDispatcher: stopping")
-}
-
-func (ed *egressDispatcher) chooseSess(b common.RawBytes) *Session {
-	var sess *Session
-	ppols := ed.syncPktPols.Load()
-	clsPkt := pktcls.NewPacket(b)
-	for _, ppol := range ppols {
-		if ppol.Class.Eval(clsPkt) {
-			for _, sess = range ppol.Sessions {
-				if sess.Healthy() {
-					return sess
-				}
-				// XXX(kormat): If all sessions are unhealthy, the last
-				// one will be chosen.
-			}
-		}
-	}
-	return sess
 }
 
 func (ed *egressDispatcher) updateMetrics(remoteIA addr.IAInt, sessId mgmt.SessionType, read int) {
@@ -98,5 +84,4 @@ func (ed *egressDispatcher) updateMetrics(remoteIA addr.IAInt, sessId mgmt.Sessi
 	}
 	counters.Pkts.Inc()
 	counters.Bytes.Add(float64(read))
-
 }

@@ -34,6 +34,7 @@ import (
 	"github.com/scionproto/scion/go/sig/base"
 	"github.com/scionproto/scion/go/sig/disp"
 	"github.com/scionproto/scion/go/sig/egress"
+	"github.com/scionproto/scion/go/sig/egress/reader"
 	"github.com/scionproto/scion/go/sig/ingress"
 	"github.com/scionproto/scion/go/sig/metrics"
 	"github.com/scionproto/scion/go/sig/quagga"
@@ -110,7 +111,7 @@ func main() {
 	}
 	go reloadOnSIGHUP(*cfgPath)
 	// Spawn egress reader
-	go egress.NewReader(tunIO).Run()
+	go reader.NewReader(tunIO).Run()
 	// Spawn ingress Dispatcher.
 	if err := ingress.Init(tunIO); err != nil {
 		fatal("Unable to spawn ingress dispatcher", "err", err)

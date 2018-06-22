@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package egress
+// Package session monitors session health and maintains a concurrency-safe
+// remote SIG address (that includes a working path) for each session.
+package session
 
 import (
-	"fmt"
-	"sync"
 	"sync/atomic"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,37 +24,31 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/log"
-	"github.com/scionproto/scion/go/lib/pktcls"
+	"github.com/scionproto/scion/go/lib/pathmgr"
 	"github.com/scionproto/scion/go/lib/pktdisp"
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/lib/snet"
+	"github.com/scionproto/scion/go/lib/spath/spathmeta"
+	"github.com/scionproto/scion/go/sig/egress"
 	"github.com/scionproto/scion/go/sig/mgmt"
 	"github.com/scionproto/scion/go/sig/sigcmn"
 	"github.com/scionproto/scion/go/sig/siginfo"
 )
 
-type SessionSet map[mgmt.SessionType]*Session
+var _ egress.Session = (*Session)(nil)
 
 // Session contains a pool of paths to the remote AS, metrics about those paths,
 // as well as maintaining the currently favoured path and remote SIG to use.
-// The Anapaya version uses packet classification and path predicates to all
-// configurable routing.
 type Session struct {
 	log.Logger
-	IA     addr.IA
+	ia     addr.IA
 	SessId mgmt.SessionType
 
-	// used when updating the path policy or its name
-	policyLock sync.Mutex
-	// used by pathmgr to filter the paths in the pool
-	policy  *pktcls.ActionFilterPaths
-	polName string
-
 	// pool of paths, managed by pathmgr
-	pool *AtomicSP
+	pool egress.PathPool
 	// remote SIGs
 	sigMap *siginfo.SigMap
-	// *RemoteInfo
+	// *egress.RemoteInfo
 	currRemote atomic.Value
 	// bool
 	healthy        atomic.Value
@@ -63,27 +57,22 @@ type Session struct {
 	sessMonStop    chan struct{}
 	sessMonStopped chan struct{}
 	workerStopped  chan struct{}
+	factory        egress.WorkerFactory
 }
 
-func NewSession(dstIA addr.IA, sessId mgmt.SessionType,
-	sigMap *siginfo.SigMap, logger log.Logger,
-	polName string, policy *pktcls.ActionFilterPaths) (*Session, error) {
+func NewSession(dstIA addr.IA, sessId mgmt.SessionType, sigMap *siginfo.SigMap, logger log.Logger,
+	pool egress.PathPool, factory egress.WorkerFactory) (*Session, error) {
+
 	var err error
 	s := &Session{
 		Logger:  logger.New("sessId", sessId),
-		IA:      dstIA,
+		ia:      dstIA,
 		SessId:  sessId,
-		polName: polName,
-		policy:  policy,
-		pool:    NewAtomicSP(),
 		sigMap:  sigMap,
+		pool:    pool,
+		factory: factory,
 	}
-	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, policy)
-	if err != nil {
-		return nil, err
-	}
-	s.pool.UpdateSP(pool)
-	s.currRemote.Store((*RemoteInfo)(nil))
+	s.currRemote.Store((*egress.RemoteInfo)(nil))
 	s.healthy.Store(false)
 	s.ring = ringbuf.New(64, nil, "egress",
 		prometheus.Labels{"ringId": dstIA.String(), "sessId": sessId.String()})
@@ -99,7 +88,7 @@ func NewSession(dstIA addr.IA, sessId mgmt.SessionType,
 
 func (s *Session) Start() {
 	go newSessMonitor(s).run()
-	go NewWorker(s, s.Logger).Run()
+	go s.factory(s, s.Logger).Run()
 }
 
 func (s *Session) Cleanup() error {
@@ -113,14 +102,31 @@ func (s *Session) Cleanup() error {
 	if err := s.conn.Close(); err != nil {
 		return common.NewBasicError("Unable to close conn", err)
 	}
-	if err := sigcmn.PathMgr.Unwatch(sigcmn.IA, s.IA); err != nil {
-		return common.NewBasicError("Unable to unwatch src-dst", err, "src", sigcmn.IA, "dst", s.IA)
+	if err := s.pool.Destroy(); err != nil {
+		return common.NewBasicError("Error destroying path pool", err)
 	}
 	return nil
 }
 
-func (s *Session) Remote() *RemoteInfo {
-	return s.currRemote.Load().(*RemoteInfo)
+func (s *Session) Remote() *egress.RemoteInfo {
+	return s.currRemote.Load().(*egress.RemoteInfo)
+}
+
+func (s *Session) Ring() *ringbuf.Ring {
+	return s.ring
+}
+
+func (s *Session) Conn() *snet.Conn {
+	return s.conn
+}
+
+func (s *Session) IA() addr.IA {
+	return s.ia
+}
+
+func (s *Session) ID() mgmt.SessionType {
+	return s.SessId
+
 }
 
 func (s *Session) Healthy() bool {
@@ -128,30 +134,36 @@ func (s *Session) Healthy() bool {
 	return s.healthy.Load().(bool)
 }
 
-func (s *Session) UpdatePolicy(name string, afp *pktcls.ActionFilterPaths) error {
-	s.policyLock.Lock()
-	defer s.policyLock.Unlock()
+func (s *Session) PathPool() egress.PathPool {
+	return s.pool
+}
 
-	pool, err := sigcmn.PathMgr.WatchFilter(sigcmn.IA, s.IA, afp)
+func (s *Session) AnnounceWorkerStopped() {
+	close(s.workerStopped)
+}
+
+type PathPool struct {
+	ia   addr.IA
+	pool *pathmgr.SyncPaths
+}
+
+var _ egress.PathPool = (*PathPool)(nil)
+
+func NewPathPool(dst addr.IA) (*PathPool, error) {
+	pool, err := sigcmn.PathMgr.Watch(sigcmn.IA, dst)
 	if err != nil {
-		return common.NewBasicError("Unable to register watch", err)
+		return nil, common.NewBasicError("Unable to register watch", err)
 	}
-	// Store old predicate so we can unwatch it later
-	oldPolicy := s.policy
-	s.polName = name
-	s.policy = afp
-	s.pool.UpdateSP(pool)
-	if err := sigcmn.PathMgr.UnwatchFilter(sigcmn.IA, s.IA, oldPolicy); err != nil {
-		return common.NewBasicError("Unable to unregister watch", err)
-	}
-	return nil
+	return &PathPool{
+		ia:   dst,
+		pool: pool,
+	}, nil
 }
 
-type RemoteInfo struct {
-	Sig      *siginfo.Sig
-	sessPath *sessPath
+func (pp *PathPool) Destroy() error {
+	return sigcmn.PathMgr.Unwatch(sigcmn.IA, pp.ia)
 }
 
-func (r *RemoteInfo) String() string {
-	return fmt.Sprintf("Sig: %s Path: %s", r.Sig, r.sessPath)
+func (pp *PathPool) Paths() spathmeta.AppPathSet {
+	return pp.pool.Load().APS
 }

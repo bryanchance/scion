@@ -28,6 +28,12 @@ import (
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sig/egress"
+	"github.com/scionproto/scion/go/sig/egress/anapaya/policypathpool"
+	"github.com/scionproto/scion/go/sig/egress/anapaya/sessselector"
+	"github.com/scionproto/scion/go/sig/egress/dispatcher"
+	"github.com/scionproto/scion/go/sig/egress/router"
+	"github.com/scionproto/scion/go/sig/egress/session"
+	"github.com/scionproto/scion/go/sig/egress/worker"
 	"github.com/scionproto/scion/go/sig/mgmt"
 	"github.com/scionproto/scion/go/sig/sigcmn"
 	"github.com/scionproto/scion/go/sig/siginfo"
@@ -36,6 +42,7 @@ import (
 const (
 	sigMgrTick        = 10 * time.Second
 	healthMonitorTick = 5 * time.Second
+	DefSessId         = mgmt.SessionType(0)
 )
 
 // ASEntry contains all of the information required to interact with a remote AS.
@@ -51,7 +58,7 @@ type ASEntry struct {
 	version           uint64 // used to track certain changes made to ASEntry
 	log.Logger
 
-	PktPolicies *egress.SyncPktPols
+	PktPolicies *sessselector.SyncPktPols
 	Sessions    egress.SessionSet
 }
 
@@ -63,7 +70,7 @@ func newASEntry(ia addr.IA) (*ASEntry, error) {
 		Nets:     make(map[string]*net.IPNet),
 		Sigs:     &siginfo.SigMap{},
 	}
-	ae.PktPolicies = egress.NewSyncPktPols()
+	ae.PktPolicies = sessselector.NewSyncPktPols()
 	ae.Sessions = make(egress.SessionSet)
 	return ae, nil
 }
@@ -144,7 +151,7 @@ func (ae *ASEntry) addNet(ipnet *net.IPNet) error {
 	if _, ok := ae.Nets[key]; ok {
 		return nil
 	}
-	if err := egress.NetMap.Add(ipnet, ae.IA, ae.egressRing); err != nil {
+	if err := router.NetMap.Add(ipnet, ae.IA, ae.egressRing); err != nil {
 		return err
 	}
 	ae.Nets[key] = ipnet
@@ -158,7 +165,7 @@ func (ae *ASEntry) addNet(ipnet *net.IPNet) error {
 	}
 	NetworkChanged(params)
 	if len(ae.Nets) == 1 {
-		go egress.NewDispatcher(ae.IA, ae.egressRing, ae.PktPolicies).Run()
+		go dispatcher.NewDispatcher(ae.IA, ae.egressRing, ae.PktPolicies).Run()
 		ae.sigMgrStop = make(chan struct{})
 		go ae.sigMgr()
 	}
@@ -178,7 +185,7 @@ func (ae *ASEntry) delNet(ipnet *net.IPNet) error {
 	if _, ok := ae.Nets[key]; !ok {
 		return common.NewBasicError("DelNet: no network found", nil, "ia", ae.IA, "net", ipnet)
 	}
-	if err := egress.NetMap.Delete(ipnet); err != nil {
+	if err := router.NetMap.Delete(ipnet); err != nil {
 		return err
 	}
 	delete(ae.Nets, key)
@@ -309,10 +316,10 @@ func (ae *ASEntry) delOldSessions(cfgs config.SessionSet) egress.SessionSet {
 		// We're also walking newly added sessions that are surely in the
 		// config, but since the number of sessions will usually be small
 		// we don't need to optimize this yet.
-		if _, ok := cfgs[sess.SessId]; !ok {
-			session := ae.Sessions[sess.SessId]
-			delete(ae.Sessions, sess.SessId)
-			deleted[session.SessId] = session
+		if _, ok := cfgs[sess.ID()]; !ok {
+			session := ae.Sessions[sess.ID()]
+			delete(ae.Sessions, sess.ID())
+			deleted[session.ID()] = session
 		}
 	}
 	return deleted
@@ -329,16 +336,21 @@ func (ae *ASEntry) AddSession(sessId mgmt.SessionType, polName string,
 func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 	afp *pktcls.ActionFilterPaths) error {
 	if s, ok := ae.Sessions[sessId]; !ok {
+		pool, err := policypathpool.NewPool(ae.IA, polName, afp)
+		if err != nil {
+			return err
+		}
 		// Session does not exist, so we create a new one
-		s, err := egress.NewSession(ae.IA, sessId, ae.Sigs, ae.Logger, polName, afp)
+		s, err := session.NewSession(ae.IA, sessId, ae.Sigs, ae.Logger, pool, worker.DefaultFactory)
 		if err != nil {
 			return err
 		}
 		ae.Sessions[s.SessId] = s
 		s.Start()
 	} else {
-		// Session exists, update its information
-		if err := s.UpdatePolicy(polName, afp); err != nil {
+		// Session exists, update its path pool
+		pool := s.PathPool().(*policypathpool.Pool)
+		if err := pool.Update(polName, afp); err != nil {
 			return err
 		}
 	}
@@ -353,12 +365,12 @@ func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 // len(ae.Sessions) == 0 { ae.healthMonitorStop <- struct{}{} }
 
 func (ae *ASEntry) buildNewPktPolicies(cfgPktPols []*config.PktPolicy,
-	classes pktcls.ClassMap) []*egress.PktPolicy {
-	var newPktPolicies []*egress.PktPolicy
+	classes pktcls.ClassMap) []*sessselector.PktPolicy {
+	var newPktPolicies []*sessselector.PktPolicy
 	for _, pol := range cfgPktPols {
 		cls := classes[pol.ClassName]
 		// Packet policies are stateless, so we construct new ones
-		pp, err := egress.NewPktPolicy(pol.ClassName, cls, pol.SessIds, ae.Sessions)
+		pp, err := sessselector.NewPktPolicy(pol.ClassName, cls, pol.SessIds, ae.Sessions)
 		if err != nil {
 			log.Error("Unable to create packet policy", "policy", pol, "err", err)
 		}
@@ -383,7 +395,7 @@ func (ae *ASEntry) addPktPolicy(name string, cls *pktcls.Class,
 			return nil
 		}
 	}
-	p, err := egress.NewPktPolicy(name, cls, sessIds, ae.Sessions)
+	p, err := sessselector.NewPktPolicy(name, cls, sessIds, ae.Sessions)
 	if err != nil {
 		return err
 	}
@@ -463,7 +475,7 @@ func (ae *ASEntry) performHealthCheck(prevHealth *bool, prevVersion *uint64) {
 
 func (ae *ASEntry) checkHealth() bool {
 	// If session 0 exists, determine overall health based on that session.
-	defSess, ok := ae.Sessions[mgmt.SessionType(0)]
+	defSess, ok := ae.Sessions[DefSessId]
 	if ok {
 		return defSess.Healthy()
 	}
