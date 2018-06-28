@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package base contains the tables for remote SIGs, ASes and their prefixes
-package base
+// Package core contains the tables for remote SIGs, ASes and their prefixes
+package core
 
 import (
 	"sync"
@@ -21,7 +21,7 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/log"
-	"github.com/scionproto/scion/go/sig/anaconfig"
+	"github.com/scionproto/scion/go/sig/config"
 )
 
 var Map = &ASMap{}
@@ -76,7 +76,7 @@ func (am *ASMap) addNewIAs(cfg *config.Cfg) bool {
 			s = false
 			continue
 		}
-		s = ae.ReloadConfig(cfgEntry, cfg.Classes, cfg.Actions) && s
+		s = ae.ReloadConfig(cfgEntry) && s
 		log.Info("ReloadConfig: Added AS", "ia", ia)
 	}
 	return s
