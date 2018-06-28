@@ -16,33 +16,15 @@ package seg
 
 import (
 	"fmt"
+
+	"github.com/scionproto/scion/go/proto"
 )
 
 type Meta struct {
-	Type    Type
+	Type    proto.PathSegType
 	Segment PathSegment `capnp:"pathSeg"`
 }
 
 func (m *Meta) String() string {
 	return fmt.Sprintf("Type: %v, Segment: %v", m.Type, m.Segment)
-}
-
-type Type uint16
-
-const (
-	UpSegment   Type = 0
-	DownSegment Type = 1
-	CoreSegment Type = 2
-)
-
-func (t Type) String() string {
-	switch t {
-	case UpSegment:
-		return "UP"
-	case DownSegment:
-		return "DOWN"
-	case CoreSegment:
-		return "CORE"
-	}
-	return fmt.Sprintf("UNKNOWN (%d)", t)
 }
