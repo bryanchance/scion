@@ -1,0 +1,12 @@
+FROM node:10.5
+WORKDIR /build
+COPY --from=scion:latest /home/scion/go/src/github.com/scionproto/scion/go/sigmgmt/sigweb .
+RUN npm install
+RUN npm install -g @angular/cli
+RUN ng build --prod --deploy-url app/
+
+FROM scion_app_base:latest
+COPY --from=scion_app_builder:latest /home/scion/go/src/github.com/scionproto/scion/bin/sigmgmt /app/
+COPY --from=scion:latest /home/scion/go/src/github.com/scionproto/scion/go/sigmgmt/static /app/static
+COPY --from=0 /build/dist /app/static/webui
+ENTRYPOINT ["/sbin/su-exec", "/app/sigmgmt"]

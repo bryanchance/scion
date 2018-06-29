@@ -47,7 +47,7 @@ hashes/debug_base: base/Dockerfile.debug hashes/scion
 APP_TARGETS = border discovery dispatcher sig path beacon cert sciond
 .PHONY: $(APP_TARGETS)
 apps: $(APP_TARGETS)
-$(APP_TARGETS): | scion_hash
+$(APP_TARGETS) sigmgmt: | scion_hash
 
 border: hashes/border
 hashes/border: app/Dockerfile.border hashes/app_base hashes/app_builder
@@ -63,6 +63,10 @@ hashes/dispatcher: app/Dockerfile.dispatcher hashes/app_base hashes/app_builder
 
 sig: hashes/sig
 hashes/sig: app/Dockerfile.sig hashes/app_base hashes/app_builder
+	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
+
+sigmgmt: hashes/sigmgmt
+hashes/sigmgmt: app/Dockerfile.sigmgmt hashes/app_base hashes/app_builder
 	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
 
 path: hashes/path
@@ -85,7 +89,7 @@ hashes/sciond: app/Dockerfile.sciond hashes/python_base
 DEBUG_TARGETS = border_debug discovery_debug dispatcher_debug sig_debug path_debug beacon_debug cert_debug sciond_debug
 .PHONY: $(DEBUG_TARGETS)
 debug: $(DEBUG_TARGETS)
-$(DEBUG_TARGETS): | scion_hash
+$(DEBUG_TARGETS) sigmgmt_debug: | scion_hash
 
 border_debug: hashes/border_debug
 hashes/border_debug: debug/Dockerfile.border hashes/debug_base hashes/border
@@ -101,6 +105,10 @@ hashes/dispatcher_debug: debug/Dockerfile.dispatcher hashes/debug_base hashes/di
 
 sig_debug: hashes/sig_debug
 hashes/sig_debug: debug/Dockerfile.sig hashes/debug_base hashes/sig
+	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
+
+sigmgmt_debug: hashes/sigmgmt_debug
+hashes/sigmgmt_debug: debug/Dockerfile.sigmgmt hashes/debug_base hashes/sigmgmt
 	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
 
 path_debug: hashes/path_debug

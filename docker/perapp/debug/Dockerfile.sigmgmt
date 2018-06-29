@@ -1,0 +1,2 @@
+FROM scion_sigmgmt:latest
+COPY --from=scion_debug_base:latest / /

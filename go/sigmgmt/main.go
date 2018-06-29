@@ -31,6 +31,7 @@ var (
 func main() {
 	os.Setenv("TZ", "UTC")
 	log.AddLogFileFlags()
+	log.AddLogConsFlags()
 	flag.Parse()
 	if err := log.SetupFromFlags(*id); err != nil {
 		fmt.Fprintf(os.Stderr, "ERROR: %s", err)
