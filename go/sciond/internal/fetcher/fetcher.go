@@ -19,11 +19,8 @@ package fetcher
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"math/rand"
 	"time"
-
-	cache "github.com/patrickmn/go-cache"
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
@@ -56,21 +53,19 @@ type Fetcher struct {
 	messenger       infra.Messenger
 	pathDB          *pathdb.DB
 	trustStore      infra.TrustStore
-	revocationCache *cache.Cache
-	coreASes        []addr.IA
+	revocationCache *RevCache
 	logger          log.Logger
 }
 
 func NewFetcher(topo *topology.Topo, messenger infra.Messenger, pathDB *pathdb.DB,
-	coreASes []addr.IA, trustStore infra.TrustStore) *Fetcher {
+	trustStore infra.TrustStore, revCache *RevCache) *Fetcher {
 
 	return &Fetcher{
 		topology:        topo,
 		messenger:       messenger,
 		pathDB:          pathDB,
 		trustStore:      trustStore,
-		revocationCache: cache.New(cache.NoExpiration, time.Second),
-		coreASes:        coreASes,
+		revocationCache: revCache,
 	}
 }
 
@@ -104,15 +99,19 @@ func (f *Fetcher) GetPaths(ctx context.Context, req *sciond.PathReq,
 	if req.Dst.IA().Eq(f.topology.ISD_AS) {
 		return f.buildSCIONDReply(nil, sciond.ErrorOk), nil
 	}
-	// Try to build paths from local information first
-	paths, err := f.buildPathsFromDB(ctx, req)
-	switch {
-	case ctx.Err() != nil:
-		return f.buildSCIONDReply(nil, sciond.ErrorNoPaths), nil
-	case err != nil:
-		return f.buildSCIONDReply(nil, sciond.ErrorInternal), err
-	case err == nil && len(paths) > 0:
-		return f.buildSCIONDReply(paths, sciond.ErrorOk), nil
+
+	if !req.Flags.Refresh {
+		// Try to build paths from local information first, if we don't have to
+		// get fresh segments.
+		paths, err := f.buildPathsFromDB(ctx, req)
+		switch {
+		case ctx.Err() != nil:
+			return f.buildSCIONDReply(nil, sciond.ErrorNoPaths), nil
+		case err != nil:
+			return f.buildSCIONDReply(nil, sciond.ErrorInternal), err
+		case err == nil && len(paths) > 0:
+			return f.buildSCIONDReply(paths, sciond.ErrorOk), nil
+		}
 	}
 	// We don't have enough local information, grab fresh segments from the
 	// network. The spawned goroutine takes care of updating the path database
@@ -126,7 +125,7 @@ func (f *Fetcher) GetPaths(ctx context.Context, req *sciond.PathReq,
 	case <-subCtx.Done():
 	case <-ctx.Done():
 	}
-	paths, err = f.buildPathsFromDB(ctx, req)
+	paths, err := f.buildPathsFromDB(ctx, req)
 	switch {
 	case ctx.Err() != nil:
 		return f.buildSCIONDReply(nil, sciond.ErrorNoPaths), nil
@@ -269,7 +268,11 @@ func (f *Fetcher) buildPathsFromDB(ctx context.Context,
 		// it sees an error.
 		return nil, err
 	}
-	srcIsCore := iaInSlice(f.topology.ISD_AS, f.coreASes)
+	localTrc, err := f.trustStore.GetValidTRC(ctx, f.topology.ISD_AS.I, f.topology.ISD_AS.I)
+	if err != nil {
+		return nil, err
+	}
+	srcIsCore := iaInSlice(f.topology.ISD_AS, localTrc.CoreASList())
 	dstIsCore := iaInSlice(req.Dst.IA(), dstTrc.CoreASList())
 	// pathdb expects slices
 	srcIASlice := []addr.IA{req.Src.IA()}
@@ -293,16 +296,16 @@ func (f *Fetcher) buildPathsFromDB(ctx context.Context,
 			return nil, err
 		}
 	case !srcIsCore && dstIsCore:
-		ups, err = f.getSegmentsFromDB(f.coreASes, srcIASlice)
+		ups, err = f.getSegmentsFromDB(localTrc.CoreASList(), srcIASlice)
 		if err != nil {
 			return nil, err
 		}
-		cores, err = f.getSegmentsFromDB(dstIASlice, f.coreASes)
+		cores, err = f.getSegmentsFromDB(dstIASlice, localTrc.CoreASList())
 		if err != nil {
 			return nil, err
 		}
 	case !srcIsCore && !dstIsCore:
-		ups, err = f.getSegmentsFromDB(f.coreASes, srcIASlice)
+		ups, err = f.getSegmentsFromDB(localTrc.CoreASList(), srcIASlice)
 		if err != nil {
 			return nil, err
 		}
@@ -345,7 +348,7 @@ func (f *Fetcher) filterRevokedPaths(paths []*combinator.Path) []*combinator.Pat
 		for _, iface := range path.Interfaces {
 			// cache automatically expires outdated revocations every second,
 			// so a cache hit implies revocation is still active.
-			if _, ok := f.revocationCache.Get(revCacheKey(iface.ISD_AS(), iface.IfID)); ok {
+			if _, ok := f.revocationCache.Get(iface.ISD_AS(), iface.IfID); ok {
 				revoked = true
 			}
 		}
@@ -413,7 +416,8 @@ Loop:
 						panic(err)
 					}
 					t.revocationCache.Add(
-						revCacheKey(info.IA(), common.IFIDType(info.IfID)),
+						info.IA(),
+						common.IFIDType(info.IfID),
 						revocation,
 						info.RelativeTTL(time.Now()),
 					)
@@ -471,10 +475,6 @@ func getStartIAs(segments []*seg.PathSegment) []addr.IA {
 		startIAs = append(startIAs, segment.ASEntries[0].IA())
 	}
 	return startIAs
-}
-
-func revCacheKey(ia addr.IA, ifid common.IFIDType) string {
-	return fmt.Sprintf("%s#%s", ia, ifid)
 }
 
 func iaInSlice(ia addr.IA, slice []addr.IA) bool {

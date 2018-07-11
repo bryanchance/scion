@@ -26,6 +26,7 @@ from itertools import product
 from external.expiring_dict import ExpiringDict
 
 # SCION
+from lib.app.sciond import get_default_sciond_path
 from lib.defines import (
     GEN_CACHE_PATH,
     PATH_FLAG_SIBRA,
@@ -127,9 +128,7 @@ class SCIONDaemon(SCIONElement):
         self._api_sock = None
         self.daemon_thread = None
         os.makedirs(SCIOND_API_SOCKDIR, exist_ok=True)
-        self.api_addr = (api_addr or
-                         os.path.join(SCIOND_API_SOCKDIR,
-                                      "%s.sock" % self.addr.isd_as))
+        self.api_addr = (api_addr or get_default_sciond_path())
 
         self.CTRL_PLD_CLASS_MAP = {
             PayloadClass.PATH: {
@@ -287,12 +286,6 @@ class SCIONDaemon(SCIONElement):
         request = pld.union
         assert isinstance(request, SCIONDPathRequest), type(request)
         req_id = pld.id
-        if request.p.flags.sibra:
-            logging.warning(
-                "Requesting SIBRA paths over SCIOND API not supported yet.")
-            self._send_path_reply(
-                req_id, [], SCIONDPathReplyError.INTERNAL, meta)
-            return
 
         dst_ia = request.dst_ia()
         src_ia = request.src_ia()
@@ -301,7 +294,7 @@ class SCIONDaemon(SCIONElement):
         thread = threading.current_thread()
         thread.name = "SCIONDaemon API id:%s %s -> %s" % (
             thread.ident, src_ia, dst_ia)
-        paths, error = self.get_paths(dst_ia, flush=request.p.flags.flush)
+        paths, error = self.get_paths(dst_ia, flush=request.p.flags.refresh)
         if request.p.maxPaths:
             paths = paths[:request.p.maxPaths]
 

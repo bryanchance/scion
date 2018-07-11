@@ -31,6 +31,7 @@ import (
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/lib/scmp"
 	"github.com/scionproto/scion/go/lib/topology"
+	"github.com/scionproto/scion/go/proto"
 )
 
 // Route handles routing of packets. Registered hooks are called, allowing them
@@ -99,7 +100,7 @@ func (rp *RtrPkt) RouteResolveSVCAny(svc addr.HostSVC) (HookResult, error) {
 	name := names[rand.Intn(len(names))]
 	elem := elemMap[name]
 	dst := elem.PublicAddrInfo(rp.Ctx.Conf.Topo.Overlay)
-	rp.Egress = append(rp.Egress, EgressPair{rp.Ctx.LocSockOut, dst})
+	rp.Egress = append(rp.Egress, EgressPair{S: rp.Ctx.LocSockOut, Dst: dst})
 	return HookContinue, nil
 }
 
@@ -116,13 +117,13 @@ func (rp *RtrPkt) RouteResolveSVCMulti(svc addr.HostSVC) (HookResult, error) {
 	// IP address.
 	seen := make(map[string]struct{})
 	for _, elem := range elemMap {
-		ai := elem.PublicAddrInfo(rp.Ctx.Conf.Topo.Overlay)
-		strIP := fmt.Sprintf("%s:%d", ai.IP, ai.OverlayPort)
+		dst := elem.PublicAddrInfo(rp.Ctx.Conf.Topo.Overlay)
+		strIP := fmt.Sprintf("%s:%d", dst.IP, dst.OverlayPort)
 		if _, ok := seen[strIP]; ok {
 			continue
 		}
 		seen[strIP] = struct{}{}
-		rp.Egress = append(rp.Egress, EgressPair{rp.Ctx.LocSockOut, ai})
+		rp.Egress = append(rp.Egress, EgressPair{S: rp.Ctx.LocSockOut, Dst: dst})
 	}
 	return HookContinue, nil
 }
@@ -143,10 +144,7 @@ func (rp *RtrPkt) forward() (HookResult, error) {
 func (rp *RtrPkt) forwardFromExternal() (HookResult, error) {
 	if assert.On {
 		assert.Mustf(rp.hopF != nil, rp.ErrStr, "rp.hopF must not be nil")
-	}
-	if rp.hopF.VerifyOnly { // Should have been caught by validatePath
-		return HookError, common.NewBasicError("BUG: Non-routing HopF, refusing to forward", nil,
-			"hopF", rp.hopF)
+		assert.Mustf(!rp.hopF.VerifyOnly, rp.ErrStr, "Non-routing HopF")
 	}
 	// FIXME(kormat): this needs to be cleaner, as it won't work with
 	// extensions that replace the path header.
@@ -154,17 +152,13 @@ func (rp *RtrPkt) forwardFromExternal() (HookResult, error) {
 		rp.CmnHdr.HdrLenBytes()
 	if onLastSeg && rp.dstIA.Eq(rp.Ctx.Conf.IA) {
 		// Destination is a host in the local ISD-AS.
-		if rp.hopF.ForwardOnly { // Should have been caught by validatePath
-			return HookError, common.NewBasicError("BUG: Delivery forbidden for Forward-only HopF",
-				nil, "hopF", rp.hopF)
-		}
 		ot := overlay.OverlayFromIP(rp.dstHost.IP(), rp.Ctx.Conf.Topo.Overlay)
 		dst := &topology.AddrInfo{
 			Overlay:     ot,
 			IP:          rp.dstHost.IP(),
 			OverlayPort: overlay.EndhostPort,
 		}
-		rp.Egress = append(rp.Egress, EgressPair{rp.Ctx.LocSockOut, dst})
+		rp.Egress = append(rp.Egress, EgressPair{S: rp.Ctx.LocSockOut, Dst: dst})
 		return HookContinue, nil
 	}
 	// If this is a cross-over Hop Field, increment the path.
@@ -175,9 +169,13 @@ func (rp *RtrPkt) forwardFromExternal() (HookResult, error) {
 	} else if err := rp.validateLocalIF(rp.ifNext); err != nil {
 		return HookError, err
 	}
-	// Destination is in a remote ISD-AS, so forward to egress router.
-	// FIXME(kormat): this will need to change when multiple interfaces per
-	// router are supported.
+	// Destination is in a remote ISD-AS.
+	if _, ok := rp.Ctx.Conf.Net.IFs[*rp.ifNext]; ok {
+		// Egress interface is local so re-inject the packet
+		// and make it look like it arrived in the internal interface
+		rp.RefInc(1)
+		return rp.reprocess()
+	}
 	nextBR := rp.Ctx.Conf.Topo.IFInfoMap[*rp.ifNext]
 	nextAI := nextBR.InternalAddr.PublicAddrInfo(rp.Ctx.Conf.Topo.Overlay)
 	ot := overlay.OverlayFromIP(nextAI.IP, rp.Ctx.Conf.Topo.Overlay)
@@ -187,7 +185,7 @@ func (rp *RtrPkt) forwardFromExternal() (HookResult, error) {
 		L4Port:      nextAI.L4Port,
 		OverlayPort: nextAI.L4Port,
 	}
-	rp.Egress = append(rp.Egress, EgressPair{rp.Ctx.LocSockOut, dst})
+	rp.Egress = append(rp.Egress, EgressPair{S: rp.Ctx.LocSockOut, Dst: dst})
 	return HookContinue, nil
 }
 
@@ -241,12 +239,12 @@ func (rp *RtrPkt) xoverFromExternal() error {
 	prevLink := rp.Ctx.Conf.Net.IFs[origIFCurr].Type
 	nextLink := rp.Ctx.Conf.Topo.IFInfoMap[*rp.ifNext].LinkType
 	// Never allowed to switch between core segments.
-	if prevLink == topology.CoreLink && nextLink == topology.CoreLink {
+	if prevLink == proto.LinkType_core && nextLink == proto.LinkType_core {
 		return common.NewBasicError("Segment change between CORE links",
 			scmp.NewError(scmp.C_Path, scmp.T_P_BadSegment, rp.mkInfoPathOffsets(), nil))
 	}
 	// Only allowed to switch from up- to up-segment if the next link is CORE.
-	if !infoF.ConsDir && !rp.infoF.ConsDir && nextLink != topology.CoreLink {
+	if !infoF.ConsDir && !rp.infoF.ConsDir && nextLink != proto.LinkType_core {
 		return common.NewBasicError(
 			"Segment change from up segment to up segment with non-CORE next link",
 			scmp.NewError(scmp.C_Path, scmp.T_P_BadSegment, rp.mkInfoPathOffsets(), nil),
@@ -254,7 +252,7 @@ func (rp *RtrPkt) xoverFromExternal() error {
 		)
 	}
 	// Only allowed to switch from down- to down-segment if the previous link is CORE.
-	if infoF.ConsDir && rp.infoF.ConsDir && prevLink != topology.CoreLink {
+	if infoF.ConsDir && rp.infoF.ConsDir && prevLink != proto.LinkType_core {
 		return common.NewBasicError(
 			"Segment change from down segment to down segment with non-CORE previous link",
 			scmp.NewError(scmp.C_Path, scmp.T_P_BadSegment, rp.mkInfoPathOffsets(), nil),
@@ -272,6 +270,38 @@ func (rp *RtrPkt) forwardFromLocal() (HookResult, error) {
 			return HookError, err
 		}
 	}
-	rp.Egress = append(rp.Egress, EgressPair{rp.Ctx.ExtSockOut[*rp.ifCurr], nil})
+	rp.Egress = append(rp.Egress, EgressPair{S: rp.Ctx.ExtSockOut[*rp.ifCurr]})
 	return HookContinue, nil
+}
+
+func (rp *RtrPkt) reprocess() (HookResult, error) {
+	// save
+	ctx := rp.Ctx
+	free := rp.Free
+	// XXX We might need to reconsider keeping timeIn value due to effect on metrics.
+	timeIn := rp.TimeIn
+	raw := rp.Raw
+	refCnt := rp.refCnt
+	// reset
+	rp.Reset()
+	// restore
+	rp.Ctx = ctx
+	rp.Free = free
+	rp.TimeIn = timeIn
+	rp.Raw = raw
+	rp.refCnt = refCnt
+	// set as incoming from local interface
+	rp.DirFrom = rcmn.DirLocal
+	s := rp.Ctx.LocSockIn
+	rp.Ingress.Dst = s.Conn.LocalAddr()
+	rp.Ingress.Src = s.Conn.LocalAddr()
+	rp.Ingress.IfID = s.Ifid
+	rp.Ingress.Sock = s.Labels["sock"]
+	// XXX This hook is meant to be called only when processing packets from external to external
+	// interface. Thus, the goroutine writing to the LocIn ringbuffer should always be the ones
+	// NOT reading from it to avoid deadlock, ie. goroutines handling packets from external
+	// interfaces.
+	s.Ring.Write(ringbuf.EntryList{rp}, true)
+	// Stop routing the packet after enqueuing it back into the ringbuffer.
+	return HookFinish, nil
 }
