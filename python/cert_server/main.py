@@ -32,7 +32,7 @@ from lib.crypto.certificate_chain import CertificateChain, verify_sig_chain_trc
 from lib.crypto.trc import TRC
 from lib.crypto.symcrypto import crypto_hash
 from lib.crypto.symcrypto import kdf
-from lib.defines import CERTIFICATE_SERVICE, GEN_CACHE_PATH
+from lib.defines import GEN_CACHE_PATH
 from lib.drkey.drkey_mgmt import (
     DRKeyMgmt,
     DRKeyReply,
@@ -64,6 +64,7 @@ from lib.types import (
     CertMgmtType,
     DRKeyMgmtType,
     PayloadClass,
+    ServiceType
 )
 from lib.util import (
     SCIONTime,
@@ -95,21 +96,23 @@ class CertServer(SCIONElement):
     """
     The SCION Certificate Server.
     """
-    SERVICE_TYPE = CERTIFICATE_SERVICE
+    SERVICE_TYPE = ServiceType.CS
     # ZK path for incoming cert chains
     ZK_CC_CACHE_PATH = "cert_chain_cache"
     # ZK path for incoming TRCs
     ZK_TRC_CACHE_PATH = "trc_cache"
     ZK_DRKEY_PATH = "drkey_cache"
 
-    def __init__(self, server_id, conf_dir, spki_cache_dir=GEN_CACHE_PATH, prom_export=None):
+    def __init__(self, server_id, conf_dir, spki_cache_dir=GEN_CACHE_PATH,
+                 prom_export=None, sciond_path=None):
         """
         :param str server_id: server identifier.
         :param str conf_dir: configuration directory.
         :param str prom_export: prometheus export address.
+        :param str sciond_path: path to sciond socket.
         """
         super().__init__(server_id, conf_dir, spki_cache_dir=spki_cache_dir,
-                         prom_export=prom_export)
+                         prom_export=prom_export, sciond_path=sciond_path)
         self.config = self._load_as_conf()
         cc_labels = {**self._labels, "type": "cc"} if self._labels else None
         trc_labels = {**self._labels, "type": "trc"} if self._labels else None
@@ -144,7 +147,7 @@ class CertServer(SCIONElement):
 
         zkid = ZkID.from_values(self.addr.isd_as, self.id,
                                 [(self.addr.host, self._port)]).pack()
-        self.zk = Zookeeper(self.topology.isd_as, CERTIFICATE_SERVICE,
+        self.zk = Zookeeper(self.topology.isd_as, self.SERVICE_TYPE,
                             zkid, self.topology.zookeepers)
         self.zk.retry("Joining party", self.zk.party_setup)
         self.trc_cache = ZkSharedCache(self.zk, self.ZK_TRC_CACHE_PATH,

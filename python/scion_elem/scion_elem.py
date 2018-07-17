@@ -35,15 +35,9 @@ from lib.crypto.certificate_chain import verify_chain_trc
 from lib.errors import SCIONParseError, SCIONVerificationError
 from lib.defines import (
     AS_CONF_FILE,
-    BEACON_SERVICE,
-    CERTIFICATE_SERVICE,
     GEN_CACHE_PATH,
-    PATH_SERVICE,
     REVOCATION_GRACE,
     SCION_UDP_EH_DATA_PORT,
-    SCIOND_API_SOCKDIR,
-    SERVICE_TYPES,
-    SIBRA_SERVICE,
     STARTUP_QUIET_PERIOD,
     TOPO_FILE,
 )
@@ -100,7 +94,7 @@ from lib.packet.scmp.util import scmp_type_name
 from lib.socket import ReliableSocket, SocketMgr
 from lib.thread import thread_safety_net, kill_self
 from lib.trust_store import TrustStore
-from lib.types import AddrType, L4Proto, PayloadClass
+from lib.types import AddrType, L4Proto, PayloadClass, ServiceType
 from lib.topology import Topology
 from lib.util import hex_str, sleep_interval
 
@@ -145,7 +139,7 @@ class SCIONElement(object):
     TRC_CC_REQ_TIMEOUT = 3
 
     def __init__(self, server_id, conf_dir, public=None, bind=None, spki_cache_dir=GEN_CACHE_PATH,
-                 prom_export=None):
+                 prom_export=None, sciond_path=None):
         """
         :param str server_id: server identifier.
         :param str conf_dir: configuration directory.
@@ -161,6 +155,8 @@ class SCIONElement(object):
         :param str prom_export:
             String of the form 'addr:port' specifying the prometheus endpoint.
             If no string is provided, no metrics are exported.
+        :param str sciond_path:
+            String that specifies the location of sciond's socket.
         """
         self.id = server_id
         self.conf_dir = conf_dir
@@ -212,7 +208,7 @@ class SCIONElement(object):
             self._export_metrics(prom_export)
             self._init_metrics()
         self._setup_sockets(True)
-        lib_sciond.init(os.path.join(SCIOND_API_SOCKDIR, "sd%s.sock" % self.addr.isd_as.file_fmt()))
+        lib_sciond.init(sciond_path)
 
     def _load_as_conf(self):
         return Config.from_file(os.path.join(self.conf_dir, AS_CONF_FILE))
@@ -447,7 +443,7 @@ class SCIONElement(object):
         Lookup certificate servers address and return meta.
         """
         try:
-            addr, port = self.dns_query_topo(CERTIFICATE_SERVICE)[0]
+            addr, port = self.dns_query_topo(ServiceType.CS)[0]
         except SCIONServiceLookupError as e:
             logging.warning("Lookup for certificate service failed: %s", e)
             return None
@@ -644,10 +640,11 @@ class SCIONElement(object):
         """
         # Received cert chain
         isd_as, ver = cert.get_leaf_isd_as_ver()
-        trc = self.trust_store.get_trc(isd_as[0], ver)
+        trc_ver = cert.core_as_cert.trc_version
+        trc = self.trust_store.get_trc(isd_as[0], trc_ver)
         if not trc:
             # Request TRC just to make sure
-            self._request_trc(isd_as[0], ver, None)
+            self._request_trc(isd_as[0], trc_ver, None)
             with self.unv_certs_lock:
                 self.unv_certs[(isd_as, ver)] = cert
             logging.error("Certificate chain verification for %s failed because of missing TRC" %
@@ -1087,12 +1084,11 @@ class SCIONElement(object):
 
         :param str qname: Service to query for.
         """
-        assert qname in SERVICE_TYPES
         service_map = {
-            BEACON_SERVICE: self.topology.beacon_servers,
-            CERTIFICATE_SERVICE: self.topology.certificate_servers,
-            PATH_SERVICE: self.topology.path_servers,
-            SIBRA_SERVICE: self.topology.sibra_servers,
+            ServiceType.BS: self.topology.beacon_servers,
+            ServiceType.CS: self.topology.certificate_servers,
+            ServiceType.PS: self.topology.path_servers,
+            ServiceType.SIBRA: self.topology.sibra_servers,
         }
         # Generate fallback from local topology
         results = []

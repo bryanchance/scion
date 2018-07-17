@@ -65,8 +65,15 @@ python/integration/cert_req_test.py -l ERROR
 EOF
 result=$?
 
+# Run go integration test
+GO_INFRA_TEST="go test -tags infrarunning"
+for i in ./go/lib/{snet,pathmgr}; do
+    ${GO_INFRA_TEST} $i
+    result=$((result+$?))
+done
+
 run Revocation "integration/revocation_test.sh\
- ${REV_BRS:-as1-ff00_0_110:br1-ff00_0_110-3 as2-ff00_0_222:br2-ff00_0_222-2 as1-ff00_0_111:br1-ff00_0_111-3 as1-ff00_0_131:br1-ff00_0_131-2}"
+ ${REV_BRS:-*br1-ff00_0_110-3 *br2-ff00_0_222-2 *br1-ff00_0_111-3 *br1-ff00_0_131-2}"
 result=$((result+$?))
 
 shutdown
