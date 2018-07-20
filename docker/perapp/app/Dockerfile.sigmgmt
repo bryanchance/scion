@@ -5,8 +5,25 @@ RUN npm install
 RUN npm install -g @angular/cli
 RUN ng build --prod --deploy-url app/
 
+# Add ssh and scp
+COPY copy_package .
+RUN ./copy_package openssh-client '/usr/share'
+RUN ./copy_package libselinux1 '/usr/share'
+RUN ./copy_package libssl1.0.0 '/usr/share'
+RUN ./copy_package zlib1g '/usr/share'
+RUN ./copy_package libgssapi-krb5-2 '/usr/share'
+RUN ./copy_package libkrb5-3 '/usr/share'
+RUN ./copy_package passwd '/usr/share'
+RUN ./copy_package libedit2 '/usr/share'
+RUN ./copy_package libpcre3 '/usr/share'
+RUN ./copy_package libk5crypto3 '/usr/share'
+RUN ./copy_package libcomerr2 '/usr/share'
+RUN ./copy_package libkrb5support0 '/usr/share'
+RUN ./copy_package libkeyutils1 '/usr/share'
+
 FROM scion_app_base:latest
 COPY --from=scion_app_builder:latest /home/scion/go/src/github.com/scionproto/scion/bin/sigmgmt /app/
 COPY --from=scion:latest /home/scion/go/src/github.com/scionproto/scion/go/sigmgmt/static /app/static
 COPY --from=0 /build/dist /app/static/webui
+COPY --from=0 /rootfs /
 ENTRYPOINT ["/sbin/su-exec", "/app/sigmgmt"]

@@ -67,7 +67,7 @@ hashes/sig: app/Dockerfile.sig hashes/app_base hashes/app_builder
 
 sigmgmt: hashes/sigmgmt
 hashes/sigmgmt: app/Dockerfile.sigmgmt hashes/app_base hashes/app_builder
-	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
+	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $< files/
 
 path: hashes/path
 hashes/path: app/Dockerfile.path hashes/python_base

@@ -33,7 +33,7 @@
           <mat-form-field>
             <input matInput name="hostKey" [(ngModel)]="host.Key" type="text" placeholder="SSH Key Path">
             <mat-hint align="start">
-              <strong>E.g. /home/user/.ssh/user.key</strong>
+              <strong>E.g. /share/conf/sigmgmt_rsa</strong>
             </mat-hint>
           </mat-form-field>
           <button mat-button type="submit" *ngIf="!editing" [disabled]="hostForm.invalid">

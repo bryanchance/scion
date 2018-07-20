@@ -99,7 +99,7 @@ func reloadHost(ctx context.Context, host *db.Host, logger log.Logger) error {
 	// ssh [ -i *sshKey ] [*sshUser@]host sudo systemctl --signal=SIGHUP kill sig.service
 	args := defaultSSHParams(ctx, host)
 	args = append(args, fmt.Sprintf("%s@%s", host.User, host.Name))
-	args = append(args, "sudo systemctl reload sig.service")
+	args = append(args, "sudo systemctl reload scion-sig.service")
 	sshCommand := exec.CommandContext(ctx, "ssh", args...)
 	logger.Info("Sending SIG reload signal via ssh", "args", args)
 	return runCommand(sshCommand)
