@@ -31,7 +31,9 @@ export class TrafficClassesComponent implements OnInit {
     }
   }
 
-  delete(idx: number) {
+  delete(e, idx: number) {
+    e.preventDefault()
+    e.stopPropagation()
     this.api.deleteTrafficClass(this.site, this.trafficClasses[idx])
       .subscribe(
         () => this.trafficClasses.splice(idx, 1),

@@ -15,55 +15,58 @@ var _ = reflect.Copy
 var _ = strconv.Itoa
 
 var parserATN = []uint16{
-	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 19, 89, 4,
+	3, 24715, 42794, 33075, 47597, 16764, 15335, 30598, 22884, 3, 22, 96, 4,
 	2, 9, 2, 4, 3, 9, 3, 4, 4, 9, 4, 4, 5, 9, 5, 4, 6, 9, 6, 4, 7, 9, 7, 4,
-	8, 9, 8, 4, 9, 9, 9, 4, 10, 9, 10, 4, 11, 9, 11, 4, 12, 9, 12, 3, 2, 3,
-	2, 3, 2, 3, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 3, 4, 3, 4, 3, 4, 3, 5, 3,
-	5, 3, 5, 3, 5, 3, 6, 3, 6, 3, 6, 3, 7, 3, 7, 3, 7, 3, 7, 3, 7, 7, 7, 49,
-	10, 7, 12, 7, 14, 7, 52, 11, 7, 3, 7, 3, 7, 3, 8, 3, 8, 3, 8, 3, 8, 3,
-	8, 7, 8, 61, 10, 8, 12, 8, 14, 8, 64, 11, 8, 3, 8, 3, 8, 3, 9, 3, 9, 3,
-	9, 3, 9, 3, 9, 3, 10, 3, 10, 3, 10, 3, 10, 5, 10, 77, 10, 10, 3, 11, 3,
-	11, 3, 11, 3, 11, 3, 11, 5, 11, 84, 10, 11, 3, 12, 3, 12, 3, 12, 3, 12,
-	2, 2, 13, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 2, 3, 3, 2, 10, 11, 2,
-	86, 2, 24, 3, 2, 2, 2, 4, 28, 3, 2, 2, 2, 6, 32, 3, 2, 2, 2, 8, 36, 3,
-	2, 2, 2, 10, 40, 3, 2, 2, 2, 12, 43, 3, 2, 2, 2, 14, 55, 3, 2, 2, 2, 16,
-	67, 3, 2, 2, 2, 18, 76, 3, 2, 2, 2, 20, 83, 3, 2, 2, 2, 22, 85, 3, 2, 2,
-	2, 24, 25, 7, 16, 2, 2, 25, 26, 7, 3, 2, 2, 26, 27, 7, 12, 2, 2, 27, 3,
-	3, 2, 2, 2, 28, 29, 7, 17, 2, 2, 29, 30, 7, 3, 2, 2, 30, 31, 7, 12, 2,
-	2, 31, 5, 3, 2, 2, 2, 32, 33, 7, 18, 2, 2, 33, 34, 7, 4, 2, 2, 34, 35,
-	9, 2, 2, 2, 35, 7, 3, 2, 2, 2, 36, 37, 7, 19, 2, 2, 37, 38, 7, 4, 2, 2,
-	38, 39, 9, 2, 2, 2, 39, 9, 3, 2, 2, 2, 40, 41, 7, 5, 2, 2, 41, 42, 7, 10,
-	2, 2, 42, 11, 3, 2, 2, 2, 43, 44, 7, 13, 2, 2, 44, 45, 7, 6, 2, 2, 45,
-	50, 5, 20, 11, 2, 46, 47, 7, 7, 2, 2, 47, 49, 5, 20, 11, 2, 48, 46, 3,
-	2, 2, 2, 49, 52, 3, 2, 2, 2, 50, 48, 3, 2, 2, 2, 50, 51, 3, 2, 2, 2, 51,
-	53, 3, 2, 2, 2, 52, 50, 3, 2, 2, 2, 53, 54, 7, 8, 2, 2, 54, 13, 3, 2, 2,
-	2, 55, 56, 7, 14, 2, 2, 56, 57, 7, 6, 2, 2, 57, 62, 5, 20, 11, 2, 58, 59,
-	7, 7, 2, 2, 59, 61, 5, 20, 11, 2, 60, 58, 3, 2, 2, 2, 61, 64, 3, 2, 2,
-	2, 62, 60, 3, 2, 2, 2, 62, 63, 3, 2, 2, 2, 63, 65, 3, 2, 2, 2, 64, 62,
-	3, 2, 2, 2, 65, 66, 7, 8, 2, 2, 66, 15, 3, 2, 2, 2, 67, 68, 7, 15, 2, 2,
-	68, 69, 7, 6, 2, 2, 69, 70, 5, 20, 11, 2, 70, 71, 7, 8, 2, 2, 71, 17, 3,
-	2, 2, 2, 72, 77, 5, 2, 2, 2, 73, 77, 5, 4, 3, 2, 74, 77, 5, 6, 4, 2, 75,
-	77, 5, 8, 5, 2, 76, 72, 3, 2, 2, 2, 76, 73, 3, 2, 2, 2, 76, 74, 3, 2, 2,
-	2, 76, 75, 3, 2, 2, 2, 77, 19, 3, 2, 2, 2, 78, 84, 5, 14, 8, 2, 79, 84,
-	5, 12, 7, 2, 80, 84, 5, 16, 9, 2, 81, 84, 5, 18, 10, 2, 82, 84, 5, 10,
-	6, 2, 83, 78, 3, 2, 2, 2, 83, 79, 3, 2, 2, 2, 83, 80, 3, 2, 2, 2, 83, 81,
-	3, 2, 2, 2, 83, 82, 3, 2, 2, 2, 84, 21, 3, 2, 2, 2, 85, 86, 5, 20, 11,
-	2, 86, 87, 7, 2, 2, 3, 87, 23, 3, 2, 2, 2, 6, 50, 62, 76, 83,
+	8, 9, 8, 4, 9, 9, 9, 4, 10, 9, 10, 4, 11, 9, 11, 4, 12, 9, 12, 4, 13, 9,
+	13, 3, 2, 3, 2, 3, 2, 3, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 3, 4, 3, 4, 3,
+	4, 3, 5, 3, 5, 3, 5, 3, 5, 3, 6, 3, 6, 3, 6, 3, 7, 3, 7, 3, 7, 3, 7, 3,
+	7, 7, 7, 51, 10, 7, 12, 7, 14, 7, 54, 11, 7, 3, 7, 3, 7, 3, 8, 3, 8, 3,
+	8, 3, 8, 3, 8, 7, 8, 63, 10, 8, 12, 8, 14, 8, 66, 11, 8, 3, 8, 3, 8, 3,
+	9, 3, 9, 3, 9, 3, 9, 3, 9, 3, 10, 3, 10, 3, 10, 3, 10, 3, 11, 3, 11, 3,
+	11, 3, 11, 5, 11, 83, 10, 11, 3, 12, 3, 12, 3, 12, 3, 12, 3, 12, 3, 12,
+	5, 12, 91, 10, 12, 3, 13, 3, 13, 3, 13, 3, 13, 2, 2, 14, 2, 4, 6, 8, 10,
+	12, 14, 16, 18, 20, 22, 24, 2, 4, 3, 2, 12, 13, 3, 2, 9, 10, 2, 93, 2,
+	26, 3, 2, 2, 2, 4, 30, 3, 2, 2, 2, 6, 34, 3, 2, 2, 2, 8, 38, 3, 2, 2, 2,
+	10, 42, 3, 2, 2, 2, 12, 45, 3, 2, 2, 2, 14, 57, 3, 2, 2, 2, 16, 69, 3,
+	2, 2, 2, 18, 74, 3, 2, 2, 2, 20, 82, 3, 2, 2, 2, 22, 90, 3, 2, 2, 2, 24,
+	92, 3, 2, 2, 2, 26, 27, 7, 19, 2, 2, 27, 28, 7, 3, 2, 2, 28, 29, 7, 14,
+	2, 2, 29, 3, 3, 2, 2, 2, 30, 31, 7, 20, 2, 2, 31, 32, 7, 3, 2, 2, 32, 33,
+	7, 14, 2, 2, 33, 5, 3, 2, 2, 2, 34, 35, 7, 21, 2, 2, 35, 36, 7, 4, 2, 2,
+	36, 37, 9, 2, 2, 2, 37, 7, 3, 2, 2, 2, 38, 39, 7, 22, 2, 2, 39, 40, 7,
+	4, 2, 2, 40, 41, 9, 2, 2, 2, 41, 9, 3, 2, 2, 2, 42, 43, 7, 5, 2, 2, 43,
+	44, 7, 12, 2, 2, 44, 11, 3, 2, 2, 2, 45, 46, 7, 15, 2, 2, 46, 47, 7, 6,
+	2, 2, 47, 52, 5, 22, 12, 2, 48, 49, 7, 7, 2, 2, 49, 51, 5, 22, 12, 2, 50,
+	48, 3, 2, 2, 2, 51, 54, 3, 2, 2, 2, 52, 50, 3, 2, 2, 2, 52, 53, 3, 2, 2,
+	2, 53, 55, 3, 2, 2, 2, 54, 52, 3, 2, 2, 2, 55, 56, 7, 8, 2, 2, 56, 13,
+	3, 2, 2, 2, 57, 58, 7, 16, 2, 2, 58, 59, 7, 6, 2, 2, 59, 64, 5, 22, 12,
+	2, 60, 61, 7, 7, 2, 2, 61, 63, 5, 22, 12, 2, 62, 60, 3, 2, 2, 2, 63, 66,
+	3, 2, 2, 2, 64, 62, 3, 2, 2, 2, 64, 65, 3, 2, 2, 2, 65, 67, 3, 2, 2, 2,
+	66, 64, 3, 2, 2, 2, 67, 68, 7, 8, 2, 2, 68, 15, 3, 2, 2, 2, 69, 70, 7,
+	17, 2, 2, 70, 71, 7, 6, 2, 2, 71, 72, 5, 22, 12, 2, 72, 73, 7, 8, 2, 2,
+	73, 17, 3, 2, 2, 2, 74, 75, 7, 18, 2, 2, 75, 76, 7, 3, 2, 2, 76, 77, 9,
+	3, 2, 2, 77, 19, 3, 2, 2, 2, 78, 83, 5, 2, 2, 2, 79, 83, 5, 4, 3, 2, 80,
+	83, 5, 6, 4, 2, 81, 83, 5, 8, 5, 2, 82, 78, 3, 2, 2, 2, 82, 79, 3, 2, 2,
+	2, 82, 80, 3, 2, 2, 2, 82, 81, 3, 2, 2, 2, 83, 21, 3, 2, 2, 2, 84, 91,
+	5, 14, 8, 2, 85, 91, 5, 12, 7, 2, 86, 91, 5, 16, 9, 2, 87, 91, 5, 20, 11,
+	2, 88, 91, 5, 10, 6, 2, 89, 91, 5, 18, 10, 2, 90, 84, 3, 2, 2, 2, 90, 85,
+	3, 2, 2, 2, 90, 86, 3, 2, 2, 2, 90, 87, 3, 2, 2, 2, 90, 88, 3, 2, 2, 2,
+	90, 89, 3, 2, 2, 2, 91, 23, 3, 2, 2, 2, 92, 93, 5, 22, 12, 2, 93, 94, 7,
+	2, 2, 3, 94, 25, 3, 2, 2, 2, 6, 52, 64, 82, 90,
 }
 var deserializer = antlr.NewATNDeserializer(nil)
 var deserializedATN = deserializer.DeserializeFromUInt16(parserATN)
 
 var literalNames = []string{
-	"", "'='", "'=0x'", "'cls='", "'('", "','", "')'",
+	"", "'='", "'=0x'", "'cls='", "'('", "','", "')'", "'true'", "'false'",
 }
 var symbolicNames = []string{
-	"", "", "", "", "", "", "", "WHITESPACE", "DIGITS", "HEX_DIGITS", "NET",
-	"ANY", "ALL", "NOT", "SRC", "DST", "DSCP", "TOS",
+	"", "", "", "", "", "", "", "", "", "WHITESPACE", "DIGITS", "HEX_DIGITS",
+	"NET", "ANY", "ALL", "NOT", "BOOL", "SRC", "DST", "DSCP", "TOS",
 }
 
 var ruleNames = []string{
 	"matchSrc", "matchDst", "matchDSCP", "matchTOS", "condCls", "condAny",
-	"condAll", "condNot", "condIPv4", "cond", "trafficClass",
+	"condAll", "condNot", "condBool", "condIPv4", "cond", "trafficClass",
 }
 var decisionToDFA = make([]*antlr.DFA, len(deserializedATN.DecisionToState))
 
@@ -100,17 +103,20 @@ const (
 	TrafficClassParserT__3       = 4
 	TrafficClassParserT__4       = 5
 	TrafficClassParserT__5       = 6
-	TrafficClassParserWHITESPACE = 7
-	TrafficClassParserDIGITS     = 8
-	TrafficClassParserHEX_DIGITS = 9
-	TrafficClassParserNET        = 10
-	TrafficClassParserANY        = 11
-	TrafficClassParserALL        = 12
-	TrafficClassParserNOT        = 13
-	TrafficClassParserSRC        = 14
-	TrafficClassParserDST        = 15
-	TrafficClassParserDSCP       = 16
-	TrafficClassParserTOS        = 17
+	TrafficClassParserT__6       = 7
+	TrafficClassParserT__7       = 8
+	TrafficClassParserWHITESPACE = 9
+	TrafficClassParserDIGITS     = 10
+	TrafficClassParserHEX_DIGITS = 11
+	TrafficClassParserNET        = 12
+	TrafficClassParserANY        = 13
+	TrafficClassParserALL        = 14
+	TrafficClassParserNOT        = 15
+	TrafficClassParserBOOL       = 16
+	TrafficClassParserSRC        = 17
+	TrafficClassParserDST        = 18
+	TrafficClassParserDSCP       = 19
+	TrafficClassParserTOS        = 20
 )
 
 // TrafficClassParser rules.
@@ -123,9 +129,10 @@ const (
 	TrafficClassParserRULE_condAny      = 5
 	TrafficClassParserRULE_condAll      = 6
 	TrafficClassParserRULE_condNot      = 7
-	TrafficClassParserRULE_condIPv4     = 8
-	TrafficClassParserRULE_cond         = 9
-	TrafficClassParserRULE_trafficClass = 10
+	TrafficClassParserRULE_condBool     = 8
+	TrafficClassParserRULE_condIPv4     = 9
+	TrafficClassParserRULE_cond         = 10
+	TrafficClassParserRULE_trafficClass = 11
 )
 
 // IMatchSrcContext is an interface to support dynamic dispatch.
@@ -216,15 +223,15 @@ func (p *TrafficClassParser) MatchSrc() (localctx IMatchSrcContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(22)
+		p.SetState(24)
 		p.Match(TrafficClassParserSRC)
 	}
 	{
-		p.SetState(23)
+		p.SetState(25)
 		p.Match(TrafficClassParserT__0)
 	}
 	{
-		p.SetState(24)
+		p.SetState(26)
 		p.Match(TrafficClassParserNET)
 	}
 
@@ -319,15 +326,15 @@ func (p *TrafficClassParser) MatchDst() (localctx IMatchDstContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(26)
+		p.SetState(28)
 		p.Match(TrafficClassParserDST)
 	}
 	{
-		p.SetState(27)
+		p.SetState(29)
 		p.Match(TrafficClassParserT__0)
 	}
 	{
-		p.SetState(28)
+		p.SetState(30)
 		p.Match(TrafficClassParserNET)
 	}
 
@@ -427,15 +434,15 @@ func (p *TrafficClassParser) MatchDSCP() (localctx IMatchDSCPContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(30)
+		p.SetState(32)
 		p.Match(TrafficClassParserDSCP)
 	}
 	{
-		p.SetState(31)
+		p.SetState(33)
 		p.Match(TrafficClassParserT__1)
 	}
 	{
-		p.SetState(32)
+		p.SetState(34)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == TrafficClassParserDIGITS || _la == TrafficClassParserHEX_DIGITS) {
@@ -542,15 +549,15 @@ func (p *TrafficClassParser) MatchTOS() (localctx IMatchTOSContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(34)
+		p.SetState(36)
 		p.Match(TrafficClassParserTOS)
 	}
 	{
-		p.SetState(35)
+		p.SetState(37)
 		p.Match(TrafficClassParserT__1)
 	}
 	{
-		p.SetState(36)
+		p.SetState(38)
 		_la = p.GetTokenStream().LA(1)
 
 		if !(_la == TrafficClassParserDIGITS || _la == TrafficClassParserHEX_DIGITS) {
@@ -648,11 +655,11 @@ func (p *TrafficClassParser) CondCls() (localctx ICondClsContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(38)
+		p.SetState(40)
 		p.Match(TrafficClassParserT__2)
 	}
 	{
-		p.SetState(39)
+		p.SetState(41)
 		p.Match(TrafficClassParserDIGITS)
 	}
 
@@ -767,37 +774,37 @@ func (p *TrafficClassParser) CondAny() (localctx ICondAnyContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(41)
+		p.SetState(43)
 		p.Match(TrafficClassParserANY)
 	}
 	{
-		p.SetState(42)
+		p.SetState(44)
 		p.Match(TrafficClassParserT__3)
 	}
 	{
-		p.SetState(43)
+		p.SetState(45)
 		p.Cond()
 	}
-	p.SetState(48)
+	p.SetState(50)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == TrafficClassParserT__4 {
 		{
-			p.SetState(44)
+			p.SetState(46)
 			p.Match(TrafficClassParserT__4)
 		}
 		{
-			p.SetState(45)
+			p.SetState(47)
 			p.Cond()
 		}
 
-		p.SetState(50)
+		p.SetState(52)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(51)
+		p.SetState(53)
 		p.Match(TrafficClassParserT__5)
 	}
 
@@ -912,37 +919,37 @@ func (p *TrafficClassParser) CondAll() (localctx ICondAllContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(53)
+		p.SetState(55)
 		p.Match(TrafficClassParserALL)
 	}
 	{
-		p.SetState(54)
+		p.SetState(56)
 		p.Match(TrafficClassParserT__3)
 	}
 	{
-		p.SetState(55)
+		p.SetState(57)
 		p.Cond()
 	}
-	p.SetState(60)
+	p.SetState(62)
 	p.GetErrorHandler().Sync(p)
 	_la = p.GetTokenStream().LA(1)
 
 	for _la == TrafficClassParserT__4 {
 		{
-			p.SetState(56)
+			p.SetState(58)
 			p.Match(TrafficClassParserT__4)
 		}
 		{
-			p.SetState(57)
+			p.SetState(59)
 			p.Cond()
 		}
 
-		p.SetState(62)
+		p.SetState(64)
 		p.GetErrorHandler().Sync(p)
 		_la = p.GetTokenStream().LA(1)
 	}
 	{
-		p.SetState(63)
+		p.SetState(65)
 		p.Match(TrafficClassParserT__5)
 	}
 
@@ -1043,20 +1050,127 @@ func (p *TrafficClassParser) CondNot() (localctx ICondNotContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(65)
+		p.SetState(67)
 		p.Match(TrafficClassParserNOT)
 	}
 	{
-		p.SetState(66)
+		p.SetState(68)
 		p.Match(TrafficClassParserT__3)
 	}
 	{
-		p.SetState(67)
+		p.SetState(69)
 		p.Cond()
 	}
 	{
-		p.SetState(68)
+		p.SetState(70)
 		p.Match(TrafficClassParserT__5)
+	}
+
+	return localctx
+}
+
+// ICondBoolContext is an interface to support dynamic dispatch.
+type ICondBoolContext interface {
+	antlr.ParserRuleContext
+
+	// GetParser returns the parser.
+	GetParser() antlr.Parser
+
+	// IsCondBoolContext differentiates from other interfaces.
+	IsCondBoolContext()
+}
+
+type CondBoolContext struct {
+	*antlr.BaseParserRuleContext
+	parser antlr.Parser
+}
+
+func NewEmptyCondBoolContext() *CondBoolContext {
+	var p = new(CondBoolContext)
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(nil, -1)
+	p.RuleIndex = TrafficClassParserRULE_condBool
+	return p
+}
+
+func (*CondBoolContext) IsCondBoolContext() {}
+
+func NewCondBoolContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondBoolContext {
+	var p = new(CondBoolContext)
+
+	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
+
+	p.parser = parser
+	p.RuleIndex = TrafficClassParserRULE_condBool
+
+	return p
+}
+
+func (s *CondBoolContext) GetParser() antlr.Parser { return s.parser }
+
+func (s *CondBoolContext) BOOL() antlr.TerminalNode {
+	return s.GetToken(TrafficClassParserBOOL, 0)
+}
+
+func (s *CondBoolContext) GetRuleContext() antlr.RuleContext {
+	return s
+}
+
+func (s *CondBoolContext) ToStringTree(ruleNames []string, recog antlr.Recognizer) string {
+	return antlr.TreesStringTree(s, ruleNames, recog)
+}
+
+func (s *CondBoolContext) EnterRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TrafficClassListener); ok {
+		listenerT.EnterCondBool(s)
+	}
+}
+
+func (s *CondBoolContext) ExitRule(listener antlr.ParseTreeListener) {
+	if listenerT, ok := listener.(TrafficClassListener); ok {
+		listenerT.ExitCondBool(s)
+	}
+}
+
+func (p *TrafficClassParser) CondBool() (localctx ICondBoolContext) {
+	localctx = NewCondBoolContext(p, p.GetParserRuleContext(), p.GetState())
+	p.EnterRule(localctx, 16, TrafficClassParserRULE_condBool)
+	var _la int
+
+	defer func() {
+		p.ExitRule()
+	}()
+
+	defer func() {
+		if err := recover(); err != nil {
+			if v, ok := err.(antlr.RecognitionException); ok {
+				localctx.SetException(v)
+				p.GetErrorHandler().ReportError(p, v)
+				p.GetErrorHandler().Recover(p, v)
+			} else {
+				panic(err)
+			}
+		}
+	}()
+
+	p.EnterOuterAlt(localctx, 1)
+	{
+		p.SetState(72)
+		p.Match(TrafficClassParserBOOL)
+	}
+	{
+		p.SetState(73)
+		p.Match(TrafficClassParserT__0)
+	}
+	{
+		p.SetState(74)
+		_la = p.GetTokenStream().LA(1)
+
+		if !(_la == TrafficClassParserT__6 || _la == TrafficClassParserT__7) {
+			p.GetErrorHandler().RecoverInline(p)
+		} else {
+			p.GetErrorHandler().ReportMatch(p)
+			p.Consume()
+		}
 	}
 
 	return localctx
@@ -1162,7 +1276,7 @@ func (s *CondIPv4Context) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *TrafficClassParser) CondIPv4() (localctx ICondIPv4Context) {
 	localctx = NewCondIPv4Context(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 16, TrafficClassParserRULE_condIPv4)
+	p.EnterRule(localctx, 18, TrafficClassParserRULE_condIPv4)
 
 	defer func() {
 		p.ExitRule()
@@ -1180,35 +1294,35 @@ func (p *TrafficClassParser) CondIPv4() (localctx ICondIPv4Context) {
 		}
 	}()
 
-	p.SetState(74)
+	p.SetState(80)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case TrafficClassParserSRC:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(70)
+			p.SetState(76)
 			p.MatchSrc()
 		}
 
 	case TrafficClassParserDST:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(71)
+			p.SetState(77)
 			p.MatchDst()
 		}
 
 	case TrafficClassParserDSCP:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(72)
+			p.SetState(78)
 			p.MatchDSCP()
 		}
 
 	case TrafficClassParserTOS:
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(73)
+			p.SetState(79)
 			p.MatchTOS()
 		}
 
@@ -1307,6 +1421,16 @@ func (s *CondContext) CondCls() ICondClsContext {
 	return t.(ICondClsContext)
 }
 
+func (s *CondContext) CondBool() ICondBoolContext {
+	var t = s.GetTypedRuleContext(reflect.TypeOf((*ICondBoolContext)(nil)).Elem(), 0)
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(ICondBoolContext)
+}
+
 func (s *CondContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -1329,7 +1453,7 @@ func (s *CondContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *TrafficClassParser) Cond() (localctx ICondContext) {
 	localctx = NewCondContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 18, TrafficClassParserRULE_cond)
+	p.EnterRule(localctx, 20, TrafficClassParserRULE_cond)
 
 	defer func() {
 		p.ExitRule()
@@ -1347,43 +1471,50 @@ func (p *TrafficClassParser) Cond() (localctx ICondContext) {
 		}
 	}()
 
-	p.SetState(81)
+	p.SetState(88)
 	p.GetErrorHandler().Sync(p)
 
 	switch p.GetTokenStream().LA(1) {
 	case TrafficClassParserALL:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(76)
+			p.SetState(82)
 			p.CondAll()
 		}
 
 	case TrafficClassParserANY:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(77)
+			p.SetState(83)
 			p.CondAny()
 		}
 
 	case TrafficClassParserNOT:
 		p.EnterOuterAlt(localctx, 3)
 		{
-			p.SetState(78)
+			p.SetState(84)
 			p.CondNot()
 		}
 
 	case TrafficClassParserSRC, TrafficClassParserDST, TrafficClassParserDSCP, TrafficClassParserTOS:
 		p.EnterOuterAlt(localctx, 4)
 		{
-			p.SetState(79)
+			p.SetState(85)
 			p.CondIPv4()
 		}
 
 	case TrafficClassParserT__2:
 		p.EnterOuterAlt(localctx, 5)
 		{
-			p.SetState(80)
+			p.SetState(86)
 			p.CondCls()
+		}
+
+	case TrafficClassParserBOOL:
+		p.EnterOuterAlt(localctx, 6)
+		{
+			p.SetState(87)
+			p.CondBool()
 		}
 
 	default:
@@ -1467,7 +1598,7 @@ func (s *TrafficClassContext) ExitRule(listener antlr.ParseTreeListener) {
 
 func (p *TrafficClassParser) TrafficClass() (localctx ITrafficClassContext) {
 	localctx = NewTrafficClassContext(p, p.GetParserRuleContext(), p.GetState())
-	p.EnterRule(localctx, 20, TrafficClassParserRULE_trafficClass)
+	p.EnterRule(localctx, 22, TrafficClassParserRULE_trafficClass)
 
 	defer func() {
 		p.ExitRule()
@@ -1487,11 +1618,11 @@ func (p *TrafficClassParser) TrafficClass() (localctx ITrafficClassContext) {
 
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(83)
+		p.SetState(90)
 		p.Cond()
 	}
 	{
-		p.SetState(84)
+		p.SetState(91)
 		p.Match(TrafficClassParserEOF)
 	}
 

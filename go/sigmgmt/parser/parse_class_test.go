@@ -58,6 +58,16 @@ func TestTrafficClassValidation(t *testing.T) {
 			Valid: false,
 		},
 		{
+			Name:  "BOOL",
+			Class: "BOOL=true",
+			Valid: true,
+		},
+		{
+			Name:  "bad BOOL",
+			Class: "BOOL=True",
+			Valid: false,
+		},
+		{
 			Name:  "single ALL",
 			Class: "ALL(dscp=0x2)",
 			Valid: true,
@@ -137,6 +147,11 @@ func TestTrafficClassTree(t *testing.T) {
 			Tree: pktcls.CondNot{Operand: pktcls.NewCondIPv4(
 				&pktcls.IPv4MatchDSCP{DSCP: uint8(0x2)},
 			)},
+		},
+		{
+			Name:  "BOOL",
+			Class: "bool=true",
+			Tree:  pktcls.CondBool(true),
 		},
 		{
 			Name:  "single ALL",

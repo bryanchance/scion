@@ -2,6 +2,7 @@ import { TrafficClass } from './models'
 export const TypeCondAllOf = 'CondAllOf'
 export const TypeCondAnyOf = 'CondAnyOf'
 export const TypeCondNot = 'CondNot'
+export const TypeCondBool = 'CondBool'
 export const TypeCondIPv4 = 'CondIPv4'
 export const TypeCondClass = 'CondClass'
 export const TypeIPv4MatchSource = 'MatchSource'
@@ -27,6 +28,9 @@ export function unmarshalInterface(json): Cond {
     }
     if (json[TypeCondNot]) {
         return CondNotFromJSON(json[TypeCondNot])
+    }
+    if (json[TypeCondBool] !== 'undefined') {
+        return CondBoolFromJSON(json[TypeCondBool])
     }
     if (json[TypeCondIPv4]) {
         return CondIPv4FromJSON(json[TypeCondIPv4])
@@ -120,6 +124,24 @@ function CondNotFromJSON(json: CondNot): CondNot {
     const condNot = new CondNot()
     condNot.Operand = unmarshalInterface(json)
     return condNot
+}
+
+export class CondBool implements Cond {
+    Value: boolean
+
+    Type() {
+        return TypeCondBool
+    }
+
+    String() {
+        return this.Value ? 'BOOL=true' : 'BOOL=false'
+    }
+}
+
+function CondBoolFromJSON(json: CondBool): CondBool {
+    const condBool = new CondBool()
+    condBool.Value = !!json
+    return condBool
 }
 
 export class CondIPv4 implements Cond {

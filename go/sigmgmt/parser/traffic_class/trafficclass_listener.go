@@ -31,6 +31,9 @@ type TrafficClassListener interface {
 	// EnterCondNot is called when entering the condNot production.
 	EnterCondNot(c *CondNotContext)
 
+	// EnterCondBool is called when entering the condBool production.
+	EnterCondBool(c *CondBoolContext)
+
 	// EnterCondIPv4 is called when entering the condIPv4 production.
 	EnterCondIPv4(c *CondIPv4Context)
 
@@ -63,6 +66,9 @@ type TrafficClassListener interface {
 
 	// ExitCondNot is called when exiting the condNot production.
 	ExitCondNot(c *CondNotContext)
+
+	// ExitCondBool is called when exiting the condBool production.
+	ExitCondBool(c *CondBoolContext)
 
 	// ExitCondIPv4 is called when exiting the condIPv4 production.
 	ExitCondIPv4(c *CondIPv4Context)

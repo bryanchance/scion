@@ -3,6 +3,7 @@ import { Component, Input } from '@angular/core'
 import {
   CondAllOf,
   CondAnyOf,
+  CondBool,
   CondClass,
   CondIPv4,
   CondNot,
@@ -54,6 +55,11 @@ export class AllComponent {
 
   addNot() {
     this.cond.Conds.unshift(new CondNot())
+    this.closeMenu()
+  }
+
+  addBool() {
+    this.cond.Conds.unshift(new CondBool())
     this.closeMenu()
   }
 

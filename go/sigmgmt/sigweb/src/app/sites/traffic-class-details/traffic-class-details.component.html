@@ -52,6 +52,7 @@
         <button mat-raised-button (click)="addAny() ">ANY</button>
         <button mat-raised-button (click)="addAll() ">ALL</button>
         <button mat-raised-button (click)="addNot() ">NOT</button>
+        <button mat-raised-button (click)="addBool() ">BOOL</button>
         <button mat-raised-button (click)="addSrc() ">SRC</button>
         <button mat-raised-button (click)="addDst() ">DST</button>
         <button mat-raised-button (click)="addDscp() ">DSCP</button>
@@ -87,6 +88,10 @@
       <div>
         <span>NOT</span>
         <p>Returns the negation of the subcondition</p>
+      </div>
+      <div>
+        <span>BOOL</span>
+        <p>Returns the boolean value</p>
       </div>
       <div>
         <span>CLASS</span>

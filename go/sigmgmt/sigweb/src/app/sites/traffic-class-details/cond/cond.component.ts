@@ -4,6 +4,7 @@ import {
   Cond,
   TypeCondAllOf,
   TypeCondAnyOf,
+  TypeCondBool,
   TypeCondClass,
   TypeCondIPv4,
   TypeCondNot,
@@ -34,6 +35,10 @@ export class CondComponent {
 
   get notType(): string {
     return TypeCondNot
+  }
+
+  get boolType(): string {
+    return TypeCondBool
   }
 
   get ipv4Type(): string {

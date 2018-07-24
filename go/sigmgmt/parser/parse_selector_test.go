@@ -3,8 +3,11 @@
 package parser
 
 import (
+	"flag"
+	"os"
 	"testing"
 
+	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/lib/spath/spathmeta"
 	"github.com/scionproto/scion/go/lib/xtest"
@@ -222,6 +225,14 @@ func TestPredicateTree(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	if !testing.Verbose() {
+		log.Root().SetHandler(log.DiscardHandler())
+	}
+	os.Exit(m.Run())
 }
 
 func mustCondPathPredicate(t *testing.T, str string) *pktcls.CondPathPredicate {

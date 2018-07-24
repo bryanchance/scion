@@ -3,6 +3,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core'
 import {
   CondAllOf,
   CondAnyOf,
+  CondBool,
   CondClass,
   CondIPv4,
   CondNot,
@@ -44,6 +45,10 @@ export class NotComponent {
 
   addAll() {
     this.cond.Operand = new CondAllOf()
+  }
+
+  addBool() {
+    this.cond.Operand = new CondBool()
   }
 
   addSrc() {

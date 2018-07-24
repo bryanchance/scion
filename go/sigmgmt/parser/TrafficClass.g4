@@ -8,6 +8,7 @@ NET: DIGITS '.' DIGITS '.' DIGITS '.' DIGITS '/' DIGITS;
 ANY: 'ANY' | 'any';
 ALL: 'ALL' | 'all';
 NOT: 'NOT' | 'not';
+BOOL: 'BOOL' | 'bool';
 SRC: 'SRC' | 'src';
 DST: 'DST' | 'dst';
 DSCP: 'DSCP' | 'dscp';
@@ -22,7 +23,8 @@ condCls: 'cls=' DIGITS;
 condAny: ANY '(' cond (',' cond)* ')';
 condAll: ALL '(' cond (',' cond)* ')';
 condNot: NOT '(' cond ')';
+condBool: BOOL '=' ('true' | 'false');
 
 condIPv4: matchSrc | matchDst | matchDSCP | matchTOS;
-cond: condAll | condAny | condNot | condIPv4 | condCls;
+cond: condAll | condAny | condNot | condIPv4 | condCls | condBool;
 trafficClass: cond EOF;

@@ -133,10 +133,19 @@ func (l *classListener) ExitCondNot(ctx *traffic_class.CondNotContext) {
 	l.pushCond(pktcls.NewCondNot(l.popCond()))
 }
 
+func (l *classListener) EnterCondBool(ctx *traffic_class.CondBoolContext) {
+	bool, err := strconv.ParseBool(ctx.GetStop().GetText())
+	if err != nil {
+		l.err = common.NewBasicError("CondBool parsing failed!", err, "bool", ctx.GetStop().GetText())
+	}
+	l.pushCond(pktcls.CondBool(bool))
+}
+
 // ValidateTrafficClass validates the structure of the class param
 func ValidateTrafficClass(class string) error {
 	p := buildTrafficClassParser(class)
-	errListener := &ErrorListener{}
+	p.RemoveErrorListeners()
+	errListener := &ErrorListener{errorType: "Parser"}
 	p.AddErrorListener(errListener)
 	// Walk the tree to validate the traffic class
 	listener := &classListener{}
@@ -154,7 +163,8 @@ func ValidateTrafficClass(class string) error {
 // BuildClassTree creates a Cond tree from the class param
 func BuildClassTree(class string) (pktcls.Cond, error) {
 	p := buildTrafficClassParser(class)
-	errListener := &ErrorListener{}
+	p.RemoveErrorListeners()
+	errListener := &ErrorListener{errorType: "Parser"}
 	p.AddErrorListener(errListener)
 	// Walk the tree and build the traffic class
 	listener := &classListener{}
@@ -170,11 +180,14 @@ func BuildClassTree(class string) (pktcls.Cond, error) {
 }
 
 func buildTrafficClassParser(class string) *traffic_class.TrafficClassParser {
+	lexer := traffic_class.NewTrafficClassLexer(
+		antlr.NewInputStream(class),
+	)
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(&ErrorListener{errorType: "Lexer"})
 	parser := traffic_class.NewTrafficClassParser(
 		antlr.NewCommonTokenStream(
-			traffic_class.NewTrafficClassLexer(
-				antlr.NewInputStream(class),
-			),
+			lexer,
 			antlr.TokenDefaultChannel),
 	)
 	parser.BuildParseTrees = true

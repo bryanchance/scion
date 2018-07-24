@@ -91,7 +91,8 @@ func (l *predicateListener) ExitCondNot(ctx *path_predicate.CondNotContext) {
 // ValidatePredicate validates the structure of the predicate param
 func ValidatePredicate(predicate string) error {
 	p := buildPathPredicateParser(predicate)
-	errListener := &ErrorListener{}
+	p.RemoveErrorListeners()
+	errListener := &ErrorListener{errorType: "Parser"}
 	p.AddErrorListener(errListener)
 	// Walk the tree to validate the predicate
 	antlr.ParseTreeWalkerDefault.Walk(&predicateListener{}, p.PathPredicate())
@@ -105,7 +106,8 @@ func ValidatePredicate(predicate string) error {
 // BuildPredicateTree creates a Cond tree from the predicate param
 func BuildPredicateTree(predicate string) (pktcls.Cond, error) {
 	p := buildPathPredicateParser(predicate)
-	errListener := &ErrorListener{}
+	p.RemoveErrorListeners()
+	errListener := &ErrorListener{errorType: "Parser"}
 	p.AddErrorListener(errListener)
 	// Walk the tree and build the path predicate
 	listener := &predicateListener{}
@@ -118,11 +120,14 @@ func BuildPredicateTree(predicate string) (pktcls.Cond, error) {
 }
 
 func buildPathPredicateParser(predicate string) *path_predicate.PathPredicateParser {
+	lexer := path_predicate.NewPathPredicateLexer(
+		antlr.NewInputStream(predicate),
+	)
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(&ErrorListener{errorType: "Lexer"})
 	parser := path_predicate.NewPathPredicateParser(
 		antlr.NewCommonTokenStream(
-			path_predicate.NewPathPredicateLexer(
-				antlr.NewInputStream(predicate),
-			),
+			lexer,
 			antlr.TokenDefaultChannel),
 	)
 	parser.BuildParseTrees = true

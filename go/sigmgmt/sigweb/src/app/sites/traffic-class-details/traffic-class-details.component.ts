@@ -5,7 +5,7 @@ import { Subscription } from 'rxjs'
 import { debounceTime } from 'rxjs/operators'
 
 import { ApiService } from '../../api/api.service'
-import { CondAllOf, CondAnyOf, CondIPv4, CondNot, MatchDestination, MatchDSCP, MatchSource } from '../models/cond'
+import { CondAllOf, CondAnyOf, CondBool, CondIPv4, CondNot, MatchDestination, MatchDSCP, MatchSource } from '../models/cond'
 import { Site, TrafficClass } from '../models/models'
 import { TrafficClassService } from './traffic-class.service'
 
@@ -146,6 +146,10 @@ export class TrafficClassDetailsComponent implements OnInit, OnDestroy {
 
   addNot() {
     this.trClass.Cond = new CondNot()
+  }
+
+  addBool() {
+    this.trClass.Cond = new CondBool()
   }
 
   addSrc() {

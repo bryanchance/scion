@@ -68,6 +68,12 @@ func (s *BaseTrafficClassListener) EnterCondNot(ctx *CondNotContext) {}
 // ExitCondNot is called when production condNot is exited.
 func (s *BaseTrafficClassListener) ExitCondNot(ctx *CondNotContext) {}
 
+// EnterCondBool is called when production condBool is entered.
+func (s *BaseTrafficClassListener) EnterCondBool(ctx *CondBoolContext) {}
+
+// ExitCondBool is called when production condBool is exited.
+func (s *BaseTrafficClassListener) ExitCondBool(ctx *CondBoolContext) {}
+
 // EnterCondIPv4 is called when production condIPv4 is entered.
 func (s *BaseTrafficClassListener) EnterCondIPv4(ctx *CondIPv4Context) {}
 

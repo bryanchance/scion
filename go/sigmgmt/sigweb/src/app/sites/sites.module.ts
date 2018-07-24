@@ -25,7 +25,8 @@ import { NotComponent } from './traffic-class-details/cond/not/not.component'
 import { SrcComponent } from './traffic-class-details/cond/src/src.component'
 import { TrafficClassDetailsComponent } from './traffic-class-details/traffic-class-details.component'
 import { TrafficClassesComponent } from './traffic-classes/traffic-classes.component';
-import { ClassComponent } from './traffic-class-details/cond/class/class.component'
+import { ClassComponent } from './traffic-class-details/cond/class/class.component';
+import { BoolComponent } from './traffic-class-details/cond/bool/bool.component'
 
 @NgModule({
   imports: [
@@ -57,6 +58,7 @@ import { ClassComponent } from './traffic-class-details/cond/class/class.compone
     TrafficClassDetailsComponent,
     MouseoverDirective,
     ClassComponent,
+    BoolComponent,
   ],
 })
 export class SitesModule { }

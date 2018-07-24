@@ -23,7 +23,9 @@ export class SitesComponent implements OnInit {
     )
   }
 
-  delete(idx: number) {
+  delete(e, idx: number) {
+    e.preventDefault()
+    e.stopPropagation()
     this.api.deleteSite(this.sites[idx]).subscribe(
       () => this.sites.splice(idx, 1),
       () => { }
