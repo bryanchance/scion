@@ -27,6 +27,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/scionproto/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/crypto"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/util"
@@ -38,10 +39,6 @@ var _ = log.Root
 var (
 	asList  []addr.IA
 	localIA addr.IA
-)
-
-const (
-	DispPath = "/run/shm/dispatcher/default.sock"
 )
 
 type TestCase struct {
@@ -61,7 +58,6 @@ type TestCase struct {
 }
 
 func generateTests(asList []addr.IA, count int, haveSciond bool) []TestCase {
-	rand.Seed(time.Now().UnixNano())
 	tests := make([]TestCase, 0, 0)
 	var cIndex, sIndex int32
 	for i := 0; i < count; i++ {
@@ -126,14 +122,14 @@ func ClientServer(haveSciond bool, idx int, tc TestCase) {
 		if haveSciond {
 			clientSciond = sciond.GetDefaultSCIONDPath(&tc.srcIA)
 		}
-		clientNet, err := NewNetwork(tc.srcIA, clientSciond, DispPath)
+		clientNet, err := NewNetwork(tc.srcIA, clientSciond, "")
 		SoMsg("Client network error", err, ShouldBeNil)
 
 		serverSciond := ""
 		if haveSciond {
 			serverSciond = sciond.GetDefaultSCIONDPath(&tc.dstIA)
 		}
-		serverNet, err := NewNetwork(tc.dstIA, serverSciond, DispPath)
+		serverNet, err := NewNetwork(tc.dstIA, serverSciond, "")
 		SoMsg("Server network error", err, ShouldBeNil)
 
 		clientAddr, err := AddrFromString(
@@ -219,7 +215,7 @@ func TestListen(t *testing.T) {
 
 func TestMain(m *testing.M) {
 	var err error
-
+	crypto.MathRandSeed()
 	// Load topology information
 	asStruct, err := util.LoadASList("../../../gen/as_list.yml")
 	if err != nil {
@@ -229,7 +225,7 @@ func TestMain(m *testing.M) {
 	asList = append(asStruct.Core, asStruct.NonCore...)
 
 	localIA = asList[rand.Intn(len(asList))]
-	err = Init(localIA, sciond.GetDefaultSCIONDPath(&localIA), "/run/shm/dispatcher/default.sock")
+	err = Init(localIA, sciond.GetDefaultSCIONDPath(&localIA), "")
 	if err != nil {
 		fmt.Println("Test setup error", err)
 		return

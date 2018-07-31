@@ -19,7 +19,6 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
@@ -30,9 +29,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/lib/crypto/trc"
 	"github.com/scionproto/scion/go/lib/env"
-	"github.com/scionproto/scion/go/lib/infra"
 	"github.com/scionproto/scion/go/lib/infra/disp"
 	"github.com/scionproto/scion/go/lib/infra/messenger"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust"
@@ -113,12 +110,12 @@ func realMain() int {
 		return 1
 	}
 	trustStore, err := trust.NewStore(trustDB, config.General.Topology.ISD_AS,
-		rand.Uint64(), log.Root())
+		rand.Uint64(), nil, log.Root())
 	if err != nil {
 		log.Crit("Unable to initialize trust store", "err", err)
 		return 1
 	}
-	err = snet.Init(config.General.Topology.ISD_AS, "", "/run/shm/dispatcher/default.sock")
+	err = snet.Init(config.General.Topology.ISD_AS, "", "")
 	if err != nil {
 		log.Crit("Unable to initialize snet", "err", err)
 		return 1
@@ -130,7 +127,7 @@ func realMain() int {
 		return 1
 	}
 
-	err = LoadAuthoritativeTRC(trustDB, trustStore)
+	err = trustStore.LoadAuthoritativeTRC(filepath.Join(config.General.ConfigDir, "certs"))
 	if err != nil {
 		log.Crit("TRC error", "err", err)
 		return 1
@@ -143,6 +140,7 @@ func realMain() int {
 		),
 		trustStore,
 		log.Root(),
+		nil,
 	)
 	trustStore.SetMessenger(msger)
 	revCache := fetcher.NewRevCache(cache.NoExpiration, time.Second)
@@ -180,42 +178,11 @@ func realMain() int {
 	// Start servers
 	rsockServer, shutdownF := NewServer("rsock", config.SD.Reliable, handlers, log.Root())
 	defer shutdownF()
-	go func() {
-		defer log.LogPanicAndExit()
-		if config.SD.DeleteSocket {
-			if _, err := os.Stat(config.SD.Reliable); !os.IsNotExist(err) {
-				if err := os.Remove(config.SD.Reliable); err != nil {
-					fatalC <- common.NewBasicError("ReliableSockServer SocketRemoval error", err)
-				}
-			}
-		}
-		if err := rsockServer.ListenAndServe(); err != nil {
-			fatalC <- common.NewBasicError("ReliableSockServer ListenAndServe error", err)
-		}
-	}()
+	StartServer("ReliableSockServer", config.SD.Reliable, rsockServer, fatalC)
 	unixpacketServer, shutdownF := NewServer("unixpacket", config.SD.Unix, handlers, log.Root())
 	defer shutdownF()
-	go func() {
-		defer log.LogPanicAndExit()
-		if config.SD.DeleteSocket {
-			if _, err := os.Stat(config.SD.Unix); !os.IsNotExist(err) {
-				if err := os.Remove(config.SD.Unix); err != nil {
-					fatalC <- common.NewBasicError("UnixServer SocketRemoval error", err)
-				}
-			}
-		}
-		if err := unixpacketServer.ListenAndServe(); err != nil {
-			fatalC <- common.NewBasicError("UnixServer ListenAndServe error", err)
-		}
-	}()
-	if config.Metrics.Prometheus != "" {
-		go func() {
-			defer log.LogPanicAndExit()
-			if err := http.ListenAndServe(config.Metrics.Prometheus, nil); err != nil {
-				fatalC <- common.NewBasicError("HTTP ListenAndServe error", err)
-			}
-		}()
-	}
+	StartServer("UnixServer", config.SD.Unix, unixpacketServer, fatalC)
+	config.Metrics.StartPrometheus(fatalC)
 	select {
 	case <-environment.AppShutdownSignal:
 		// Whenever we receive a SIGINT or SIGTERM we exit without an error.
@@ -264,56 +231,16 @@ func NewServer(network string, rsockPath string, handlers servers.HandlerMap,
 	return server, shutdownF
 }
 
-func LoadAuthoritativeTRC(db *trustdb.DB, store infra.TrustStore) error {
-	fileTRC, err := trc.TRCFromDir(
-		filepath.Join(config.General.ConfigDir, "certs"),
-		config.General.Topology.ISD_AS.I,
-		func(err error) {
-			log.Warn("Error reading TRC", "err", err)
-		})
-	if err != nil {
-		return common.NewBasicError("Unable to load TRC from directory", err)
-	}
-
-	ctx, cancelF := context.WithTimeout(context.Background(), time.Second)
-	dbTRC, err := store.GetValidTRC(
-		ctx,
-		config.General.Topology.ISD_AS.I,
-		config.General.Topology.ISD_AS.I,
-	)
-	cancelF()
-	switch {
-	case err != nil && common.GetErrorMsg(err) != trust.ErrEndOfTrail:
-		// Unexpected error in trust store
-		return err
-	case common.GetErrorMsg(err) == trust.ErrEndOfTrail && fileTRC == nil:
-		return common.NewBasicError("No TRC found on disk or in trustdb", nil)
-	case common.GetErrorMsg(err) == trust.ErrEndOfTrail && fileTRC != nil:
-		_, err := db.InsertTRC(fileTRC)
-		return err
-	case err == nil && fileTRC == nil:
-		// Nothing to do, no TRC to load from file but we already have one in the DB
-		return nil
-	default:
-		// Found a TRC file on disk, and found a TRC in the DB. Check versions.
-		switch {
-		case fileTRC.Version > dbTRC.Version:
-			_, err := db.InsertTRC(fileTRC)
-			return err
-		case fileTRC.Version == dbTRC.Version:
-			// Because it is the same version, check if the TRCs match
-			eq, err := fileTRC.JSONEquals(dbTRC)
-			if err != nil {
-				return common.NewBasicError("Unable to compare TRCs", err)
+func StartServer(name, sockPath string, server *servers.Server, fatalC chan error) {
+	go func() {
+		defer log.LogPanicAndExit()
+		if config.SD.DeleteSocket {
+			if err := os.Remove(sockPath); err != nil && !os.IsNotExist(err) {
+				fatalC <- common.NewBasicError(name+" SocketRemoval error", err)
 			}
-			if !eq {
-				return common.NewBasicError("Conflicting TRCs found for same version", nil,
-					"db", dbTRC, "file", fileTRC)
-			}
-			return nil
-		default:
-			// file TRC is older than DB TRC, so we just ignore it
-			return nil
 		}
-	}
+		if err := server.ListenAndServe(); err != nil {
+			fatalC <- common.NewBasicError(name+" ListenAndServe error", err)
+		}
+	}()
 }

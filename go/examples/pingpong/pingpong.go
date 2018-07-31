@@ -34,6 +34,7 @@ import (
 	"github.com/lucas-clemente/quic-go/qerr"
 
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/integration"
 	"github.com/scionproto/scion/go/lib/log"
 	sd "github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/snet"
@@ -61,9 +62,8 @@ var (
 	id          = flag.String("id", "pingpong", "Element ID")
 	mode        = flag.String("mode", ModeClient, "Run in "+ModeClient+" or "+ModeServer+" mode")
 	sciond      = flag.String("sciond", "", "Path to sciond socket")
-	dispatcher  = flag.String("dispatcher", "/run/shm/dispatcher/default.sock",
-		"Path to dispatcher socket")
-	count = flag.Int("count", 0,
+	dispatcher  = flag.String("dispatcher", "", "Path to dispatcher socket")
+	count       = flag.Int("count", 0,
 		fmt.Sprintf("Number of pings, between 0 and %d; a count of 0 means infinity", MaxPings))
 	timeout = flag.Duration("timeout", DefaultTimeout,
 		"Timeout for the ping response")
@@ -347,6 +347,10 @@ func (s server) run() {
 	qsock, err := squic.ListenSCION(nil, &local)
 	if err != nil {
 		LogFatal("Unable to listen", "err", err)
+	}
+	if len(os.Getenv(integration.GoIntegrationEnv)) > 0 {
+		// Needed for integration test ready signal.
+		fmt.Printf("%s%s\n", integration.ReadySignal, local.IA)
 	}
 	log.Info("Listening", "local", qsock.Addr())
 	for {

@@ -1,4 +1,5 @@
 // Copyright 2016 ETH Zurich
+// Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,10 +27,43 @@ import (
 	"github.com/inconshreveable/log15"
 	logext "github.com/inconshreveable/log15/ext"
 	"github.com/kormat/fmt15" // Allows customization of timestamps and multi-line support
+	"github.com/mattn/go-isatty"
 	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/scionproto/scion/go/lib/common"
 )
+
+type Lvl log15.Lvl
+
+const (
+	LvlCrit  = Lvl(log15.LvlCrit)
+	LvlError = Lvl(log15.LvlError)
+	LvlWarn  = Lvl(log15.LvlWarn)
+	LvlInfo  = Lvl(log15.LvlInfo)
+	LvlDebug = Lvl(log15.LvlDebug)
+)
+
+func LvlFromString(lvl string) (Lvl, error) {
+	// Since we also parse python log entries we also have to handle the levels of python.
+	switch strings.ToUpper(lvl) {
+	case "DEBUG", "DBUG":
+		return LvlDebug, nil
+	case "INFO":
+		return LvlInfo, nil
+	case "WARN", "WARNING":
+		return LvlWarn, nil
+	case "ERROR", "EROR":
+		return LvlError, nil
+	case "CRIT", "CRITICAL":
+		return LvlCrit, nil
+	default:
+		return LvlDebug, fmt.Errorf("Unknown level: %v", lvl)
+	}
+}
+
+func (l Lvl) String() string {
+	return strings.ToUpper(log15.Lvl(l).String())
+}
 
 type Logger log15.Logger
 type Handler log15.Handler
@@ -120,8 +154,12 @@ func SetupLogConsole(logConsole string) error {
 	if err != nil {
 		return common.NewBasicError("Unable to parse log.console flag:", err)
 	}
-	logConsHandler = log15.LvlFilterHandler(logLvl, log15.StreamHandler(os.Stderr,
-		fmt15.Fmt15Format(fmt15.ColorMap)))
+	var cMap map[log15.Lvl]int
+	if isatty.IsTerminal(os.Stderr.Fd()) {
+		cMap = fmt15.ColorMap
+	}
+	logConsHandler = log15.LvlFilterHandler(logLvl,
+		log15.StreamHandler(os.Stderr, fmt15.Fmt15Format(cMap)))
 	setHandlers()
 	return nil
 }
@@ -197,6 +235,23 @@ func Error(msg string, ctx ...interface{}) {
 
 func Crit(msg string, ctx ...interface{}) {
 	log15.Crit(msg, ctx...)
+}
+
+func Log(lvl Lvl, msg string, ctx ...interface{}) {
+	var logFun func(string, ...interface{})
+	switch lvl {
+	case LvlDebug:
+		logFun = Debug
+	case LvlInfo:
+		logFun = Info
+	case LvlWarn:
+		logFun = Warn
+	case LvlError:
+		logFun = Error
+	case LvlCrit:
+		logFun = Crit
+	}
+	logFun(msg, ctx...)
 }
 
 func RandId(idlen int) string {

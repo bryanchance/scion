@@ -12,30 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package env contains common command line and initialization code for SCION
-// Infrastructure services. If something is specific to one app, it should go
-// into that app's code and not here.
+// Package env contains common command line and initialization code for SCION services.
+// If something is specific to one app, it should go into that app's code and not here.
 //
 // During initialization, SIGHUPs are masked. To call a function on each
 // SIGHUP, pass the function when calling Init.
-//
-// TODO(scrye): Also common stuff like trustdb initialization, messenger
-// initialization and handler registration can go here. Everything that can be
-// shared by infra apps, to reduce duplicated code.
 package env
 
 import (
 	"fmt"
 	"io"
-	"math/rand"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	"time"
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/crypto"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/overlay"
 	"github.com/scionproto/scion/go/lib/snet"
@@ -58,6 +53,7 @@ func init() {
 	os.Setenv("TZ", "UTC")
 	sighupC = make(chan os.Signal, 1)
 	signal.Notify(sighupC, syscall.SIGHUP)
+	crypto.MathRandSeed()
 }
 
 type General struct {
@@ -70,8 +66,6 @@ type General struct {
 	TopologyPath string `toml:"Topology"`
 	// Topology is the loaded topology file.
 	Topology *topology.Topo `toml:"-"`
-	// Seed for the PRNG. A value of 0 means use current UNIX time as seed.
-	Seed int64
 }
 
 // setFiles determines the values for extra config files (e.g., topology.json).
@@ -101,12 +95,6 @@ func InitGeneral(cfg *General) error {
 		return err
 	}
 	cfg.Topology = topo
-	// Initialize default PRNG
-	if cfg.Seed == 0 {
-		rand.Seed(time.Now().Unix())
-	} else {
-		rand.Seed(cfg.Seed)
-	}
 	return nil
 }
 
@@ -238,6 +226,17 @@ type Metrics struct {
 	// Prometheus contains the address to export prometheus metrics on. If
 	// not set, metrics are not exported.
 	Prometheus string
+}
+
+func (cfg *Metrics) StartPrometheus(fatalC chan error) {
+	if cfg.Prometheus != "" {
+		go func() {
+			defer log.LogPanicAndExit()
+			if err := http.ListenAndServe(cfg.Prometheus, nil); err != nil {
+				fatalC <- common.NewBasicError("HTTP ListenAndServe error", err)
+			}
+		}()
+	}
 }
 
 // Trust contains information that is BS, CS, PS, SD specific.
