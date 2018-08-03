@@ -93,6 +93,9 @@ jobs:
                 name: Build app images
                 command: make -C docker/perapp
             - run:
+                name: Build sigmgmt image
+                command: make -C docker/perapp sigmgmt_debug
+            - run:
                 name: Docker login
                 command: echo $GCR_KEY | docker login -u _json_key --password-stdin https://eu.gcr.io
             - run:
