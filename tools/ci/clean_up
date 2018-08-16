@@ -4,5 +4,4 @@ set -ex
 
 docker cp ${2:-scion_ci}:/home/scion/go/src/github.com/scionproto/scion/logs "${1:?"Directory needs to be specified!"}"
 docker cp ${2:-scion_ci}:/home/scion/go/src/github.com/scionproto/scion/gen "$1"
-
-docker stop ${2:-scion_ci}
+cp -R logs "$1"

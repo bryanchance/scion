@@ -62,6 +62,10 @@ from lib.crypto.util import (
     get_ca_private_key_file_path,
     get_offline_key_file_path,
     get_online_key_file_path,
+    get_master_key,
+    get_master_key_file_path,
+    MASTER_KEY_0,
+    MASTER_KEY_1,
 )
 from lib.defines import (
     AS_CONF_FILE,
@@ -102,7 +106,7 @@ DEFAULT_ZK_LOG4J = "topology/Zookeeper.log4j"
 
 HOSTS_FILE = 'hosts'
 SUPERVISOR_CONF = 'supervisord.conf'
-DOCKER_CONF = 'docker-compose.yml'
+DOCKER_CONF = 'scion-dc.yml'
 COMMON_DIR = 'endhost'
 
 ZOOKEEPER_HOST_TMPFS_DIR = "/run/shm/host-zk"
@@ -130,6 +134,9 @@ THRESHOLD_EEPKI = 0
 DEFAULT_NETWORK = "127.0.0.0/8"
 DEFAULT_PRIV_NETWORK = "192.168.0.0/16"
 DEFAULT_MININET_NETWORK = "100.64.0.0/10"
+
+DEFAULT_DOCKER_NETWORK = "172.18.0.0/24"
+ZOOKEEPER_ADDR = "172.18.0.1"
 
 SCION_SERVICE_NAMES = (
     "BeaconService",
@@ -231,6 +238,7 @@ class ConfigGenerator(object):
         self._write_trust_files(topo_dicts, trc_files)
         self._write_cust_files(topo_dicts, cust_files)
         self._write_conf_policies(topo_dicts)
+        self._write_master_keys(topo_dicts)
         self._write_networks_conf(networks, NETWORKS_FILE)
         if self.gen_bind_addr:
             self._write_networks_conf(prv_networks, PRV_NETWORKS_FILE)
@@ -317,9 +325,7 @@ class ConfigGenerator(object):
         PathPolicy.from_file(self.path_policy_file)
 
     def _gen_as_conf(self, as_topo):
-        master_as_key = base64.b64encode(os.urandom(16))
         return {
-            'MasterASKey': master_as_key.decode("utf-8"),
             'RegisterTime': 5,
             'PropagateTime': 5,
             'CertChainVersion': 0,
@@ -327,6 +333,26 @@ class ConfigGenerator(object):
             'RegisterPath': True if as_topo["PathService"] else False,
             'PathSegmentTTL': self.pseg_ttl,
         }
+
+    def _write_master_keys(self, topo_dicts):
+        """
+        Write AS master keys.
+        """
+        master_keys = {}
+        for topo_id, as_topo, base in _srv_iter(
+                topo_dicts, self.out_dir, common=True):
+
+            master_keys.setdefault(topo_id, self._gen_master_keys())
+            write_file(get_master_key_file_path(base, MASTER_KEY_0),
+                       base64.b64encode(master_keys[topo_id][0]).decode())
+            write_file(get_master_key_file_path(base, MASTER_KEY_1),
+                       base64.b64encode(master_keys[topo_id][1]).decode())
+            # Confirm that keys parse correctly.
+            assert get_master_key(base, MASTER_KEY_0) == master_keys[topo_id][0]
+            assert get_master_key(base, MASTER_KEY_1) == master_keys[topo_id][1]
+
+    def _gen_master_keys(self):
+        return os.urandom(16), os.urandom(16)
 
     def _write_networks_conf(self, networks, out_file):
         config = configparser.ConfigParser(interpolation=None)
@@ -725,8 +751,8 @@ class TopoGenerator(object):
         zk_conf = {}
         if "zookeepers" in self.topo_config.get("defaults", {}):
             zk_conf = self.topo_config["defaults"]["zookeepers"]
-        if self.docker and "docker-zks" in self.topo_config.get("defaults", {}):
-            zk_conf = self.topo_config["defaults"]["docker-zks"]
+        if self.docker:
+            zk_conf[1] = {'addr': ZOOKEEPER_ADDR}
         for key, val in zk_conf.items():
             self._gen_zk_entry(topo_id, key, val)
 
@@ -999,9 +1025,10 @@ class DockerGenerator(object):
     def __init__(self, out_dir, topo_dicts, cs):
         self.out_dir = out_dir
         self.topo_dicts = topo_dicts
-        self.dc_conf = {'version': '3', 'services': {}}
+        self.dc_conf = {'version': '3', 'services': {}, 'networks': {}}
 
     def generate(self):
+        self._base_conf()
         self._zookeeper_conf()
         self._dispatcher_conf()
         for topo_id, topo in self.topo_dicts.items():
@@ -1013,6 +1040,10 @@ class DockerGenerator(object):
             self._sciond_conf(topo_id, base)
         write_file(os.path.join(self.out_dir, DOCKER_CONF),
                    yaml.dump(self.dc_conf, default_flow_style=False))
+
+    def _base_conf(self):
+        default_net = {'ipam': {'config': [{'subnet': DEFAULT_DOCKER_NETWORK}]}}
+        self.dc_conf['networks']['default'] = default_net
 
     def _br_conf(self, topo, base):
         raw_entry = {

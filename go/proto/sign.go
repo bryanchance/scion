@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/lib/crypto"
+	"github.com/scionproto/scion/go/lib/scrypto"
 	"github.com/scionproto/scion/go/lib/util"
 )
 
@@ -56,14 +56,14 @@ func (s *SignS) Sign(key, message common.RawBytes) (common.RawBytes, error) {
 	case SignType_none:
 		return nil, nil
 	case SignType_ed25519:
-		return crypto.Sign(s.sigPack(message, false), key, crypto.Ed25519)
+		return scrypto.Sign(s.sigPack(message, false), key, scrypto.Ed25519)
 	}
 	return nil, common.NewBasicError("SignS.Sign: Unsupported SignType", nil, "type", s.Type)
 }
 
 func (s *SignS) SignAndSet(key, message common.RawBytes) error {
 	var err error
-	s.Timestamp = uint32(time.Now().Unix())
+	s.Timestamp = util.TimeToSecs(time.Now())
 	s.Signature, err = s.Sign(key, message)
 	return err
 }
@@ -71,7 +71,7 @@ func (s *SignS) SignAndSet(key, message common.RawBytes) error {
 // Time returns the timestamp. If the receiver is nil, the zero value is returned.
 func (s *SignS) Time() time.Time {
 	if s != nil {
-		return util.USecsToTime(s.Timestamp)
+		return util.SecsToTime(s.Timestamp)
 	}
 	return time.Time{}
 }
@@ -81,7 +81,7 @@ func (s *SignS) Verify(key, message common.RawBytes) error {
 	case SignType_none:
 		return nil
 	case SignType_ed25519:
-		return crypto.Verify(s.sigPack(message, false), s.Signature, key, crypto.Ed25519)
+		return scrypto.Verify(s.sigPack(message, false), s.Signature, key, scrypto.Ed25519)
 	}
 	return common.NewBasicError("SignS.Verify: Unsupported SignType", nil, "type", s.Type)
 }

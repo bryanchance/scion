@@ -1,4 +1,4 @@
-// Copyright 2018 ETH Zurich
+// Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,18 +26,22 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/scionproto/scion/go/lib/addr"
-	"github.com/scionproto/scion/go/lib/crypto/cert"
-	"github.com/scionproto/scion/go/lib/crypto/trc"
 	"github.com/scionproto/scion/go/lib/ctrl/cert_mgmt"
 	"github.com/scionproto/scion/go/lib/infra"
 	"github.com/scionproto/scion/go/lib/infra/disp"
 	"github.com/scionproto/scion/go/lib/infra/messenger"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb"
 	"github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/scrypto/cert"
+	"github.com/scionproto/scion/go/lib/scrypto/trc"
 	"github.com/scionproto/scion/go/lib/snet/rpt"
 	"github.com/scionproto/scion/go/lib/xtest"
 	"github.com/scionproto/scion/go/lib/xtest/loader"
 	"github.com/scionproto/scion/go/lib/xtest/p2p"
+)
+
+const (
+	testCtxTimeout = 200 * time.Millisecond
 )
 
 var (
@@ -175,7 +179,7 @@ func TestGetValidTRC(t *testing.T) {
 
 		for _, tc := range testCases {
 			Convey(tc.Name, func() {
-				ctx, cancelF := context.WithTimeout(context.Background(), time.Second)
+				ctx, cancelF := context.WithTimeout(context.Background(), testCtxTimeout)
 				defer cancelF()
 
 				trcObj, err := store.GetValidTRC(ctx, tc.ISD, tc.Trail...)
@@ -271,7 +275,7 @@ func TestGetTRC(t *testing.T) {
 
 		for _, tc := range testCases[4:5] {
 			Convey(tc.Name, func() {
-				ctx, cancelF := context.WithTimeout(context.Background(), time.Second)
+				ctx, cancelF := context.WithTimeout(context.Background(), testCtxTimeout)
 				defer cancelF()
 
 				trcObj, err := store.GetTRC(ctx, tc.ISD, tc.Version)
@@ -336,7 +340,7 @@ func TestGetValidChain(t *testing.T) {
 
 		for _, tc := range testCases {
 			Convey(tc.Name, func() {
-				ctx, cancelF := context.WithTimeout(context.Background(), time.Second)
+				ctx, cancelF := context.WithTimeout(context.Background(), testCtxTimeout)
 				defer cancelF()
 
 				chain, err := store.GetValidChain(ctx, tc.IA, tc.Trail...)
@@ -434,7 +438,7 @@ func TestGetChain(t *testing.T) {
 
 		for _, tc := range testCases {
 			Convey(tc.Name, func() {
-				ctx, cancelF := context.WithTimeout(context.Background(), time.Second)
+				ctx, cancelF := context.WithTimeout(context.Background(), testCtxTimeout)
 				defer cancelF()
 
 				chain, err := store.GetChain(ctx, tc.IA, tc.Version)
@@ -573,7 +577,7 @@ func TestTRCReqHandler(t *testing.T) {
 				go serverMessenger.ListenAndServe()
 				defer serverMessenger.CloseServer()
 
-				ctx, cancelF := context.WithTimeout(context.Background(), 100*time.Millisecond)
+				ctx, cancelF := context.WithTimeout(context.Background(), testCtxTimeout)
 				defer cancelF()
 
 				msg := &cert_mgmt.TRCReq{
@@ -692,7 +696,7 @@ func TestChainReqHandler(t *testing.T) {
 				go serverMessenger.ListenAndServe()
 				defer serverMessenger.CloseServer()
 
-				ctx, cancelF := context.WithTimeout(context.Background(), 100*time.Millisecond)
+				ctx, cancelF := context.WithTimeout(context.Background(), testCtxTimeout)
 				defer cancelF()
 
 				msg := &cert_mgmt.ChainReq{
@@ -728,17 +732,13 @@ func loadCrypto(t *testing.T, isds []addr.ISD,
 	trcMap := make(map[addr.ISD]*trc.TRC)
 	for _, isd := range isds {
 		trcMap[isd], err = trc.TRCFromFile(getTRCFileName(isd, 1), false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		xtest.FailOnErr(t, err)
 	}
 
 	chainMap := make(map[addr.IA]*cert.Chain)
 	for _, ia := range ias {
 		chainMap[ia], err = cert.ChainFromFile(getChainFileName(ia, 1), false)
-		if err != nil {
-			t.Fatal(err)
-		}
+		xtest.FailOnErr(t, err)
 	}
 	return trcMap, chainMap
 }
@@ -752,47 +752,32 @@ func getChainFileName(ia addr.IA, version uint64) string {
 		tmpDir, ia.I, ia.A.FileFmt(), ia.I, ia.A.FileFmt(), version)
 }
 
-func initStore(t *testing.T, ia addr.IA, msger infra.Messenger) (*Store, func()) {
+func initStore(t *testing.T, ia addr.IA, msger infra.Messenger) (*Store, func() error) {
 	t.Helper()
-
-	dbFile := xtest.MustTempFileName("", "truststore-test")
-	db, err := trustdb.New(dbFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	db, err := trustdb.New(":memory:")
+	xtest.FailOnErr(t, err)
 	options := &Config{
 		LocalCSes: []net.Addr{
 			&messenger.MockAddress{},
 		},
 	}
 	store, err := NewStore(db, ia, 0, options, log.Root())
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	xtest.FailOnErr(t, err)
 	// Enable fake network access for trust database
 	store.SetMessenger(msger)
-	return store, func() {
-		db.Close()
-		os.Remove(dbFile)
-	}
+	return store, db.Close
 }
 
 func insertTRC(t *testing.T, store *Store, trcObj *trc.TRC) {
 	t.Helper()
 
 	_, err := store.trustdb.InsertTRC(trcObj)
-	if err != nil {
-		t.Fatal(err)
-	}
+	xtest.FailOnErr(t, err)
 }
 
 func insertChain(t *testing.T, store *Store, chain *cert.Chain) {
 	t.Helper()
 
 	_, err := store.trustdb.InsertChain(chain)
-	if err != nil {
-		t.Fatal(err)
-	}
+	xtest.FailOnErr(t, err)
 }

@@ -1,4 +1,5 @@
 // Copyright 2017 ETH Zurich
+// Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +29,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/lib/crypto"
+	"github.com/scionproto/scion/go/lib/scrypto"
 	"github.com/scionproto/scion/go/lib/util"
 )
 
@@ -92,12 +93,29 @@ func (tvr *TRCVerResult) QuorumOk() bool {
 	return uint32(len(tvr.Verified)) >= tvr.Quorum
 }
 
+type CoreASMap map[addr.IA]*CoreAS
+
+// Contains returns whether a is in c.
+func (c CoreASMap) Contains(a addr.IA) bool {
+	_, ok := c[a]
+	return ok
+}
+
+// ASList returns a list of core ASes' IDs.
+func (c CoreASMap) ASList() []addr.IA {
+	l := make([]addr.IA, 0, len(c))
+	for key := range c {
+		l = append(l, key)
+	}
+	return l
+}
+
 type TRC struct {
 	// CertLogs is a map from end-entity certificate logs to their addresses and public-key
 	// certificate.
 	CertLogs map[string]*CertLog
 	// CoreASes is a map from core ASes to their online and offline key.
-	CoreASes map[addr.IA]*CoreAS
+	CoreASes CoreASMap
 	// CreationTime is the unix timestamp in seconds at which the TRC was created.
 	CreationTime uint32
 	// Description is an human-readable description of the ISD.
@@ -205,22 +223,13 @@ func (t *TRC) Key() *Key {
 	return NewKey(t.ISD, t.Version)
 }
 
-// CoreASList returns a list of core ASes' addresses.
-func (t *TRC) CoreASList() []addr.IA {
-	l := make([]addr.IA, 0, len(t.CoreASes))
-	for key := range t.CoreASes {
-		l = append(l, key)
-	}
-	return l
-}
-
 // IsActive checks if TRC is active and can be used for certificate chain verification. MaxTRC is
 // the newest active TRC of the same ISD which we know of.
 func (t *TRC) IsActive(maxTRC *TRC) error {
 	if t.Quarantine {
 		return common.NewBasicError(EarlyAnnouncement, nil)
 	}
-	currTime := uint32(time.Now().Unix())
+	currTime := util.TimeToSecs(time.Now())
 	if currTime < t.CreationTime {
 		return common.NewBasicError(EarlyUsage, nil,
 			"now", timeToString(currTime), "creation", timeToString(t.CreationTime))
@@ -248,7 +257,7 @@ func (t *TRC) Sign(name string, signKey common.RawBytes, signAlgo string) error 
 	if err != nil {
 		return common.NewBasicError("Unable to pack TRC for signing", err)
 	}
-	sig, err := crypto.Sign(sigInput, signKey, signAlgo)
+	sig, err := scrypto.Sign(sigInput, signKey, signAlgo)
 	if err != nil {
 		return common.NewBasicError("Unable to create signature", err)
 	}
@@ -301,7 +310,7 @@ func (t *TRC) verifySignatures(old *TRC) (*TRCVerResult, error) {
 			tvr.Failed[signer] = common.NewBasicError(SignatureMissing, nil, "as", signer)
 			continue
 		}
-		err = crypto.Verify(sigInput, sig, coreAS.OnlineKey, coreAS.OnlineKeyAlg)
+		err = scrypto.Verify(sigInput, sig, coreAS.OnlineKey, coreAS.OnlineKeyAlg)
 		if err == nil {
 			tvr.Verified = append(tvr.Verified, signer)
 		} else {
@@ -407,5 +416,5 @@ func (t *TRC) String() string {
 }
 
 func timeToString(t uint32) string {
-	return util.TimeToString(util.USecsToTime(t))
+	return util.TimeToString(util.SecsToTime(t))
 }

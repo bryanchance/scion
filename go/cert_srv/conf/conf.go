@@ -21,16 +21,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/as_conf"
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/lib/crypto"
-	"github.com/scionproto/scion/go/lib/crypto/cert"
 	"github.com/scionproto/scion/go/lib/ctrl"
 	"github.com/scionproto/scion/go/lib/infra/messenger"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb"
 	"github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/scrypto"
+	"github.com/scionproto/scion/go/lib/scrypto/cert"
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/lib/topology"
 )
@@ -58,6 +57,10 @@ type Conf struct {
 	// Topo contains the names of all local infrastructure elements, a map
 	// of interface IDs to routers, and the actual topology.
 	Topo *topology.Topo
+	// ASConf is the local AS configuration.
+	ASConf *as_conf.ASConf
+	// MasterKeys holds the local AS master keys.
+	MasterKeys *as_conf.MasterKeys
 	// BindAddr is the local bind address.
 	BindAddr *snet.Addr
 	// PublicAddr is the public address.
@@ -110,6 +113,12 @@ func Load(id string, confDir string, stateDir string) (*Conf, error) {
 	if err := c.loadTopo(); err != nil {
 		return nil, err
 	}
+	if err := c.loadAsConf(); err != nil {
+		return nil, err
+	}
+	if err := c.loadMasterKeys(); err != nil {
+		return nil, err
+	}
 	if err := c.loadTrustDB(); err != nil {
 		return nil, err
 	}
@@ -153,6 +162,12 @@ func ReloadConf(oldConf *Conf) (*Conf, error) {
 	if err := c.loadTopo(); err != nil {
 		return nil, err
 	}
+	if err := c.loadAsConf(); err != nil {
+		return nil, err
+	}
+	if err := c.loadMasterKeys(); err != nil {
+		return nil, err
+	}
 	if err := c.loadStore(); err != nil {
 		return nil, err
 	}
@@ -179,14 +194,30 @@ func (c *Conf) loadTopo() error {
 	if !ok {
 		return common.NewBasicError(ErrorAddr, nil, "err", "Element ID not found", "id", c.ID)
 	}
-	publicInfo := topoAddr.PublicAddrInfo(c.Topo.Overlay)
-	c.PublicAddr = &snet.Addr{IA: c.Topo.ISD_AS, Host: addr.HostFromIP(publicInfo.IP),
-		L4Port: uint16(publicInfo.L4Port)}
-	bindInfo := topoAddr.BindAddrInfo(c.Topo.Overlay)
-	tmpBind := &snet.Addr{IA: c.Topo.ISD_AS, Host: addr.HostFromIP(bindInfo.IP),
-		L4Port: uint16(bindInfo.L4Port)}
-	if !tmpBind.EqAddr(c.PublicAddr) {
-		c.BindAddr = tmpBind
+	pub := topoAddr.PublicAddr(c.Topo.Overlay)
+	c.PublicAddr = &snet.Addr{IA: c.Topo.ISD_AS, Host: pub}
+	bind := topoAddr.BindAddr(c.Topo.Overlay)
+	if bind != nil {
+		c.BindAddr = &snet.Addr{IA: c.Topo.ISD_AS, Host: bind}
+	}
+	return nil
+}
+
+// loadASConf loads the local AS configuration.
+func (c *Conf) loadAsConf() error {
+	if err := as_conf.Load(filepath.Join(c.ConfDir, as_conf.CfgName)); err != nil {
+		return common.NewBasicError("Unable to load ASConf", err)
+	}
+	c.ASConf = as_conf.CurrConf
+	return nil
+}
+
+// loadMasterKeys loads the local AS master keys.
+func (c *Conf) loadMasterKeys() error {
+	var err error
+	c.MasterKeys, err = as_conf.LoadMasterKeys(filepath.Join(c.ConfDir, "keys"))
+	if err != nil {
+		return common.NewBasicError("Unable to load master keys", err)
 	}
 	return nil
 }
@@ -197,7 +228,7 @@ func (c *Conf) loadStore() error {
 	c.Store, err = trust.NewStore(
 		c.TrustDB,
 		c.Topo.ISD_AS,
-		crypto.RandUint64(),
+		scrypto.RandUint64(),
 		&trust.Config{
 			MustHaveLocalChain: true,
 		},

@@ -21,6 +21,9 @@ jobs:
             # Setup
             - checkout
             - run:
+                name: Update docker
+                command: ./tools/ci/docker_update
+            - run:
                 name: Docker login
                 command: docker login -u aopsacct -p $DOCKERHUB_PASSWORD
             - run:
@@ -31,6 +34,9 @@ jobs:
                 name: Build scion:latest image
                 command: ./docker.sh build
                 when: always
+            # - run:
+            #     name: Build app images
+            #     command: make -C docker/perapp
 
             # Build and run tests:
             - run:
@@ -81,8 +87,8 @@ jobs:
         steps:
             - checkout
             - run:
-                name: Docker upgrade
-                command: sudo apt-get update && sudo apt-get install --only-upgrade docker-ce
+                name: Update docker
+                command: ./tools/ci/docker_update
             - run:
                 name: Build base
                 command: ./docker.sh base

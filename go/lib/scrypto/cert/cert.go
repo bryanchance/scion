@@ -26,7 +26,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/lib/crypto"
+	"github.com/scionproto/scion/go/lib/scrypto"
 	"github.com/scionproto/scion/go/lib/util"
 )
 
@@ -102,7 +102,7 @@ func (c *Certificate) Verify(subject addr.IA, verifyKey common.RawBytes, signAlg
 		return common.NewBasicError(InvalidSubject, nil,
 			"expected", c.Subject, "actual", subject)
 	}
-	if err := c.VerifyTime(uint32(time.Now().Unix())); err != nil {
+	if err := c.VerifyTime(util.TimeToSecs(time.Now())); err != nil {
 		return err
 	}
 	return c.VerifySignature(verifyKey, signAlgo)
@@ -113,13 +113,13 @@ func (c *Certificate) Verify(subject addr.IA, verifyKey common.RawBytes, signAlg
 func (c *Certificate) VerifyTime(ts uint32) error {
 	if ts < c.IssuingTime {
 		return common.NewBasicError(EarlyUsage, nil,
-			"IssuingTime", util.TimeToString(util.USecsToTime(c.IssuingTime)),
-			"current", util.TimeToString(util.USecsToTime(ts)))
+			"IssuingTime", util.TimeToString(util.SecsToTime(c.IssuingTime)),
+			"current", util.TimeToString(util.SecsToTime(ts)))
 	}
 	if ts > c.ExpirationTime {
 		return common.NewBasicError(Expired, nil,
-			"ExpirationTime", util.TimeToString(util.USecsToTime(c.ExpirationTime)),
-			"current", util.TimeToString(util.USecsToTime(ts)))
+			"ExpirationTime", util.TimeToString(util.SecsToTime(c.ExpirationTime)),
+			"current", util.TimeToString(util.SecsToTime(ts)))
 	}
 	return nil
 }
@@ -131,7 +131,7 @@ func (c *Certificate) VerifySignature(verifyKey common.RawBytes, signAlgo string
 	if err != nil {
 		return common.NewBasicError(UnableSigPack, err)
 	}
-	return crypto.Verify(sigInput, c.Signature, verifyKey, signAlgo)
+	return scrypto.Verify(sigInput, c.Signature, verifyKey, signAlgo)
 }
 
 // Sign adds signature to the certificate. The signature is computed over the certificate
@@ -141,7 +141,7 @@ func (c *Certificate) Sign(signKey common.RawBytes, signAlgo string) error {
 	if err != nil {
 		return err
 	}
-	sig, err := crypto.Sign(sigInput, signKey, signAlgo)
+	sig, err := scrypto.Sign(sigInput, signKey, signAlgo)
 	if err != nil {
 		return err
 	}

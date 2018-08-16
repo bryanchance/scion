@@ -1,4 +1,4 @@
-// Copyright 2018 ETH Zurich
+// Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"github.com/scionproto/scion/go/lib/infra/modules/segverifier"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/overlay"
+	"github.com/scionproto/scion/go/lib/revcache"
 	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/topology"
 	"github.com/scionproto/scion/go/proto"
@@ -119,7 +120,7 @@ func (h *ASInfoRequestHandler) Handle(transport infra.Transport, src net.Addr, p
 				{
 					RawIsdas: reqIA.IAInt(),
 					Mtu:      0,
-					IsCore:   iaInSlice(reqIA, trcObj.CoreASList()),
+					IsCore:   trcObj.CoreASes.Contains(reqIA),
 				},
 			}
 		}
@@ -248,23 +249,33 @@ func makeHostInfos(ot overlay.Type, addrMap map[string]topology.TopoAddr) []scio
 }
 
 func TopoAddrToHostInfo(ot overlay.Type, topoAddr topology.TopoAddr) sciond.HostInfo {
-	var v4, v6 net.IP
+	var v4Addr, v6Addr *addr.AppAddr
+	var ipv4, ipv6 net.IP
+	var port uint16
 	if ot.IsIPv4() {
-		v4 = topoAddr.PublicAddrInfo(ot.To4()).IP
+		v4Addr = topoAddr.IPv4.PublicAddr()
+		if v4Addr != nil {
+			ipv4 = v4Addr.L3.IP()
+			port = v4Addr.L4.Port()
+		}
 	}
 	if ot.IsIPv6() {
-		v6 = topoAddr.PublicAddrInfo(ot.To6()).IP
+		v6Addr = topoAddr.IPv6.PublicAddr()
+		if v6Addr != nil {
+			ipv6 = v6Addr.L3.IP()
+			port = v6Addr.L4.Port()
+		}
 	}
-	port := topoAddr.PublicAddrInfo(ot).L4Port
+	// XXX This assumes that Ipv4 and IPv6 use the same port!
 	return sciond.HostInfo{
 		Addrs: struct {
 			Ipv4 []byte
 			Ipv6 []byte
 		}{
-			Ipv4: v4,
-			Ipv6: v6,
+			Ipv4: ipv4,
+			Ipv6: ipv6,
 		},
-		Port: uint16(port),
+		Port: port,
 	}
 }
 
@@ -272,7 +283,7 @@ func TopoAddrToHostInfo(ot overlay.Type, topoAddr topology.TopoAddr) sciond.Host
 // RevNotification announcements. The SCIOND API spawns a goroutine with method Handle
 // for each RevNotification it receives.
 type RevNotificationHandler struct {
-	RevCache *fetcher.RevCache
+	RevCache revcache.RevCache
 }
 
 func (h *RevNotificationHandler) Handle(transport infra.Transport, src net.Addr, pld *sciond.Pld,
@@ -284,7 +295,7 @@ func (h *RevNotificationHandler) Handle(transport infra.Transport, src net.Addr,
 	revReply := sciond.RevReply{}
 	revInfo, err := h.verifySRevInfo(ctx, revNotification.SRevInfo)
 	if err == nil {
-		h.RevCache.Add(revInfo.RawIsdas.IA(), common.IFIDType(revInfo.IfID),
+		h.RevCache.Set(revcache.NewKey(revInfo.RawIsdas.IA(), common.IFIDType(revInfo.IfID)),
 			revNotification.SRevInfo, revInfo.TTL())
 	}
 	switch {

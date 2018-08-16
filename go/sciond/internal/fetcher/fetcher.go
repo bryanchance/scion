@@ -1,4 +1,3 @@
-// Copyright 2018 ETH Zurich
 // Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,16 +29,17 @@ import (
 	"github.com/scionproto/scion/go/lib/infra"
 	"github.com/scionproto/scion/go/lib/infra/messenger"
 	"github.com/scionproto/scion/go/lib/infra/modules/combinator"
+	"github.com/scionproto/scion/go/lib/infra/modules/segsaver"
 	"github.com/scionproto/scion/go/lib/infra/modules/segverifier"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/pathdb"
 	"github.com/scionproto/scion/go/lib/pathdb/query"
+	"github.com/scionproto/scion/go/lib/revcache"
 	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/lib/spath"
 	"github.com/scionproto/scion/go/lib/topology"
 	"github.com/scionproto/scion/go/lib/util"
-	"github.com/scionproto/scion/go/proto"
 )
 
 const (
@@ -54,12 +54,12 @@ type Fetcher struct {
 	messenger       infra.Messenger
 	pathDB          *pathdb.DB
 	trustStore      infra.TrustStore
-	revocationCache *RevCache
+	revocationCache revcache.RevCache
 	logger          log.Logger
 }
 
 func NewFetcher(topo *topology.Topo, messenger infra.Messenger, pathDB *pathdb.DB,
-	trustStore infra.TrustStore, revCache *RevCache) *Fetcher {
+	trustStore infra.TrustStore, revCache revcache.RevCache) *Fetcher {
 
 	return &Fetcher{
 		topology:        topo,
@@ -207,7 +207,7 @@ func (f *Fetcher) buildSCIONDReplyEntries(paths []*combinator.Path) []sciond.Pat
 					FwdPath:    []byte{},
 					Mtu:        uint16(f.topology.MTU),
 					Interfaces: []sciond.PathInterface{},
-					ExpTime:    uint32(time.Now().Add(spath.MaxTTL * time.Second).Unix()),
+					ExpTime:    util.TimeToSecs(time.Now().Add(spath.MaxTTL * time.Second)),
 				},
 			},
 		}
@@ -229,17 +229,17 @@ func (f *Fetcher) buildSCIONDReplyEntries(paths []*combinator.Path) []sciond.Pat
 				FwdPath:    x.Bytes(),
 				Mtu:        path.Mtu,
 				Interfaces: path.Interfaces,
-				ExpTime:    uint32(path.ExpTime.Unix()),
+				ExpTime:    util.TimeToSecs(path.ExpTime),
 			},
 			HostInfo: sciond.HostInfo{
 				Addrs: struct {
 					Ipv4 []byte
 					Ipv6 []byte
 				}{
-					Ipv4: nextHop.InternalAddr.IPv4.PublicAddr(),
+					Ipv4: nextHop.InternalAddr.IPv4.PublicAddr().L3.IP(),
 					// FIXME(scrye): also add support for IPv6
 				},
-				Port: uint16(nextHop.InternalAddr.IPv4.PublicL4Port()),
+				Port: nextHop.InternalAddr.IPv4.PublicAddr().L4.Port(),
 			},
 		})
 	}
@@ -273,8 +273,8 @@ func (f *Fetcher) buildPathsFromDB(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	srcIsCore := iaInSlice(f.topology.ISD_AS, localTrc.CoreASList())
-	dstIsCore := iaInSlice(req.Dst.IA(), dstTrc.CoreASList())
+	srcIsCore := localTrc.CoreASes.Contains(f.topology.ISD_AS)
+	dstIsCore := dstTrc.CoreASes.Contains(req.Dst.IA())
 	// pathdb expects slices
 	srcIASlice := []addr.IA{req.Src.IA()}
 	dstIASlice := []addr.IA{req.Dst.IA()}
@@ -288,29 +288,29 @@ func (f *Fetcher) buildPathsFromDB(ctx context.Context,
 			return nil, err
 		}
 	case srcIsCore && !dstIsCore:
-		cores, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASList(), srcIASlice)
+		cores, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASes.ASList(), srcIASlice)
 		if err != nil {
 			return nil, err
 		}
-		downs, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASList(), dstIASlice)
+		downs, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASes.ASList(), dstIASlice)
 		if err != nil {
 			return nil, err
 		}
 	case !srcIsCore && dstIsCore:
-		ups, err = f.getSegmentsFromDB(ctx, localTrc.CoreASList(), srcIASlice)
+		ups, err = f.getSegmentsFromDB(ctx, localTrc.CoreASes.ASList(), srcIASlice)
 		if err != nil {
 			return nil, err
 		}
-		cores, err = f.getSegmentsFromDB(ctx, dstIASlice, localTrc.CoreASList())
+		cores, err = f.getSegmentsFromDB(ctx, dstIASlice, localTrc.CoreASes.ASList())
 		if err != nil {
 			return nil, err
 		}
 	case !srcIsCore && !dstIsCore:
-		ups, err = f.getSegmentsFromDB(ctx, localTrc.CoreASList(), srcIASlice)
+		ups, err = f.getSegmentsFromDB(ctx, localTrc.CoreASes.ASList(), srcIASlice)
 		if err != nil {
 			return nil, err
 		}
-		downs, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASList(), dstIASlice)
+		downs, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASes.ASList(), dstIASlice)
 		if err != nil {
 			return nil, err
 		}
@@ -351,7 +351,7 @@ func (f *Fetcher) filterRevokedPaths(paths []*combinator.Path) []*combinator.Pat
 		for _, iface := range path.Interfaces {
 			// cache automatically expires outdated revocations every second,
 			// so a cache hit implies revocation is still active.
-			if _, ok := f.revocationCache.Get(iface.ISD_AS(), iface.IfID); ok {
+			if _, ok := f.revocationCache.Get(revcache.NewKey(iface.ISD_AS(), iface.IfID)); ok {
 				revoked = true
 			}
 		}
@@ -365,11 +365,11 @@ func (f *Fetcher) filterRevokedPaths(paths []*combinator.Path) []*combinator.Pat
 // fetchAndVerify downloads path segments from the network. Segments that are
 // successfully verified are added to the pathDB. Revocations that are
 // successfully verified are added to the revocation cache.
-func (t *Fetcher) fetchAndVerify(ctx context.Context, cancelF context.CancelFunc,
+func (f *Fetcher) fetchAndVerify(ctx context.Context, cancelF context.CancelFunc,
 	req *sciond.PathReq, earlyTrigger *util.Trigger) {
 
 	defer cancelF()
-	reply, err := t.getSegmentsFromNetwork(ctx, req)
+	reply, err := f.getSegmentsFromNetwork(ctx, req)
 	if err != nil {
 		log.Warn("Unable to retrieve paths from network", "err", err)
 		return
@@ -379,57 +379,24 @@ func (t *Fetcher) fetchAndVerify(ctx context.Context, cancelF context.CancelFunc
 	if timer != nil {
 		defer timer.Stop()
 	}
-	// Build verification units
-	units := segverifier.BuildUnits(reply.Recs.Recs, reply.Recs.SRevInfos)
-	unitResultsC := make(chan segverifier.UnitResult, len(units))
-	for _, unit := range units {
-		go unit.Verify(ctx, unitResultsC)
-	}
-Loop:
-	for numResults := 0; numResults < len(units); numResults++ {
-		select {
-		case result := <-unitResultsC:
-			if err, ok := result.Errors[-1]; ok {
-				log.Info("Segment verification failed",
-					"segment", result.Unit.SegMeta.Segment, "err", err)
-			} else {
-				// Verification succeeded
-				n, err := t.pathDB.Insert(ctx, &result.Unit.SegMeta.Segment,
-					[]proto.PathSegType{result.Unit.SegMeta.Type})
-				if err != nil {
-					log.Warn("Unable to insert segment into path database",
-						"segment", result.Unit.SegMeta.Segment, "err", err)
-					continue
-				}
-				if n > 0 {
-					log.Debug("Inserted segment into path database",
-						"segment", result.Unit.SegMeta.Segment)
-				}
-			}
-			// Insert successfully verified revocations into the revcache
-			for index, revocation := range result.Unit.SRevInfos {
-				if err, ok := result.Errors[index]; ok {
-					log.Info("Revocation verification failed",
-						"revocation", revocation, "err", err)
-				} else {
-					// Verification succeeded for this revocation, so we can add it to the cache
-					info, err := revocation.RevInfo()
-					if err != nil {
-						// This should be caught during network message sanitization
-						panic(err)
-					}
-					t.revocationCache.Add(
-						info.IA(),
-						common.IFIDType(info.IfID),
-						revocation,
-						info.RelativeTTL(time.Now()),
-					)
-				}
-			}
-		case <-ctx.Done():
-			break Loop
+	// verify and store the segments
+	verifiedSeg := func(ctx context.Context, s *seg.Meta) {
+		if err := segsaver.StoreSeg(ctx, s, f.pathDB, f.logger); err != nil {
+			f.logger.Error("Unable to insert segment into path database",
+				"seg", s.Segment, "err", err)
 		}
 	}
+	verifiedRev := func(ctx context.Context, rev *path_mgmt.SignedRevInfo) {
+		segsaver.StoreRevocation(rev, f.revocationCache)
+	}
+	segErr := func(s *seg.Meta, err error) {
+		f.logger.Warn("Segment verification failed", "segment", s.Segment, "err", err)
+	}
+	revErr := func(revocation *path_mgmt.SignedRevInfo, err error) {
+		f.logger.Warn("Revocation verification failed", "revocation", revocation, "err", err)
+	}
+	segverifier.Verify(ctx, reply.Recs.Recs, reply.Recs.SRevInfos,
+		verifiedSeg, verifiedRev, segErr, revErr)
 }
 
 func (f *Fetcher) getSegmentsFromNetwork(ctx context.Context,
@@ -442,15 +409,13 @@ func (f *Fetcher) getSegmentsFromNetwork(ctx context.Context,
 	}
 	psName := f.topology.PSNames[rand.Intn(numPSServers)]
 	topoAddr := f.topology.PS[psName]
-	info := topoAddr.PublicAddrInfo(f.topology.Overlay)
-	if info == nil {
+	ps := &snet.Addr{
+		IA:   f.topology.ISD_AS,
+		Host: topoAddr.PublicAddr(f.topology.Overlay),
+	}
+	if ps.Host == nil {
 		return nil, common.NewBasicError("PS address not found", nil, "name", psName,
 			"overlay", f.topology.Overlay)
-	}
-	ps := &snet.Addr{
-		IA:     f.topology.ISD_AS,
-		Host:   addr.HostFromIP(info.IP),
-		L4Port: uint16(info.L4Port),
 	}
 	// Get segments from path server
 	msg := &path_mgmt.SegReq{
@@ -478,15 +443,6 @@ func getStartIAs(segments []*seg.PathSegment) []addr.IA {
 		startIAs = append(startIAs, segment.ASEntries[0].IA())
 	}
 	return startIAs
-}
-
-func iaInSlice(ia addr.IA, slice []addr.IA) bool {
-	for _, otherIA := range slice {
-		if ia.Eq(otherIA) {
-			return true
-		}
-	}
-	return false
 }
 
 // NewExtendedContext returns a new _independent_ context that can extend past

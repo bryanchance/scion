@@ -47,9 +47,9 @@ func (r *Router) genACLPkt(intf *netconf.Interface) {
 		logger.Error("Unable to construct signed CtrlPld object", "err", err)
 		return
 	}
-	srcAddr := intf.IFAddr.PublicAddrInfo(intf.IFAddr.Overlay)
-	if err := r.genPkt(intf.RemoteIA, addr.HostFromIP(intf.RemoteAddr.IP),
-		intf.RemoteAddr.L4Port, srcAddr, scpld); err != nil {
+	src := intf.IFAddr.PublicAddr(intf.IFAddr.Overlay)
+	dst := &addr.AppAddr{L3: intf.RemoteAddr.L3(), L4: intf.RemoteAddr.L4()}
+	if err := r.genPkt(intf.RemoteIA, dst, src, intf.RemoteAddr, scpld); err != nil {
 		logger.Error("Error generating ACL Push packet", "err", err)
 	}
 }
