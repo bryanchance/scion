@@ -12,25 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package addr
+package util
 
-import "net"
+import (
+	"fmt"
+	"math/rand"
+)
 
-// IsIPv4 returns whether the ip is IPv4 or not.
-// This has the side effect in Go that if the ip passed was the direct result
-// of net.IPv4(), it will fail to detect it as an IPv4 given that the
-// underlying byte buffer is 16B.
-func IsIPv4(ip net.IP) bool {
-	return len(ip) == net.IPv4len
+// DebugID is used to correlate behavior in logs. A DebugID is allocated
+// for each outgoing request/response or notify message exchange, and for each
+// handler executed during ListenAndServe.
+type DebugID uint32
+
+func GetDebugID() DebugID {
+	return DebugID(rand.Uint32())
 }
 
-func IsIPv6(ip net.IP) bool {
-	return len(ip) == net.IPv6len
-}
-
-func NewSVCUDPAppAddr(svc HostSVC) *AppAddr {
-	return &AppAddr{
-		L3: svc,
-		L4: NewL4UDPInfo(0),
-	}
+func (id DebugID) String() string {
+	return fmt.Sprintf("%08x", uint32(id))
 }

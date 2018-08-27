@@ -1,4 +1,4 @@
-// Copyright 2018 ETH Zurich
+// Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -292,7 +292,7 @@ func (solution *PathSolution) GetFwdPathMetadata() *Path {
 			// Normal hop field.
 			newHF := currentSeg.appendHopFieldFrom(asEntry.HopEntries[0])
 			currentSeg.ExpTime = minUint32(currentSeg.ExpTime,
-				uint32(newHF.ExpTime)*spath.ExpTimeUnit)
+				uint32(newHF.ExpTime.ToDuration().Seconds()))
 			inIFID, outIFID = newHF.ConsEgress, newHF.ConsIngress
 
 			// If we've transitioned from a previous segment, set Xover flag.
@@ -319,15 +319,19 @@ func (solution *PathSolution) GetFwdPathMetadata() *Path {
 				}
 
 				if solEdge.edge.Shortcut != 0 {
+					if solEdge.segment.IsDownSeg() && edgeIdx == 1 {
+						newHF.Xover = true
+					}
+
 					if solEdge.edge.Peer != 0 {
-						// We're crossing a peering shortcut. Always set Xover flag
-						// for the current hop field, even if on last segment.
+						// Always set Xover flag for the current hop field,
+						// even if on last segment.
 						newHF.Xover = true
 						// Add a new hop field for the peering entry, and set Xover.
 						pHF := currentSeg.appendHopFieldFrom(asEntry.HopEntries[solEdge.edge.Peer])
 						pHF.Xover = true
 						currentSeg.ExpTime = minUint32(currentSeg.ExpTime,
-							uint32(pHF.ExpTime)*spath.ExpTimeUnit)
+							uint32(pHF.ExpTime.ToDuration().Seconds()))
 						inIFID, outIFID = pHF.ConsEgress, pHF.ConsIngress
 					} else {
 						// Normal shortcut, so only half of this HF is traversed by the packet
