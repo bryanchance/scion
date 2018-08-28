@@ -29,9 +29,6 @@ export function unmarshalInterface(json): Cond {
     if (json[TypeCondNot]) {
         return CondNotFromJSON(json[TypeCondNot])
     }
-    if (json[TypeCondBool] !== 'undefined') {
-        return CondBoolFromJSON(json[TypeCondBool])
-    }
     if (json[TypeCondIPv4]) {
         return CondIPv4FromJSON(json[TypeCondIPv4])
     }
@@ -46,6 +43,9 @@ export function unmarshalInterface(json): Cond {
     }
     if (json[TypeIPv4MatchDSCP]) {
         return MatchdscpFromJSON(json[TypeIPv4MatchDSCP])
+    }
+    if (json[TypeCondBool] !== undefined) {
+        return CondBoolFromJSON(json[TypeCondBool])
     }
     console.error(json)
 }
