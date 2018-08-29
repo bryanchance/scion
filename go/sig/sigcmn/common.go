@@ -57,6 +57,11 @@ var (
 	MgmtAddr *mgmt.Addr
 )
 
+const (
+	initAttempts = 100
+	initInterval = time.Second
+)
+
 func Init(ia addr.IA, ip net.IP) error {
 	var err error
 	IA = ia
@@ -79,7 +84,7 @@ func Init(ia addr.IA, ip net.IP) error {
 	}
 	network := snet.NewNetworkWithPR(ia, *dispatcherPath, PathMgr)
 	// Initialize SCION local networking module
-	err = snet.InitWithNetwork(network)
+	err = initSNET(network, initAttempts, initInterval)
 	if err != nil {
 		return common.NewBasicError("Error initializing SCION Network module", err)
 	}
@@ -108,4 +113,18 @@ func ValidatePort(desc string, port int) error {
 			"min", 1, "max", MaxPort, "actual", port)
 	}
 	return nil
+}
+
+// initSNET initializes snet. The number of attempts is specified, as well as the sleep duration.
+// This allows the service to wait for a limited time for sciond to become available
+func initSNET(network *snet.Network, attempts int, sleep time.Duration) (err error) {
+	// Initialize SCION local networking module
+	for i := 0; i < attempts; i++ {
+		if err = snet.InitWithNetwork(network); err == nil {
+			break
+		}
+		log.Error("Unable to initialize snet", "Retry interval", sleep, "err", err)
+		time.Sleep(sleep)
+	}
+	return err
 }
