@@ -1,5 +1,4 @@
-// Copyright 2017 ETH Zurich
-// Copyright 2018 ETH Zurich, Anapaya Systems
+// Copyright 2018 ETH Zurich
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,19 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package seg
+package scrypto
 
-import (
-	"fmt"
-
-	"github.com/scionproto/scion/go/proto"
-)
-
-type Meta struct {
-	Type    proto.PathSegType
-	Segment *PathSegment `capnp:"pathSeg"`
-}
-
-func (m *Meta) String() string {
-	return fmt.Sprintf("Type: %v, Segment: %v", m.Type, m.Segment)
-}
+// LatestVer is the wildcard version indicating the highest available version
+// when requesting certificate chains and TRCs.
+const LatestVer uint64 = 0

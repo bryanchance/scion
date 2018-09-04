@@ -41,7 +41,6 @@ import (
 	"github.com/scionproto/scion/go/lib/spath"
 	"github.com/scionproto/scion/go/lib/topology"
 	"github.com/scionproto/scion/go/lib/util"
-	"github.com/scionproto/scion/go/proto"
 )
 
 const (
@@ -54,13 +53,13 @@ var requestID messenger.Counter
 type Fetcher struct {
 	topology        *topology.Topo
 	messenger       infra.Messenger
-	pathDB          *pathdb.DB
+	pathDB          pathdb.PathDB
 	trustStore      infra.TrustStore
 	revocationCache revcache.RevCache
 	logger          log.Logger
 }
 
-func NewFetcher(topo *topology.Topo, messenger infra.Messenger, pathDB *pathdb.DB,
+func NewFetcher(topo *topology.Topo, messenger infra.Messenger, pathDB pathdb.PathDB,
 	trustStore infra.TrustStore, revCache revcache.RevCache, logger log.Logger) *Fetcher {
 
 	return &Fetcher{
@@ -95,9 +94,13 @@ func (f *Fetcher) GetPaths(ctx context.Context, req *sciond.PathReq,
 	}
 
 	// Commit to a path server, and use it for path and crypto queries
-	psAppAddr, err := f.topology.GetRandomServer(proto.ServiceType_ps)
+	psID, err := f.topology.PSNames.GetRandom()
 	if err != nil {
 		return nil, common.NewBasicError("PS not found in topology", err)
+	}
+	psAppAddr := f.topology.PS.GetById(psID).PublicAddr(f.topology.Overlay)
+	if psAppAddr == nil {
+		return nil, common.NewBasicError("PS not found in topology", nil)
 	}
 	ps := &snet.Addr{IA: f.topology.ISD_AS, Host: psAppAddr}
 
@@ -429,15 +432,8 @@ func (f *Fetcher) getSegmentsFromNetwork(ctx context.Context,
 	msg := &path_mgmt.SegReq{
 		RawSrcIA: req.Src,
 		RawDstIA: req.Dst,
-		Flags: struct {
-			Sibra     bool
-			CacheOnly bool
-		}{
-			Sibra:     false,
-			CacheOnly: false,
-		},
 	}
-	reply, err := f.messenger.GetPathSegs(ctx, msg, ps, requestID.Next())
+	reply, err := f.messenger.GetSegs(ctx, msg, ps, requestID.Next())
 	if err != nil {
 		return nil, err
 	}

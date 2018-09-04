@@ -30,7 +30,7 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/ctrl/seg"
-	"github.com/scionproto/scion/go/lib/pathdb/conn"
+	"github.com/scionproto/scion/go/lib/pathdb"
 	"github.com/scionproto/scion/go/lib/pathdb/query"
 	"github.com/scionproto/scion/go/lib/sqlite"
 	"github.com/scionproto/scion/go/proto"
@@ -43,7 +43,7 @@ type segMeta struct {
 	Seg         *seg.PathSegment
 }
 
-var _ conn.Conn = (*Backend)(nil)
+var _ pathdb.PathDB = (*Backend)(nil)
 
 type Backend struct {
 	sync.RWMutex
@@ -132,7 +132,8 @@ func (b *Backend) InsertWithHPCfgIDs(ctx context.Context, pseg *seg.PathSegment,
 }
 
 func (b *Backend) get(ctx context.Context, segID common.RawBytes) (*segMeta, error) {
-	rows, err := b.db.QueryContext(ctx, "SELECT * FROM Segments WHERE SegID=?", segID)
+	query := "SELECT RowID, SegID, LastUpdated, Segment FROM Segments WHERE SegID=?"
+	rows, err := b.db.QueryContext(ctx, query, segID)
 	if err != nil {
 		return nil, common.NewBasicError("Failed to lookup segment", err)
 	}
@@ -194,8 +195,9 @@ func (b *Backend) updateSeg(ctx context.Context, meta *segMeta) error {
 	if err != nil {
 		return err
 	}
-	stmtStr := `UPDATE Segments SET LastUpdated=?, Segment=? WHERE RowID=?`
-	_, err = b.tx.ExecContext(ctx, stmtStr, meta.LastUpdated.Unix(), packedSeg, meta.RowID)
+	exp := meta.Seg.MaxExpiry().Unix()
+	stmtStr := `UPDATE Segments SET LastUpdated=?, Segment=?, Expiry=? WHERE RowID=?`
+	_, err = b.tx.ExecContext(ctx, stmtStr, meta.LastUpdated.Unix(), packedSeg, exp, meta.RowID)
 	if err != nil {
 		return common.NewBasicError("Failed to update segment", err)
 	}
@@ -240,9 +242,10 @@ func (b *Backend) insertFull(ctx context.Context, pseg *seg.PathSegment,
 	if err != nil {
 		return err
 	}
+	exp := pseg.MaxExpiry().Unix()
 	// Insert path segment.
-	inst := `INSERT INTO Segments (SegID, LastUpdated, Segment) VALUES (?, ?, ?)`
-	res, err := b.tx.ExecContext(ctx, inst, segID, time.Now().Unix(), packedSeg)
+	inst := `INSERT INTO Segments (SegID, LastUpdated, Segment, Expiry) VALUES (?, ?, ?, ?)`
+	res, err := b.tx.ExecContext(ctx, inst, segID, time.Now().Unix(), packedSeg, exp)
 	if err != nil {
 		b.tx.Rollback()
 		return common.NewBasicError("Failed to insert path segment", err)
@@ -336,29 +339,27 @@ func (b *Backend) insertStartOrEnd(ctx context.Context, as *seg.ASEntry,
 }
 
 func (b *Backend) Delete(ctx context.Context, segID common.RawBytes) (int, error) {
-	b.Lock()
-	defer b.Unlock()
-	if b.db == nil {
-		return 0, common.NewBasicError("No database open", nil)
-	}
-	// Create new transaction
-	if err := b.begin(ctx); err != nil {
-		return 0, err
-	}
-	res, err := b.tx.ExecContext(ctx, "DELETE FROM Segments WHERE SegID=?", segID)
-	if err != nil {
-		b.tx.Rollback()
-		return 0, common.NewBasicError("Failed to delete segment", err)
-	}
-	// Commit transaction
-	if err := b.commit(); err != nil {
-		return 0, err
-	}
-	deleted, _ := res.RowsAffected()
-	return int(deleted), nil
+	return b.deleteInTrx(ctx, func() (sql.Result, error) {
+		return b.tx.ExecContext(ctx, "DELETE FROM Segments WHERE SegID=?", segID)
+	})
 }
 
 func (b *Backend) DeleteWithIntf(ctx context.Context, intf query.IntfSpec) (int, error) {
+	return b.deleteInTrx(ctx, func() (sql.Result, error) {
+		delStmt := `DELETE FROM Segments WHERE EXISTS (
+			SELECT * FROM IntfToSeg WHERE IsdID=? AND AsID=? AND IntfID=?)`
+		return b.tx.ExecContext(ctx, delStmt, intf.IA.I, intf.IA.A, intf.IfID)
+	})
+}
+
+func (b *Backend) DeleteExpired(ctx context.Context, now time.Time) (int, error) {
+	return b.deleteInTrx(ctx, func() (sql.Result, error) {
+		delStmt := `DELETE FROM Segments WHERE Expiry < ?`
+		return b.tx.ExecContext(ctx, delStmt, now.Unix())
+	})
+}
+
+func (b *Backend) deleteInTrx(ctx context.Context, delete func() (sql.Result, error)) (int, error) {
 	b.Lock()
 	defer b.Unlock()
 	if b.db == nil {
@@ -368,9 +369,7 @@ func (b *Backend) DeleteWithIntf(ctx context.Context, intf query.IntfSpec) (int,
 	if err := b.begin(ctx); err != nil {
 		return 0, err
 	}
-	delStmt := `DELETE FROM Segments WHERE EXISTS (
-		SELECT * FROM IntfToSeg WHERE IsdID=? AND AsID=? AND IntfID=?)`
-	res, err := b.tx.ExecContext(ctx, delStmt, intf.IA.I, intf.IA.A, intf.IfID)
+	res, err := delete()
 	if err != nil {
 		b.tx.Rollback()
 		return 0, common.NewBasicError("Failed to delete segments", err)
@@ -439,9 +438,13 @@ func (b *Backend) buildQuery(params *query.Params) (string, []interface{}) {
 	}
 	joins := []string{}
 	where := []string{}
-	if len(params.SegID) > 0 {
-		where = append(where, "s.SegID=?")
-		args = append(args, params.SegID)
+	if len(params.SegIDs) > 0 {
+		subQ := make([]string, 0, len(params.SegIDs))
+		for _, segID := range params.SegIDs {
+			subQ = append(subQ, "s.SegID=?")
+			args = append(args, segID)
+		}
+		where = append(where, fmt.Sprintf("(%s)", strings.Join(subQ, " OR ")))
 	}
 	if len(params.SegTypes) > 0 {
 		joins = append(joins, "JOIN SegTypes t ON t.SegRowID=s.RowID")
@@ -473,8 +476,13 @@ func (b *Backend) buildQuery(params *query.Params) (string, []interface{}) {
 		joins = append(joins, "JOIN StartsAt st ON st.SegRowID=s.RowID")
 		subQ := []string{}
 		for _, as := range params.StartsAt {
-			subQ = append(subQ, "(st.IsdID=? AND st.AsID=?)")
-			args = append(args, as.I, as.A)
+			if as.A == 0 {
+				subQ = append(subQ, "(st.IsdID=?)")
+				args = append(args, as.I)
+			} else {
+				subQ = append(subQ, "(st.IsdID=? AND st.AsID=?)")
+				args = append(args, as.I, as.A)
+			}
 		}
 		where = append(where, fmt.Sprintf("(%s)", strings.Join(subQ, " OR ")))
 	}
@@ -482,10 +490,19 @@ func (b *Backend) buildQuery(params *query.Params) (string, []interface{}) {
 		joins = append(joins, "JOIN EndsAt e ON e.SegRowID=s.RowID")
 		subQ := []string{}
 		for _, as := range params.EndsAt {
-			subQ = append(subQ, "(e.IsdID=? AND e.AsID=?)")
-			args = append(args, as.I, as.A)
+			if as.A == 0 {
+				subQ = append(subQ, "(e.IsdID=?)")
+				args = append(args, as.I)
+			} else {
+				subQ = append(subQ, "(e.IsdID=? AND e.AsID=?)")
+				args = append(args, as.I, as.A)
+			}
 		}
 		where = append(where, fmt.Sprintf("(%s)", strings.Join(subQ, " OR ")))
+	}
+	if params.MinLastUpdate != nil {
+		where = append(where, "(LastUpdated>?)")
+		args = append(args, params.MinLastUpdate.Unix())
 	}
 	// Assemble the query.
 	if len(joins) > 0 {

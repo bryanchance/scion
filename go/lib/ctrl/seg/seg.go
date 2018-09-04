@@ -1,4 +1,5 @@
 // Copyright 2017 ETH Zurich
+// Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +21,9 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"strings"
+	"time"
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
@@ -96,6 +99,9 @@ func (ps *PathSegment) InfoF() (*spath.InfoField, error) {
 }
 
 func (ps *PathSegment) Validate() error {
+	if err := ps.SData.Validate(); err != nil {
+		return err
+	}
 	if len(ps.RawASEntries) == 0 {
 		return common.NewBasicError("PathSegment has no AS Entries", nil)
 	}
@@ -142,7 +148,61 @@ func (ps *PathSegment) ContainsInterface(ia addr.IA, ifid common.IFIDType) bool 
 	return false
 }
 
-// walkHopEntries iterates through the hop entries of asEntries, checking that
+// MaxExpiry returns the maximum expiry of all hop fields.
+// Assumes segment is validated.
+func (ps *PathSegment) MaxExpiry() time.Time {
+	return ps.expiry(0, func(hfTtl time.Duration, ttl time.Duration) bool {
+		return hfTtl > ttl
+	})
+}
+
+// MinExpiry returns the minimum expiry of all hop fields.
+// Assumes segment is validated.
+func (ps *PathSegment) MinExpiry() time.Time {
+	return ps.expiry(spath.MaxTTL*time.Second, func(hfTtl time.Duration, ttl time.Duration) bool {
+		return hfTtl < ttl
+	})
+}
+
+func (ps *PathSegment) expiry(initTtl time.Duration,
+	compare func(time.Duration, time.Duration) bool) time.Time {
+
+	info, err := ps.InfoF()
+	if err != nil {
+		// This should not happen, as Validate already checks that infoF can be parsed.
+		panic(err)
+	}
+	ttl := initTtl
+	for _, asEntry := range ps.ASEntries {
+		for _, he := range asEntry.HopEntries {
+			hf, err := he.HopField()
+			if err != nil {
+				// This should not happen, as Validate already checks that it
+				// is possible to extract the hop field.
+				panic(err)
+			}
+			hfTtl := hf.ExpTime.ToDuration()
+			if compare(hfTtl, ttl) {
+				ttl = hfTtl
+			}
+		}
+	}
+	return info.Timestamp().Add(ttl)
+}
+
+// FirstIA returns the IA of the first ASEntry.
+// Note that if the seg contains no ASEntries this method will panic.
+func (ps *PathSegment) FirstIA() addr.IA {
+	return ps.ASEntries[0].IA()
+}
+
+// LastIA returns the IA of the last ASEntry.
+// Note that if the seg contains no ASEntries this method will panic.
+func (ps *PathSegment) LastIA() addr.IA {
+	return ps.ASEntries[len(ps.ASEntries)-1].IA()
+}
+
+// WalkHopEntries iterates through the hop entries of asEntries, checking that
 // the hop fields within can be parsed. If an parse error is found, the
 // function immediately returns with an error.
 func (ps *PathSegment) WalkHopEntries() error {
@@ -218,6 +278,36 @@ func (ps *PathSegment) Write(b common.RawBytes) (int, error) {
 	return proto.WriteRoot(ps, b)
 }
 
+// RawWriteTo writes the PathSegment to the writer in a form that is understood by spath/Path.
+func (ps *PathSegment) RawWriteTo(w io.Writer) (int64, error) {
+	var total int64
+	inf, err := ps.InfoF()
+	if err != nil {
+		return total, err
+	}
+	inf.Hops = uint8(len(ps.ASEntries))
+	n, err := inf.WriteTo(w)
+	total += n
+	if err != nil {
+		return total, err
+	}
+	for _, asEntry := range ps.ASEntries {
+		if len(asEntry.HopEntries) == 0 {
+			return total, common.NewBasicError("ASEntry has no HopEntry", nil, "asEntry", asEntry)
+		}
+		hf, err := asEntry.HopEntries[0].HopField()
+		if err != nil {
+			return total, err
+		}
+		n, err = hf.WriteTo(w)
+		total += n
+		if err != nil {
+			return total, err
+		}
+	}
+	return total, nil
+}
+
 func (ps *PathSegment) Pack() (common.RawBytes, error) {
 	return proto.PackRoot(ps)
 }
@@ -255,5 +345,5 @@ func (ps *PathSegment) String() string {
 	}
 	// TODO(shitz): Add extensions.
 	desc = append(desc, strings.Join(hops_desc, ">"))
-	return strings.Join(desc, "")
+	return strings.Join(desc, " ")
 }
