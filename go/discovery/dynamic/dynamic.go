@@ -176,7 +176,7 @@ func marshallAndUpdate(rt *topology.RawTopo, topo *util.AtomicTopo) error {
 }
 
 func fillService(c *zk.Conn, ia addr.IA, servicetype string,
-	fallback map[string]topology.RawAddrInfo) (map[string]topology.RawAddrInfo, string) {
+	fallback map[string]*topology.RawSrvInfo) (map[string]*topology.RawSrvInfo, string) {
 	service, err := getZkService(c, ia, servicetype)
 	if err != nil {
 		log.Warn("Could not fetch service entries from ZK, using fallback",
@@ -191,8 +191,8 @@ func fillService(c *zk.Conn, ia addr.IA, servicetype string,
 }
 
 func getZkService(connection *zk.Conn, ia addr.IA,
-	servertype string) (map[string]topology.RawAddrInfo, error) {
-	services := make(map[string]topology.RawAddrInfo)
+	servertype string) (map[string]*topology.RawSrvInfo, error) {
+	services := make(map[string]*topology.RawSrvInfo)
 	partybase := fmt.Sprintf("/%s/%s/party", ia, servertype)
 	children, _, err := connection.Children(partybase)
 	if err != nil {
@@ -223,7 +223,6 @@ func getZkService(connection *zk.Conn, ia addr.IA,
 			return nil, err
 		}
 		for i := 0; i < addrs.Len(); i++ {
-			var saddr string
 			addr, err := addrs.At(i).Addr()
 			if err != nil {
 				log.Error("Could not fetch service address", "addrs", addrs, "err", err)
@@ -233,9 +232,8 @@ func getZkService(connection *zk.Conn, ia addr.IA,
 			if ip == nil {
 				return nil, errors.New(fmt.Sprintf("Could not parse IP '%v'", ip))
 			}
-			saddr = ip.String()
 			// Make a RemoteAddrInfo we can put into the topology for later serving
-			services[sid] = raiFromAddrPortOverlay(saddr, int(addrs.At(i).Port()), 0)
+			services[sid] = rsiFromAddrPortOverlay(ip, int(addrs.At(i).Port()), 0)
 		}
 	}
 	return services, nil
@@ -259,15 +257,23 @@ func decodePartydata(b []byte) (*proto.ZkId, error) {
 	return &zkid, nil
 }
 
-func raiFromAddrPortOverlay(addr string, l4port int, overlayport int) topology.RawAddrInfo {
-	return topology.RawAddrInfo{Public: []topology.RawAddrPortOverlay{
-		{
+func rsiFromAddrPortOverlay(ip net.IP, l4port int, overlayport int) *topology.RawSrvInfo {
+	addrs := make(topology.RawAddrMap)
+	rpbo := &topology.RawPubBindOverlay{
+		Public: topology.RawAddrPortOverlay{
 			RawAddrPort: topology.RawAddrPort{
-				Addr:   addr,
+				Addr:   ip.String(),
 				L4Port: l4port,
 			},
 			OverlayPort: overlayport,
 		},
-	},
+	}
+	if ip.To4() != nil {
+		addrs["IPv4"] = rpbo
+	} else {
+		addrs["IPv6"] = rpbo
+	}
+	return &topology.RawSrvInfo{
+		Addrs: addrs,
 	}
 }

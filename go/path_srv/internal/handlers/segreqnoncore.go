@@ -27,6 +27,7 @@ import (
 	"github.com/scionproto/scion/go/lib/infra"
 	"github.com/scionproto/scion/go/lib/infra/messenger"
 	"github.com/scionproto/scion/go/lib/pathdb/query"
+	"github.com/scionproto/scion/go/path_srv/internal/addrutil"
 	"github.com/scionproto/scion/go/proto"
 )
 
@@ -102,15 +103,13 @@ func (h *segReqNonCoreHandler) handleCoreDst(ctx context.Context, segReq *path_m
 
 	dstISDLocal := segReq.DstIA().I == h.localIA.I
 	h.logger.Debug("[segReqHandler] handleCoreDst", "remote", dstISDLocal)
-	upSegs, err := h.fetchUpSegsFromDB(ctx, coreASes)
+	upSegs, err := h.fetchUpSegsFromDB(ctx, coreASes, !segReq.Flags.CacheOnly)
 	if err != nil {
 		h.logger.Error("[segReqHandler] Failed to find up segments", "err", err)
 		h.sendEmptySegReply(ctx, segReq, msger)
 		return
 	}
 	if len(upSegs) == 0 {
-		// TODO(lukedirtwalker): We should hold the request until the timeout of the context,
-		// and continue processing as soon as we have up segments. (only if !CacheOnly)
 		h.logger.Warn("[segReqHandler] No up segments found")
 		h.sendEmptySegReply(ctx, segReq, msger)
 		return
@@ -122,7 +121,7 @@ func (h *segReqNonCoreHandler) handleCoreDst(ctx context.Context, segReq *path_m
 	connFirstIAs := make(map[addr.IA]struct{})
 	// TODO(lukedirtwalker): we shouldn't just query all cores, this could be a lot of overhead.
 	// Add a limit of cores we query.
-	for _, src := range firstIAs(upSegs) {
+	for _, src := range upSegs.FirstIAs() {
 		if !src.Eq(dst) {
 			res, err := h.fetchCoreSegs(ctx, msger, src, dst, segReq.Flags.CacheOnly)
 			if err != nil {
@@ -138,7 +137,7 @@ func (h *segReqNonCoreHandler) handleCoreDst(ctx context.Context, segReq *path_m
 		}
 	}
 	// Make sure we only return connected segments.
-	upSegs = filterSegs(upSegs, func(s *seg.PathSegment) bool {
+	upSegs.FilterSegs(func(s *seg.PathSegment) bool {
 		_, connected := connFirstIAs[s.FirstIA()]
 		return connected
 	})
@@ -149,6 +148,7 @@ func (h *segReqNonCoreHandler) handleCoreDst(ctx context.Context, segReq *path_m
 func (h *segReqNonCoreHandler) handleNonCoreDst(ctx context.Context, segReq *path_mgmt.SegReq,
 	msger infra.Messenger, dstIA addr.IA, coreASes []addr.IA) {
 
+	// TODO(lukedirtwalker): if Flags.CacheOnly is set we shouldn't need the address here:
 	cPS, err := h.corePSAddr(ctx, coreASes)
 	if err != nil {
 		h.logger.Error("failed to get path to core to query for down segs", "err", err)
@@ -166,7 +166,7 @@ func (h *segReqNonCoreHandler) handleNonCoreDst(ctx context.Context, segReq *pat
 		h.sendEmptySegReply(ctx, segReq, msger)
 		return
 	}
-	upSegs, err := h.fetchUpSegsFromDB(ctx, coreASes)
+	upSegs, err := h.fetchUpSegsFromDB(ctx, coreASes, !segReq.Flags.CacheOnly)
 	if err != nil {
 		h.logger.Error("Failed to find up segs", "err", err)
 		h.sendEmptySegReply(ctx, segReq, msger)
@@ -178,10 +178,10 @@ func (h *segReqNonCoreHandler) handleNonCoreDst(ctx context.Context, segReq *pat
 	connDownFirstIAs := make(map[addr.IA]struct{})
 	// TODO(lukedirtwalker): in case of CacheOnly we can use a single query,
 	// else we should start go routines for the core segs here.
-	for _, dst := range firstIAs(downSegs) {
+	for _, dst := range downSegs.FirstIAs() {
 		// TODO(lukedirtwalker): we shouldn't just query all cores, this could be a lot of overhead.
 		// Add a limit of cores we query.
-		for _, src := range firstIAs(upSegs) {
+		for _, src := range upSegs.FirstIAs() {
 			if src.Eq(dst) {
 				connUpFirstIAs[src] = struct{}{}
 				connDownFirstIAs[dst] = struct{}{}
@@ -201,11 +201,11 @@ func (h *segReqNonCoreHandler) handleNonCoreDst(ctx context.Context, segReq *pat
 	}
 	// Make sure we only return connected segments.
 	// No need to filter cores, since we only query for connected ones.
-	upSegs = filterSegs(upSegs, func(s *seg.PathSegment) bool {
+	upSegs.FilterSegs(func(s *seg.PathSegment) bool {
 		_, connected := connUpFirstIAs[s.FirstIA()]
 		return connected
 	})
-	downSegs = filterSegs(downSegs, func(s *seg.PathSegment) bool {
+	downSegs.FilterSegs(func(s *seg.PathSegment) bool {
 		_, connected := connDownFirstIAs[s.FirstIA()]
 		return connected
 	})
@@ -215,12 +215,17 @@ func (h *segReqNonCoreHandler) handleNonCoreDst(ctx context.Context, segReq *pat
 }
 
 func (h *segReqNonCoreHandler) fetchUpSegsFromDB(ctx context.Context,
-	coreASes []addr.IA) ([]*seg.PathSegment, error) {
-	return h.fetchSegsFromDB(ctx, &query.Params{
+	coreASes []addr.IA, retry bool) (seg.Segments, error) {
+
+	query := &query.Params{
 		SegTypes: []proto.PathSegType{proto.PathSegType_up},
 		StartsAt: coreASes,
 		EndsAt:   []addr.IA{h.localIA},
-	})
+	}
+	if retry {
+		return h.fetchSegsFromDBRetry(ctx, query)
+	}
+	return h.fetchSegsFromDB(ctx, query)
 }
 
 func (h *segReqNonCoreHandler) fetchCoreSegs(ctx context.Context,
@@ -256,16 +261,14 @@ func (h *segReqNonCoreHandler) fetchCoreSegs(ctx context.Context,
 func (h *segReqNonCoreHandler) corePSAddr(ctx context.Context,
 	coreASes []addr.IA) (net.Addr, error) {
 
-	upSegs, err := h.fetchUpSegsFromDB(ctx, coreASes)
+	upSegs, err := h.fetchUpSegsFromDB(ctx, coreASes, true)
 	if err != nil {
 		return nil, err
 	}
 	if len(upSegs) < 1 {
-		// TODO(lukedirtwalker): We should hold the request until the timeout of the context,
-		// and continue processing as soon as we have up segments. (only if !CacheOnly)
 		return nil, common.NewBasicError("No up segments found!", nil)
 	}
 	// select a core AS we have an up segment to.
 	seg := upSegs[rand.Intn(len(upSegs))]
-	return h.psAddrFromSeg(seg, seg.FirstIA())
+	return addrutil.GetPath(addr.SvcPS, seg, seg.FirstIA(), h.topology)
 }

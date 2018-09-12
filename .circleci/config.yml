@@ -28,7 +28,7 @@ jobs:
                 command: docker login -u aopsacct -p $DOCKERHUB_PASSWORD
             - run:
                 name: Pull and tag scion_base image
-                command: ./tools/ci/prepare_image 6ada83761371bb52769a9b6ad73f95c27c9a725f555f52c92b72d3b573bc1ac7
+                command: ./tools/ci/prepare_image 6972ea3f919b57a94b97f91b9a36a19482b58d092842ad902a8b3140b4fe4ab1
                 when: always
             - run:
                 name: Build scion:latest image

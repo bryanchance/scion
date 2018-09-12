@@ -52,6 +52,19 @@ type Params struct {
 }
 
 type Result struct {
-	Seg      *seg.PathSegment
-	HpCfgIDs []*HPCfgID
+	Seg        *seg.PathSegment
+	LastUpdate time.Time
+	HpCfgIDs   []*HPCfgID
+}
+
+// Results is a type for convenience methods on a slice of Results.
+type Results []*Result
+
+// Segs returns the segments in the Results slice.
+func (r Results) Segs() seg.Segments {
+	segs := make(seg.Segments, len(r))
+	for i, r := range r {
+		segs[i] = r.Seg
+	}
+	return segs
 }

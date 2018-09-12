@@ -15,13 +15,10 @@
 package handlers
 
 import (
-	"bytes"
 	"context"
 	"net"
 	"time"
 
-	"github.com/scionproto/scion/go/lib/addr"
-	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/ctrl/path_mgmt"
 	"github.com/scionproto/scion/go/lib/ctrl/seg"
 	"github.com/scionproto/scion/go/lib/infra"
@@ -31,9 +28,8 @@ import (
 	"github.com/scionproto/scion/go/lib/pathdb"
 	"github.com/scionproto/scion/go/lib/pathdb/query"
 	"github.com/scionproto/scion/go/lib/revcache"
-	"github.com/scionproto/scion/go/lib/snet"
-	"github.com/scionproto/scion/go/lib/spath"
 	"github.com/scionproto/scion/go/lib/topology"
+	"github.com/scionproto/scion/go/path_srv/internal/segutil"
 )
 
 const (
@@ -54,6 +50,7 @@ type baseHandler struct {
 	revCache   revcache.RevCache
 	trustStore infra.TrustStore
 	topology   *topology.Topo
+	retryInt   time.Duration
 	logger     log.Logger
 }
 
@@ -64,6 +61,7 @@ func newBaseHandler(request *infra.Request, args HandlerArgs) *baseHandler {
 		revCache:   args.RevCache,
 		trustStore: args.TrustStore,
 		topology:   args.Topology,
+		retryInt:   time.Second,
 		logger:     request.Logger,
 	}
 }
@@ -76,59 +74,47 @@ func (h *baseHandler) fetchSegsFromDB(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
+	segs := query.Results(res).Segs()
 	// XXX(lukedirtwalker): Consider cases where segment with revoked interfaces should be returned.
-	return filterSegs(extractSegs(res), h.noRevokedHopIntf), nil
+	segs.FilterSegs(func(s *seg.PathSegment) bool {
+		return segutil.NoRevokedHopIntf(h.revCache, s)
+	})
+	return segs, nil
 }
 
-// noRevokedHopIntf returns true if there is no revoked on-segment interface on the segment s.
-func (h *baseHandler) noRevokedHopIntf(s *seg.PathSegment) bool {
-	revKeys := make(map[revcache.Key]struct{})
-	addRevKeys([]*seg.PathSegment{s}, revKeys, true)
-	for rk := range revKeys {
-		if _, ok := h.revCache.Get(&rk); ok {
-			return false
+// fetchSegsFromDBRetry calls fetchSegsFromDB and if this results in no segments,
+// this method retries until either there is a result, or the context timed out.
+//
+// Note that looping is not the most efficient way to do this. We could also have a channel
+// from the segReg handler to the segReq handlers, but this leads to a more complex logic
+// (handlers are no longer independent).
+// Also this would need to make sure that this is the only process that writes to the DB.
+//
+// If this is ever not performant enough it makes sense to change the logic.
+// Retries should happen mostly at startup and otherwise very rarely.
+func (h *baseHandler) fetchSegsFromDBRetry(ctx context.Context,
+	params *query.Params) ([]*seg.PathSegment, error) {
+
+	for {
+		upSegs, err := h.fetchSegsFromDB(ctx, params)
+		if err != nil || len(upSegs) > 0 {
+			return upSegs, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(h.retryInt):
+			// retry
 		}
 	}
-	return true
-}
-
-func (h *baseHandler) psAddrFromSeg(s *seg.PathSegment, dstIA addr.IA) (net.Addr, error) {
-	x := &bytes.Buffer{}
-	if _, err := s.RawWriteTo(x); err != nil {
-		return nil, common.NewBasicError("Failed to write segment to buffer", err)
-	}
-	p := spath.New(x.Bytes())
-	if err := p.Reverse(); err != nil {
-		return nil, common.NewBasicError("Failed to reverse path", err)
-	}
-	if err := p.InitOffsets(); err != nil {
-		return nil, common.NewBasicError("Failed to init offsets", err)
-	}
-	hopF, err := p.GetHopField(p.HopOff)
-	if err != nil {
-		return nil, common.NewBasicError("Failed to extract first HopField", err, "p", p)
-	}
-	ifId := hopF.ConsIngress
-	nextHop, ok := h.topology.IFInfoMap[ifId]
-	if !ok {
-		return nil, common.NewBasicError("Unable to find first-hop BR for path", nil, "ifId", ifId)
-	}
-	return &snet.Addr{
-		IA:      dstIA,
-		Host:    addr.NewSVCUDPAppAddr(addr.SvcPS),
-		Path:    p,
-		NextHop: nextHop.InternalAddr.OverlayAddr(h.topology.Overlay),
-	}, nil
 }
 
 func (h *baseHandler) verifyAndStore(ctx context.Context, src net.Addr,
-	segVerified func(context.Context, *seg.Meta),
 	recs []*seg.Meta, revInfos []*path_mgmt.SignedRevInfo) {
 	// TODO(lukedirtwalker): collect the verified segs/revoc and return them.
 
 	// verify and store the segments
 	verifiedSeg := func(ctx context.Context, s *seg.Meta) {
-		segVerified(ctx, s)
 		if err := segsaver.StoreSeg(ctx, s, h.pathDB, h.logger); err != nil {
 			h.logger.Error("Unable to insert segment into path database",
 				"seg", s.Segment, "err", err)
@@ -145,49 +131,4 @@ func (h *baseHandler) verifyAndStore(ctx context.Context, src net.Addr,
 	}
 	segverifier.Verify(ctx, h.trustStore, src, recs,
 		revInfos, verifiedSeg, verifiedRev, segErr, revErr)
-}
-
-// ignore is a convenience function that can be passed into verifyAndStore if no further action
-// should be taken when a segment was verified.
-func ignore(context.Context, *seg.Meta) {}
-
-func filterSegs(segs []*seg.PathSegment, keep func(*seg.PathSegment) bool) []*seg.PathSegment {
-	filtered := segs[:0]
-	for _, s := range segs {
-		if keep(s) {
-			filtered = append(filtered, s)
-		}
-	}
-	return filtered
-}
-
-// XXX(lukedirtwalker): this code is also in fetcher (inside getSegmentsFromDB)
-func extractSegs(res []*query.Result) []*seg.PathSegment {
-	segs := make([]*seg.PathSegment, len(res))
-	for i, r := range res {
-		segs[i] = r.Seg
-	}
-	return segs
-}
-
-// XXX(lukedirtwalker): this code is also in fetcher (getStartIAs)
-func firstIAs(segs []*seg.PathSegment) []addr.IA {
-	return extractIAs(segs, (*seg.PathSegment).FirstIA)
-}
-
-func lastIAs(segs []*seg.PathSegment) []addr.IA {
-	return extractIAs(segs, (*seg.PathSegment).LastIA)
-}
-
-func extractIAs(segs []*seg.PathSegment, extract func(*seg.PathSegment) addr.IA) []addr.IA {
-	var ias []addr.IA
-	addrs := make(map[addr.IA]struct{})
-	for _, s := range segs {
-		ia := extract(s)
-		if _, ok := addrs[ia]; !ok {
-			addrs[ia] = struct{}{}
-			ias = append(ias, ia)
-		}
-	}
-	return ias
 }
