@@ -70,7 +70,8 @@ func NewPathPredicateParser(input antlr.TokenStream) *PathPredicateParser {
 
 	this.BaseParser = antlr.NewBaseParser(input)
 
-	this.Interpreter = antlr.NewParserATNSimulator(this, deserializedATN, decisionToDFA, antlr.NewPredictionContextCache())
+	this.Interpreter = antlr.NewParserATNSimulator(this, deserializedATN, decisionToDFA,
+		antlr.NewPredictionContextCache())
 	this.RuleNames = ruleNames
 	this.LiteralNames = literalNames
 	this.SymbolicNames = symbolicNames
@@ -131,7 +132,9 @@ func NewEmptySelectorContext() *SelectorContext {
 
 func (*SelectorContext) IsSelectorContext() {}
 
-func NewSelectorContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *SelectorContext {
+func NewSelectorContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *SelectorContext {
+
 	var p = new(SelectorContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -254,7 +257,9 @@ func NewEmptyCondAnyContext() *CondAnyContext {
 
 func (*CondAnyContext) IsCondAnyContext() {}
 
-func NewCondAnyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondAnyContext {
+func NewCondAnyContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *CondAnyContext {
+
 	var p = new(CondAnyContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -399,7 +404,9 @@ func NewEmptyCondAllContext() *CondAllContext {
 
 func (*CondAllContext) IsCondAllContext() {}
 
-func NewCondAllContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondAllContext {
+func NewCondAllContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *CondAllContext {
+
 	var p = new(CondAllContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -544,7 +551,9 @@ func NewEmptyCondNotContext() *CondNotContext {
 
 func (*CondNotContext) IsCondNotContext() {}
 
-func NewCondNotContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondNotContext {
+func NewCondNotContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *CondNotContext {
+
 	var p = new(CondNotContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -657,7 +666,9 @@ func NewEmptyCondContext() *CondContext {
 
 func (*CondContext) IsCondContext() {}
 
-func NewCondContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondContext {
+func NewCondContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *CondContext {
+
 	var p = new(CondContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -814,7 +825,9 @@ func NewEmptyPathPredicateContext() *PathPredicateContext {
 
 func (*PathPredicateContext) IsPathPredicateContext() {}
 
-func NewPathPredicateContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *PathPredicateContext {
+func NewPathPredicateContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *PathPredicateContext {
+
 	var p = new(PathPredicateContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)

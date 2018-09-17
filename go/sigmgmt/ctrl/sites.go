@@ -9,11 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/scionproto/scion/go/lib/pktcls"
-
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 
+	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/sigmgmt/config"
 	"github.com/scionproto/scion/go/sigmgmt/db"
 	"github.com/scionproto/scion/go/sigmgmt/parser"

@@ -1,4 +1,5 @@
 // Copyright Anapaya 2017
+// +build ignore
 
 package rpkt
 

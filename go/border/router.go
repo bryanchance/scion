@@ -24,6 +24,7 @@ import (
 	"github.com/scionproto/scion/go/border/conf"
 	"github.com/scionproto/scion/go/border/metrics"
 	"github.com/scionproto/scion/go/border/rcmn"
+	"github.com/scionproto/scion/go/border/rctrl"
 	"github.com/scionproto/scion/go/border/rctx"
 	"github.com/scionproto/scion/go/border/rpkt"
 	"github.com/scionproto/scion/go/lib/assert"
@@ -54,8 +55,6 @@ type Router struct {
 	freePkts *ringbuf.Ring
 	// sRevInfoQ is a channel for handling SignedRevInfo payloads.
 	sRevInfoQ chan rpkt.RawSRevCallbackArgs
-	// iFID is a channel for handling IFID packets from the local BS
-	ifIDQ chan rpkt.IFIDCallbackArgs
 	// pktErrorQ is a channel for handling packet errors
 	pktErrorQ chan pktErrorArgs
 }
@@ -72,12 +71,11 @@ func NewRouter(id, confDir string) (*Router, error) {
 // Run sets up networking, and starts go routines for handling the main packet
 // processing as well as various other router functions.
 func (r *Router) Run() error {
-	go r.PeriodicPushACL()
-	go r.IFStateUpdate()
-	go r.RevInfoFwd()
-	go r.IFIDFwd()
+	// TODO(sgmonroy) No ACL support, see #1801.
+	//go r.PeriodicPushACL()
 	go r.PacketError()
 	go r.confSig()
+	go rctrl.Control(r.sRevInfoQ)
 	// TODO(shitz): Here should be some code to periodically check the discovery
 	// service for updated info.
 	var wait chan struct{}
@@ -148,7 +146,8 @@ func (r *Router) processPacket(rp *rpkt.RtrPkt) {
 		return
 	}
 	// Add ACL verification hook to all packets
-	rp.RegisterACLHook()
+	// TODO(sgmonroy) No ACL support, see #1801.
+	//rp.RegisterACLHook()
 	// Validation looks for errors in the packet that didn't break basic
 	// parsing.
 	valid, err := rp.Validate()
@@ -173,16 +172,13 @@ func (r *Router) processPacket(rp *rpkt.RtrPkt) {
 		rp.Error("Error parsing payload", "err", err)
 		return
 	}
-	// Process the packet, if a previous step has registered a relevant hook
-	// for doing so.
+	// Process the packet, if a previous step has registered a relevant hook for doing so.
 	if err := rp.Process(); err != nil {
 		r.handlePktError(rp, err, "Error processing packet")
 		return
 	}
-	// If the packet's destination is this router, there's no need to forward it.
-	if rp.DirTo != rcmn.DirSelf {
-		if err := rp.Route(); err != nil {
-			r.handlePktError(rp, err, "Error routing packet")
-		}
+	// Forward the packet. Packets destined to self are forwarded to the local dispatcher.
+	if err := rp.Route(); err != nil {
+		r.handlePktError(rp, err, "Error routing packet")
 	}
 }

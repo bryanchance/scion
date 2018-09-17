@@ -27,6 +27,18 @@
 			"revisionTime": "2018-05-03T22:54:05Z"
 		},
 		{
+			"checksumSHA1": "RfRYeGCcXj3cu5p0fJoIegLK12Y=",
+			"path": "github.com/alexflint/go-arg",
+			"revision": "f7c0423bd11ee80ab81d25c6d46f492998af8547",
+			"revisionTime": "2018-05-16T18:24:05Z"
+		},
+		{
+			"checksumSHA1": "M5vBatiAKUjyLYrb9nS+6QbpEjE=",
+			"path": "github.com/alexflint/go-scalar",
+			"revision": "e80c3b7ed292b052c7083b6fd7154a8422c33f65",
+			"revisionTime": "2017-02-16T02:04:25Z"
+		},
+		{
 			"checksumSHA1": "L/rKBjOshWG/yXpolY0LRzaX8hk=",
 			"path": "github.com/antlr/antlr4/runtime/Go/antlr",
 			"revision": "d4d7e3d3bc3b65bb00579fe826834a9263fa45e6",
@@ -237,6 +249,18 @@
 			"revisionTime": "2016-01-05T22:08:40Z"
 		},
 		{
+			"checksumSHA1": "E3l/8pxiD5GkGqpS1DP9b+wFIog=",
+			"path": "github.com/kisielk/gotool",
+			"revision": "80517062f582ea3340cd4baf70e86d539ae7d84d",
+			"revisionTime": "2018-02-21T18:54:26Z"
+		},
+		{
+			"checksumSHA1": "9jyCVFMF5GDl15Vqp2ZxRmmNftE=",
+			"path": "github.com/kisielk/gotool/internal/load",
+			"revision": "80517062f582ea3340cd4baf70e86d539ae7d84d",
+			"revisionTime": "2018-02-21T18:54:26Z"
+		},
+		{
 			"checksumSHA1": "eiKZJz+wsoOmDZQ7xdpX+sqQte4=",
 			"license": "APL 2.0",
 			"path": "github.com/kormat/fmt15",
@@ -373,6 +397,18 @@
 			"path": "github.com/patrickmn/go-cache",
 			"revision": "7ac151875ffb48b9f3ccce9ea20f020b0c1596c8",
 			"revisionTime": "2017-04-18T23:29:47Z"
+		},
+		{
+			"checksumSHA1": "3sD1fLvjcNwB8JRpeSJWj8KsGL4=",
+			"path": "github.com/pavius/impi",
+			"revision": "c1cbdcb8df2b23af8530360d87ac9a7fabc48618",
+			"revisionTime": "2018-03-02T13:45:24Z"
+		},
+		{
+			"checksumSHA1": "FptfsjsTRqvPxCAO8h+AuITYVpw=",
+			"path": "github.com/pavius/impi/cmd/impi",
+			"revision": "c1cbdcb8df2b23af8530360d87ac9a7fabc48618",
+			"revisionTime": "2018-03-02T13:45:24Z"
 		},
 		{
 			"checksumSHA1": "FGg99nQ56Fo3radSCuU1AeEUJug=",
@@ -533,6 +569,18 @@
 			"path": "github.com/vishvananda/netns",
 			"revision": "54f0e4339ce73702a0607f49922aaa1e749b418d",
 			"revisionTime": "2017-02-14T06:09:35Z"
+		},
+		{
+			"checksumSHA1": "g27xFm/EIghjjcT3DuGt976CgNo=",
+			"path": "github.com/walle/lll",
+			"revision": "8b13b3fbf7312913fcfdbfa78997b9bd1dbb11af",
+			"revisionTime": "2016-07-02T15:04:58Z"
+		},
+		{
+			"checksumSHA1": "V74uq4M+82grbD85c6TQ3JyMCL4=",
+			"path": "github.com/walle/lll/cmd/lll",
+			"revision": "8b13b3fbf7312913fcfdbfa78997b9bd1dbb11af",
+			"revisionTime": "2016-07-02T15:04:58Z"
 		},
 		{
 			"checksumSHA1": "IQkUIOnvlf0tYloFx9mLaXSvXWQ=",

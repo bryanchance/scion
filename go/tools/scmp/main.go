@@ -27,7 +27,6 @@ import (
 	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/sock/reliable"
 	"github.com/scionproto/scion/go/lib/spath"
-
 	"github.com/scionproto/scion/go/tools/scmp/cmn"
 	"github.com/scionproto/scion/go/tools/scmp/echo"
 	"github.com/scionproto/scion/go/tools/scmp/recordpath"
@@ -128,7 +127,8 @@ func choosePath() *sciond.PathReplyEntry {
 			if err == nil && int(pathIndex) < len(paths) {
 				break
 			}
-			fmt.Fprintf(os.Stderr, "ERROR: Invalid path index, valid indices range: [0, %v]\n", len(paths))
+			fmt.Fprintf(os.Stderr, "ERROR: Invalid path index, valid indices range: [0, %v]\n",
+				len(paths))
 		}
 	}
 	return paths[pathIndex]

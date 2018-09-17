@@ -19,7 +19,6 @@ package fetcher
 import (
 	"bytes"
 	"context"
-	"math/rand"
 	"time"
 
 	"github.com/scionproto/scion/go/lib/addr"
@@ -41,6 +40,7 @@ import (
 	"github.com/scionproto/scion/go/lib/spath"
 	"github.com/scionproto/scion/go/lib/topology"
 	"github.com/scionproto/scion/go/lib/util"
+	"github.com/scionproto/scion/go/proto"
 )
 
 const (
@@ -109,26 +109,16 @@ func (f *Fetcher) GetPaths(ctx context.Context, req *sciond.PathReq,
 		return f.buildSCIONDReply(nil, sciond.ErrorBadDstIA),
 			common.NewBasicError("Bad destination AS", nil, "ia", req.Dst.IA())
 	}
-	// FIXME(scrye): If there are multiple core ASes in the remote ISD, we
-	// might attempt to build paths towards one that is unreachable. SCIOND
-	// should attempt to build paths towards multiple remote core ASes, and
-	// return to the client one that is actually reachable.
-	if req.Dst.IA().A == 0 {
-		remoteTRC, err := f.trustStore.GetValidTRC(ctx, req.Dst.IA().I, ps)
-		if err != nil {
-			return f.buildSCIONDReply(nil, sciond.ErrorInternal),
-				common.NewBasicError("Unable to select from remote core", err)
-		}
-		coreASes := remoteTRC.CoreASes.ASList()
-		if len(coreASes) == 0 {
-			return f.buildSCIONDReply(nil, sciond.ErrorInternal),
-				common.NewBasicError("No remote core AS found", nil)
-		}
-		req.Dst = coreASes[rand.Intn(len(coreASes))].IAInt()
-	}
 	if req.Dst.IA().Eq(f.topology.ISD_AS) {
 		return f.buildSCIONDReply(nil, sciond.ErrorOk), nil
 	}
+	// A ISD-0 destination should not require a TRC lookup in sciond, it could lead to a
+	// lookup loop: If sciond doesn't have the TRC, it would ask the CS, the CS would try to connect
+	// to the CS in the destination ISD and for that it will ask sciond for paths to ISD-0.
+	// Instead we consider ISD-0 always as core destination in sciond.
+	// If there are no cached paths in sciond, send the query to the local PS,
+	// which will forward the query to a ISD-local core PS, so there won't be any loop.
+
 	// Try to build paths from local information first, if we don't have to
 	// get fresh segments.
 	if !req.Flags.Refresh {
@@ -253,6 +243,10 @@ func (f *Fetcher) buildSCIONDReplyEntries(paths []*combinator.Path) []sciond.Pat
 			f.logger.Warn("Unable to find first-hop BR for path", "ifid", path.Interfaces[0].IfID)
 			continue
 		}
+		var port uint16
+		if nextHop.InternalAddrs.IPv4.PublicOverlay.L4() != nil {
+			port = nextHop.InternalAddrs.IPv4.PublicOverlay.L4().Port()
+		}
 		entries = append(entries, sciond.PathReplyEntry{
 			Path: &sciond.FwdPathMeta{
 				FwdPath:    x.Bytes(),
@@ -265,10 +259,10 @@ func (f *Fetcher) buildSCIONDReplyEntries(paths []*combinator.Path) []sciond.Pat
 					Ipv4 []byte
 					Ipv6 []byte
 				}{
-					Ipv4: nextHop.InternalAddrs.IPv4.PublicAddr().L3.IP().To4(),
+					Ipv4: nextHop.InternalAddrs.IPv4.PublicOverlay.L3().IP().To4(),
 					// FIXME(scrye): also add support for IPv6
 				},
-				Port: nextHop.InternalAddrs.IPv4.PublicAddr().L4.Port(),
+				Port: port,
 			},
 		})
 	}
@@ -296,7 +290,7 @@ func (f *Fetcher) buildPathsFromDB(ctx context.Context,
 		return nil, err
 	}
 	srcIsCore := localTrc.CoreASes.Contains(f.topology.ISD_AS)
-	dstIsCore := dstTrc.CoreASes.Contains(req.Dst.IA())
+	dstIsCore := req.Dst.IA().A == 0 || dstTrc.CoreASes.Contains(req.Dst.IA())
 	// pathdb expects slices
 	srcIASlice := []addr.IA{req.Src.IA()}
 	dstIASlice := []addr.IA{req.Dst.IA()}
@@ -305,49 +299,56 @@ func (f *Fetcher) buildPathsFromDB(ctx context.Context,
 	switch {
 	case srcIsCore && dstIsCore:
 		// Gone corin'
-		cores, err = f.getSegmentsFromDB(ctx, dstIASlice, srcIASlice)
+		cores, err = f.getSegmentsFromDB(ctx, dstIASlice, srcIASlice, proto.PathSegType_core)
 		if err != nil {
 			return nil, err
 		}
 	case srcIsCore && !dstIsCore:
-		cores, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASes.ASList(), srcIASlice)
+		cores, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASes.ASList(), srcIASlice,
+			proto.PathSegType_core)
 		if err != nil {
 			return nil, err
 		}
-		downs, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASes.ASList(), dstIASlice)
+		downs, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASes.ASList(), dstIASlice,
+			proto.PathSegType_down)
 		if err != nil {
 			return nil, err
 		}
 	case !srcIsCore && dstIsCore:
-		ups, err = f.getSegmentsFromDB(ctx, localTrc.CoreASes.ASList(), srcIASlice)
+		ups, err = f.getSegmentsFromDB(ctx, localTrc.CoreASes.ASList(), srcIASlice,
+			proto.PathSegType_up)
 		if err != nil {
 			return nil, err
 		}
-		cores, err = f.getSegmentsFromDB(ctx, dstIASlice, localTrc.CoreASes.ASList())
+		cores, err = f.getSegmentsFromDB(ctx, dstIASlice, localTrc.CoreASes.ASList(),
+			proto.PathSegType_core)
 		if err != nil {
 			return nil, err
 		}
 	case !srcIsCore && !dstIsCore:
-		ups, err = f.getSegmentsFromDB(ctx, localTrc.CoreASes.ASList(), srcIASlice)
+		ups, err = f.getSegmentsFromDB(ctx, localTrc.CoreASes.ASList(), srcIASlice,
+			proto.PathSegType_up)
 		if err != nil {
 			return nil, err
 		}
-		downs, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASes.ASList(), dstIASlice)
+		downs, err = f.getSegmentsFromDB(ctx, dstTrc.CoreASes.ASList(), dstIASlice,
+			proto.PathSegType_down)
 		if err != nil {
 			return nil, err
 		}
-		cores, err = f.getSegmentsFromDB(ctx, downs.FirstIAs(), ups.FirstIAs())
+		cores, err = f.getSegmentsFromDB(ctx, downs.FirstIAs(), ups.FirstIAs(),
+			proto.PathSegType_core)
 		if err != nil {
 			return nil, err
 		}
 	}
-	paths := combinator.Combine(req.Src.IA(), req.Dst.IA(), ups, cores, downs)
+	paths := buildPathsToAllDsts(req, ups, cores, downs)
 	paths = f.filterRevokedPaths(paths)
 	return paths, nil
 }
 
 func (f *Fetcher) getSegmentsFromDB(ctx context.Context, startsAt,
-	endsAt []addr.IA) ([]*seg.PathSegment, error) {
+	endsAt []addr.IA, segType proto.PathSegType) ([]*seg.PathSegment, error) {
 
 	// We shouldn't query with zero length slices. Doing so would return too many segments.
 	if len(startsAt) == 0 || len(endsAt) == 0 {
@@ -356,6 +357,7 @@ func (f *Fetcher) getSegmentsFromDB(ctx context.Context, startsAt,
 	results, err := f.pathDB.Get(ctx, &query.Params{
 		StartsAt: startsAt,
 		EndsAt:   endsAt,
+		SegTypes: []proto.PathSegType{segType},
 	})
 	if err != nil {
 		return nil, err
@@ -435,6 +437,20 @@ func (f *Fetcher) getSegmentsFromNetwork(ctx context.Context,
 	}
 	// Sanitize input. There's no point in propagating garbage all throughout other modules.
 	return reply.Sanitize(f.logger), nil
+}
+
+func buildPathsToAllDsts(req *sciond.PathReq,
+	ups, cores, downs seg.Segments) []*combinator.Path {
+
+	dsts := []addr.IA{req.Dst.IA()}
+	if req.Dst.IA().A == 0 {
+		dsts = cores.FirstIAs()
+	}
+	var paths []*combinator.Path
+	for _, dst := range dsts {
+		paths = append(paths, combinator.Combine(req.Src.IA(), dst, ups, cores, downs)...)
+	}
+	return paths
 }
 
 // NewExtendedContext returns a new _independent_ context that can extend past

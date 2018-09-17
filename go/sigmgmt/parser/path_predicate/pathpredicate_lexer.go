@@ -100,7 +100,8 @@ func NewPathPredicateLexer(input antlr.CharStream) *PathPredicateLexer {
 	l := new(PathPredicateLexer)
 
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	l.Interpreter = antlr.NewLexerATNSimulator(l, lexerAtn, lexerDecisionToDFA, antlr.NewPredictionContextCache())
+	l.Interpreter = antlr.NewLexerATNSimulator(l, lexerAtn, lexerDecisionToDFA,
+		antlr.NewPredictionContextCache())
 
 	l.channelNames = lexerChannelNames
 	l.modeNames = lexerModeNames

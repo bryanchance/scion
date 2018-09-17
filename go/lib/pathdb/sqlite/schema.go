@@ -21,7 +21,7 @@ const (
 	// SchemaVersion is the version of the SQLite schema understood by this backend.
 	// Whenever changes to the schema are made, this version number should be increased
 	// to prevent data corruption between incompatible database schemas.
-	SchemaVersion = 2
+	SchemaVersion = 4
 	// Schema is the SQLite database layout.
 	Schema = `CREATE TABLE Segments(
 		RowID INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,6 +62,12 @@ const (
 		CfgID INTEGER NOT NULL,
 		PRIMARY KEY (SegRowID, IsdID, AsID, CfgID) ON CONFLICT IGNORE,
 		FOREIGN KEY (SegRowID) REFERENCES Segments(RowID) ON DELETE CASCADE
+	);
+	CREATE TABLE NextQuery(
+		IsdID INTEGER NOT NULL,
+		AsID INTEGER NOT NULL,
+		NextQuery INTEGER NOT NULL,
+		PRIMARY KEY (IsdID, AsID) ON CONFLICT REPLACE
 	);`
 	SegmentsTable  = "Segments"
 	IntfToSegTable = "IntfToSeg"
@@ -69,4 +75,5 @@ const (
 	EndsAtTable    = "EndsAt"
 	SegTypesTable  = "SegTypes"
 	HpCfgIdsTable  = "HpCfgIds"
+	NextQueryTable = "NextQuery"
 )

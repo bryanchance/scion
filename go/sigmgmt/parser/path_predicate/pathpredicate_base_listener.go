@@ -3,7 +3,8 @@
 package path_predicate // PathPredicate
 import "github.com/antlr/antlr4/runtime/Go/antlr"
 
-// BasePathPredicateListener is a complete listener for a parse tree produced by PathPredicateParser.
+// BasePathPredicateListener is a complete listener for a parse tree produced
+// by PathPredicateParser.
 type BasePathPredicateListener struct{}
 
 var _ PathPredicateListener = &BasePathPredicateListener{}

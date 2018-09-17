@@ -19,6 +19,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/ctrl/seg"
 	"github.com/scionproto/scion/go/lib/pathdb/query"
@@ -45,4 +46,9 @@ type PathDB interface {
 	DeleteExpired(ctx context.Context, now time.Time) (int, error)
 	// Get returns all path segment(s) matching the parameters specified.
 	Get(context.Context, *query.Params) ([]*query.Result, error)
+	// InsertNextQuery inserts or updates the timestamp nextQuery for the given dst.
+	InsertNextQuery(ctx context.Context, dst addr.IA, nextQuery time.Time) (bool, error)
+	// GetNextQuery returns the nextQuery timestamp for the given dst,
+	// or nil if it hasn't been queried.
+	GetNextQuery(ctx context.Context, dst addr.IA) (*time.Time, error)
 }

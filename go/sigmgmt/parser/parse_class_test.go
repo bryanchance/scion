@@ -6,9 +6,9 @@ import (
 	"net"
 	"testing"
 
-	"github.com/scionproto/scion/go/lib/pktcls"
-
 	. "github.com/smartystreets/goconvey/convey"
+
+	"github.com/scionproto/scion/go/lib/pktcls"
 )
 
 func TestTrafficClassValidation(t *testing.T) {

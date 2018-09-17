@@ -85,7 +85,8 @@ func NewTrafficClassParser(input antlr.TokenStream) *TrafficClassParser {
 
 	this.BaseParser = antlr.NewBaseParser(input)
 
-	this.Interpreter = antlr.NewParserATNSimulator(this, deserializedATN, decisionToDFA, antlr.NewPredictionContextCache())
+	this.Interpreter = antlr.NewParserATNSimulator(this, deserializedATN, decisionToDFA,
+		antlr.NewPredictionContextCache())
 	this.RuleNames = ruleNames
 	this.LiteralNames = literalNames
 	this.SymbolicNames = symbolicNames
@@ -160,7 +161,9 @@ func NewEmptyMatchSrcContext() *MatchSrcContext {
 
 func (*MatchSrcContext) IsMatchSrcContext() {}
 
-func NewMatchSrcContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MatchSrcContext {
+func NewMatchSrcContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *MatchSrcContext {
+
 	var p = new(MatchSrcContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -263,7 +266,9 @@ func NewEmptyMatchDstContext() *MatchDstContext {
 
 func (*MatchDstContext) IsMatchDstContext() {}
 
-func NewMatchDstContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MatchDstContext {
+func NewMatchDstContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *MatchDstContext {
+
 	var p = new(MatchDstContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -366,7 +371,9 @@ func NewEmptyMatchDSCPContext() *MatchDSCPContext {
 
 func (*MatchDSCPContext) IsMatchDSCPContext() {}
 
-func NewMatchDSCPContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MatchDSCPContext {
+func NewMatchDSCPContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *MatchDSCPContext {
+
 	var p = new(MatchDSCPContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -481,7 +488,9 @@ func NewEmptyMatchTOSContext() *MatchTOSContext {
 
 func (*MatchTOSContext) IsMatchTOSContext() {}
 
-func NewMatchTOSContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *MatchTOSContext {
+func NewMatchTOSContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *MatchTOSContext {
+
 	var p = new(MatchTOSContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -596,7 +605,9 @@ func NewEmptyCondClsContext() *CondClsContext {
 
 func (*CondClsContext) IsCondClsContext() {}
 
-func NewCondClsContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondClsContext {
+func NewCondClsContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *CondClsContext {
+
 	var p = new(CondClsContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -691,7 +702,9 @@ func NewEmptyCondAnyContext() *CondAnyContext {
 
 func (*CondAnyContext) IsCondAnyContext() {}
 
-func NewCondAnyContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondAnyContext {
+func NewCondAnyContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *CondAnyContext {
+
 	var p = new(CondAnyContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -836,7 +849,9 @@ func NewEmptyCondAllContext() *CondAllContext {
 
 func (*CondAllContext) IsCondAllContext() {}
 
-func NewCondAllContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondAllContext {
+func NewCondAllContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *CondAllContext {
+
 	var p = new(CondAllContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -981,7 +996,9 @@ func NewEmptyCondNotContext() *CondNotContext {
 
 func (*CondNotContext) IsCondNotContext() {}
 
-func NewCondNotContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondNotContext {
+func NewCondNotContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *CondNotContext {
+
 	var p = new(CondNotContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -1094,7 +1111,9 @@ func NewEmptyCondBoolContext() *CondBoolContext {
 
 func (*CondBoolContext) IsCondBoolContext() {}
 
-func NewCondBoolContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondBoolContext {
+func NewCondBoolContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *CondBoolContext {
+
 	var p = new(CondBoolContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -1201,7 +1220,9 @@ func NewEmptyCondIPv4Context() *CondIPv4Context {
 
 func (*CondIPv4Context) IsCondIPv4Context() {}
 
-func NewCondIPv4Context(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondIPv4Context {
+func NewCondIPv4Context(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *CondIPv4Context {
+
 	var p = new(CondIPv4Context)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -1358,7 +1379,9 @@ func NewEmptyCondContext() *CondContext {
 
 func (*CondContext) IsCondContext() {}
 
-func NewCondContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *CondContext {
+func NewCondContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *CondContext {
+
 	var p = new(CondContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)
@@ -1496,7 +1519,9 @@ func (p *TrafficClassParser) Cond() (localctx ICondContext) {
 			p.CondNot()
 		}
 
-	case TrafficClassParserSRC, TrafficClassParserDST, TrafficClassParserDSCP, TrafficClassParserTOS:
+	case TrafficClassParserSRC, TrafficClassParserDST, TrafficClassParserDSCP,
+		TrafficClassParserTOS:
+
 		p.EnterOuterAlt(localctx, 4)
 		{
 			p.SetState(85)
@@ -1549,7 +1574,9 @@ func NewEmptyTrafficClassContext() *TrafficClassContext {
 
 func (*TrafficClassContext) IsTrafficClassContext() {}
 
-func NewTrafficClassContext(parser antlr.Parser, parent antlr.ParserRuleContext, invokingState int) *TrafficClassContext {
+func NewTrafficClassContext(parser antlr.Parser, parent antlr.ParserRuleContext,
+	invokingState int) *TrafficClassContext {
+
 	var p = new(TrafficClassContext)
 
 	p.BaseParserRuleContext = antlr.NewBaseParserRuleContext(parent, invokingState)

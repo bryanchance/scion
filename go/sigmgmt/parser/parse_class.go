@@ -136,7 +136,8 @@ func (l *classListener) ExitCondNot(ctx *traffic_class.CondNotContext) {
 func (l *classListener) EnterCondBool(ctx *traffic_class.CondBoolContext) {
 	bool, err := strconv.ParseBool(ctx.GetStop().GetText())
 	if err != nil {
-		l.err = common.NewBasicError("CondBool parsing failed!", err, "bool", ctx.GetStop().GetText())
+		l.err = common.NewBasicError("CondBool parsing failed!", err,
+			"bool", ctx.GetStop().GetText())
 	}
 	l.pushCond(pktcls.CondBool(bool))
 }

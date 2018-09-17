@@ -8,13 +8,12 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/scionproto/scion/go/sigmgmt/util"
-
 	"github.com/gorilla/mux"
 
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/sig/sigcmn"
 	"github.com/scionproto/scion/go/sigmgmt/db"
+	"github.com/scionproto/scion/go/sigmgmt/util"
 )
 
 const (
@@ -24,7 +23,8 @@ const (
 
 func (c *Controller) GetASes(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
 	var ases []db.ASEntry
-	if err := c.db.Order("id asc").Where("site_id = ?", mux.Vars(r)["site"]).Find(&ases).Error; err != nil {
+	err := c.db.Order("id asc").Where("site_id = ?", mux.Vars(r)["site"]).Find(&ases).Error
+	if err != nil {
 		respondError(w, err, DBFindError, http.StatusBadRequest)
 		return
 	}

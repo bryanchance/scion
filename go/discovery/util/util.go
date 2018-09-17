@@ -33,7 +33,9 @@ func MarshalToJSON(rt *topology.RawTopo) ([]byte, error) {
 	return b, nil
 }
 
-func MakeHandler(topo *AtomicTopo, promLabels prometheus.Labels) func(http.ResponseWriter, *http.Request) {
+func MakeHandler(topo *AtomicTopo, promLabels prometheus.Labels) func(http.ResponseWriter,
+	*http.Request) {
+
 	reqProcessTime := metrics.RequestProcessTime.With(promLabels)
 	totalReqs := metrics.TotalRequests.With(promLabels)
 	totalBytes := metrics.TotalBytes.With(promLabels)
@@ -48,7 +50,9 @@ func MakeHandler(topo *AtomicTopo, promLabels prometheus.Labels) func(http.Respo
 	}
 }
 
-func MakeACLHandler(topo *AtomicTopo, promLabels prometheus.Labels) func(http.ResponseWriter, *http.Request) {
+func MakeACLHandler(topo *AtomicTopo, promLabels prometheus.Labels) func(http.ResponseWriter,
+	*http.Request) {
+
 	reqProcessTime := metrics.RequestProcessTime.With(promLabels)
 	totalReqs := metrics.TotalRequests.With(promLabels)
 	deniedReqs := metrics.TotalDenials.With(promLabels)

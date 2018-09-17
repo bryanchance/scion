@@ -97,6 +97,11 @@ func (h *segReqCoreHandler) handleReq(ctx context.Context,
 		h.sendEmptySegReply(ctx, segReq, msger)
 		return
 	}
+	if len(downSegs) == 0 {
+		h.logger.Debug("[segReqHandler] no down segs found")
+		h.sendEmptySegReply(ctx, segReq, msger)
+		return
+	}
 	var coreSegs []*seg.PathSegment
 	// if request came from same AS also return core segs, to start of down segs.
 	if segReq.SrcIA().Eq(h.localIA) {
@@ -171,12 +176,10 @@ func (h *segReqCoreHandler) fetchDownSegsFromDB(ctx context.Context,
 func (h *segReqCoreHandler) fetchDownSegsFromRemoteCore(ctx context.Context, msger infra.Messenger,
 	dstIA addr.IA) ([]*seg.PathSegment, error) {
 
-	// down segs
-	cPS, err := h.corePSAddr(ctx, dstIA.I)
-	if err != nil {
-		return nil, err
+	cPSResolve := func() (net.Addr, error) {
+		return h.corePSAddr(ctx, dstIA.I)
 	}
-	downSegs, err := h.fetchDownSegs(ctx, msger, dstIA, cPS, false)
+	downSegs, err := h.fetchDownSegs(ctx, msger, dstIA, cPSResolve, false)
 	if err != nil {
 		return nil, err
 	}

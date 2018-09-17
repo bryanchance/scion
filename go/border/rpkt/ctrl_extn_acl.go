@@ -1,4 +1,5 @@
 // Copyright Anapaya 2017
+// +build ignore
 
 package rpkt
 
@@ -32,7 +33,7 @@ func (rp *RtrPkt) RegisterACLHook() {
 }
 
 func (rp *RtrPkt) validateACLHook() (HookResult, error) {
-	if rp.DirTo != rcmn.DirExternal {
+	if rp.Ingress.IfID != 0 {
 		// We only care about egress packets.
 		return HookContinue, nil
 	}

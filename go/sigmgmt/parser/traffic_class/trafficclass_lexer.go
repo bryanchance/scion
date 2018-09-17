@@ -138,7 +138,8 @@ func NewTrafficClassLexer(input antlr.CharStream) *TrafficClassLexer {
 	l := new(TrafficClassLexer)
 
 	l.BaseLexer = antlr.NewBaseLexer(input)
-	l.Interpreter = antlr.NewLexerATNSimulator(l, lexerAtn, lexerDecisionToDFA, antlr.NewPredictionContextCache())
+	l.Interpreter = antlr.NewLexerATNSimulator(l, lexerAtn, lexerDecisionToDFA,
+		antlr.NewPredictionContextCache())
 
 	l.channelNames = lexerChannelNames
 	l.modeNames = lexerModeNames
