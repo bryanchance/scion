@@ -19,9 +19,11 @@ import (
 	"net"
 	"time"
 
+	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/ctrl/path_mgmt"
 	"github.com/scionproto/scion/go/lib/ctrl/seg"
 	"github.com/scionproto/scion/go/lib/infra"
+	"github.com/scionproto/scion/go/lib/infra/modules/itopo"
 	"github.com/scionproto/scion/go/lib/infra/modules/segsaver"
 	"github.com/scionproto/scion/go/lib/infra/modules/segverifier"
 	"github.com/scionproto/scion/go/lib/log"
@@ -42,8 +44,8 @@ type HandlerArgs struct {
 	PathDB     pathdb.PathDB
 	RevCache   revcache.RevCache
 	TrustStore infra.TrustStore
-	Topology   *topology.Topo
 	Config     psconfig.Config
+	IA         addr.IA
 }
 
 type baseHandler struct {
@@ -63,8 +65,9 @@ func newBaseHandler(request *infra.Request, args HandlerArgs) *baseHandler {
 		pathDB:     args.PathDB,
 		revCache:   args.RevCache,
 		trustStore: args.TrustStore,
-		topology:   args.Topology,
 		retryInt:   time.Second,
+		config:     args.Config,
+		topology:   itopo.GetCurrentTopology(),
 		logger:     request.Logger,
 	}
 }
@@ -127,7 +130,7 @@ func (h *baseHandler) verifyAndStore(ctx context.Context, src net.Addr,
 		}
 	}
 	verifiedRev := func(ctx context.Context, rev *path_mgmt.SignedRevInfo) {
-		segsaver.StoreRevocation(rev, h.revCache)
+		h.revCache.Insert(rev)
 	}
 	segErr := func(s *seg.Meta, err error) {
 		h.logger.Warn("Segment verification failed", "segment", s.Segment, "err", err)

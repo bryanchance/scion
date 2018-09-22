@@ -53,7 +53,7 @@ var (
 	IA       addr.IA
 	Host     addr.HostAddr
 	PathMgr  *pathmgr.PR
-	CtrlConn *snet.Conn
+	CtrlConn snet.Conn
 	MgmtAddr *mgmt.Addr
 )
 
@@ -117,7 +117,7 @@ func ValidatePort(desc string, port int) error {
 
 // initSNET initializes snet. The number of attempts is specified, as well as the sleep duration.
 // This allows the service to wait for a limited time for sciond to become available
-func initSNET(network *snet.Network, attempts int, sleep time.Duration) (err error) {
+func initSNET(network *snet.SCIONNetwork, attempts int, sleep time.Duration) (err error) {
 	// Initialize SCION local networking module
 	for i := 0; i < attempts; i++ {
 		if err = snet.InitWithNetwork(network); err == nil {

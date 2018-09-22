@@ -16,7 +16,6 @@ package topology
 
 import (
 	"fmt"
-	"net"
 	"strings"
 
 	"github.com/scionproto/scion/go/lib/addr"
@@ -43,6 +42,24 @@ type TopoAddr struct {
 	IPv4    *pubBindAddr
 	IPv6    *pubBindAddr
 	Overlay overlay.Type
+}
+
+// TestTopoAddr creates a new TopoAddr. This is only for testing and should
+// never be used by apps.
+func TestTopoAddr(v4AppAddr, v6AppAddr *addr.AppAddr,
+	v4OverlayAddr, v6OverlayAddr *overlay.OverlayAddr) TopoAddr {
+
+	return TopoAddr{
+		IPv4: &pubBindAddr{
+			pub:     v4AppAddr,
+			overlay: v4OverlayAddr,
+		},
+		IPv6: &pubBindAddr{
+			pub:     v6AppAddr,
+			overlay: v6OverlayAddr,
+		},
+		Overlay: overlay.IPv46,
+	}
 }
 
 // Create TopoAddr from RawAddrMap, depending on supplied Overlay type
@@ -164,12 +181,12 @@ type pubBindAddr struct {
 
 func (pbo *pubBindAddr) fromRaw(rpbo *RawPubBindOverlay, udpOverlay bool) error {
 	var err error
-	ip := net.ParseIP(rpbo.Public.Addr)
-	if ip == nil {
+	l3 := addr.HostFromIPStr(rpbo.Public.Addr)
+	if l3 == nil {
 		return common.NewBasicError(ErrInvalidPub, nil, "ip", rpbo.Public.Addr)
 	}
 	pbo.pub = &addr.AppAddr{
-		L3: addr.HostFromIP(ip),
+		L3: l3,
 		L4: addr.NewL4UDPInfo(uint16(rpbo.Public.L4Port)),
 	}
 	pbo.overlay, err = newOverlayAddr(udpOverlay, pbo.pub.L3, rpbo.Public.OverlayPort)
@@ -177,12 +194,12 @@ func (pbo *pubBindAddr) fromRaw(rpbo *RawPubBindOverlay, udpOverlay bool) error 
 		return err
 	}
 	if rpbo.Bind != nil {
-		ip := net.ParseIP(rpbo.Bind.Addr)
-		if ip == nil {
+		l3 := addr.HostFromIPStr(rpbo.Bind.Addr)
+		if l3 == nil {
 			return common.NewBasicError(ErrInvalidBind, nil, "ip", rpbo.Bind.Addr)
 		}
 		pbo.bind = &addr.AppAddr{
-			L3: addr.HostFromIP(ip),
+			L3: l3,
 			L4: addr.NewL4UDPInfo(uint16(rpbo.Bind.L4Port)),
 		}
 	}
@@ -190,14 +207,23 @@ func (pbo *pubBindAddr) fromRaw(rpbo *RawPubBindOverlay, udpOverlay bool) error 
 }
 
 func (t *pubBindAddr) PublicAddr() *addr.AppAddr {
+	if t == nil {
+		return nil
+	}
 	return t.pub
 }
 
 func (t *pubBindAddr) BindAddr() *addr.AppAddr {
+	if t == nil {
+		return nil
+	}
 	return t.bind
 }
 
 func (t *pubBindAddr) OverlayAddr() *overlay.OverlayAddr {
+	if t == nil {
+		return nil
+	}
 	return t.overlay
 }
 

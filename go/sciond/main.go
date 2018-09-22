@@ -30,18 +30,16 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/env"
-	"github.com/scionproto/scion/go/lib/infra/disp"
-	"github.com/scionproto/scion/go/lib/infra/messenger"
+	"github.com/scionproto/scion/go/lib/infra/infraenv"
+	"github.com/scionproto/scion/go/lib/infra/modules/itopo"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb"
-	"github.com/scionproto/scion/go/lib/infra/transport"
 	"github.com/scionproto/scion/go/lib/log"
 	pathdbbe "github.com/scionproto/scion/go/lib/pathdb/sqlite"
 	"github.com/scionproto/scion/go/lib/revcache/memrevcache"
-	"github.com/scionproto/scion/go/lib/sciond"
-	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/proto"
 	"github.com/scionproto/scion/go/sciond/internal/fetcher"
+	"github.com/scionproto/scion/go/sciond/internal/sdconfig"
 	"github.com/scionproto/scion/go/sciond/internal/servers"
 )
 
@@ -54,24 +52,7 @@ type Config struct {
 	Logging env.Logging
 	Metrics env.Metrics
 	Trust   env.Trust
-	SD      struct {
-		// Address to listen on via the reliable socket protocol. If empty,
-		// a reliable socket server on the default socket is started.
-		Reliable string
-		// Address to listen on for normal unixgram messages. If empty, a
-		// unixgram server on the default socket is started.
-		Unix string
-		// If set to True, the socket is removed before being created
-		DeleteSocket bool
-		// Public is the local address to listen on for SCION messages (if Bind is
-		// not set), and to send out messages to other nodes.
-		Public *snet.Addr
-		// If set, Bind is the preferred local address to listen on for SCION
-		// messages.
-		Bind *snet.Addr
-		// PathDB contains the file location  of the path segment database.
-		PathDB string
-	}
+	SD      sdconfig.Config
 }
 
 var config Config
@@ -116,61 +97,41 @@ func realMain() int {
 		log.Crit("Unable to initialize trust store", "err", err)
 		return 1
 	}
-	err = snet.Init(config.General.Topology.ISD_AS, "", "")
-	if err != nil {
-		log.Crit("Unable to initialize snet", "err", err)
-		return 1
-	}
-	conn, err := snet.ListenSCIONWithBindSVC("udp4", config.SD.Public,
-		config.SD.Bind, addr.SvcNone)
-	if err != nil {
-		log.Crit("Unable to listen on SCION", "err", err)
-		return 1
-	}
-
 	err = trustStore.LoadAuthoritativeTRC(filepath.Join(config.General.ConfigDir, "certs"))
 	if err != nil {
 		log.Crit("TRC error", "err", err)
 		return 1
 	}
-	msger := messenger.New(
+	msger, err := infraenv.InitMessenger(
 		config.General.Topology.ISD_AS,
-		disp.New(
-			transport.NewPacketTransport(conn),
-			messenger.DefaultAdapter,
-			log.Root(),
-		),
+		config.SD.Public,
+		config.SD.Bind,
+		addr.SvcNone,
+		config.General.ReconnectToDispatcher,
 		trustStore,
-		log.Root(),
-		nil,
 	)
-	trustStore.SetMessenger(msger)
+	if err != nil {
+		log.Crit(infraenv.ErrAppUnableToInitMessenger, "err", err)
+		return 1
+	}
 	revCache := memrevcache.New(cache.NoExpiration, time.Second)
 	// Route messages to their correct handlers
 	handlers := servers.HandlerMap{
 		proto.SCIONDMsg_Which_pathReq: &servers.PathRequestHandler{
 			Fetcher: fetcher.NewFetcher(
-				// FIXME(scrye): This doesn't allow for topology updates. When
-				// reloading support is implemented, fresh topology information
-				// should be loaded from file.
-				config.General.Topology,
 				msger,
 				pathDB,
 				trustStore,
 				revCache,
+				config.SD,
 				log.Root(),
 			),
 		},
 		proto.SCIONDMsg_Which_asInfoReq: &servers.ASInfoRequestHandler{
 			TrustStore: trustStore,
-			Topology:   config.General.Topology,
 		},
-		proto.SCIONDMsg_Which_ifInfoRequest: &servers.IFInfoRequestHandler{
-			Topology: config.General.Topology,
-		},
-		proto.SCIONDMsg_Which_serviceInfoRequest: &servers.SVCInfoRequestHandler{
-			Topology: config.General.Topology,
-		},
+		proto.SCIONDMsg_Which_ifInfoRequest:      &servers.IFInfoRequestHandler{},
+		proto.SCIONDMsg_Which_serviceInfoRequest: &servers.SVCInfoRequestHandler{},
 		proto.SCIONDMsg_Which_revNotification: &servers.RevNotificationHandler{
 			RevCache:   revCache,
 			TrustStore: trustStore,
@@ -208,17 +169,13 @@ func Init(configName string) error {
 	if err != nil {
 		return err
 	}
+	itopo.SetCurrentTopology(config.General.Topology)
 	environment = env.SetupEnv(nil)
 	err = env.InitLogging(&config.Logging)
 	if err != nil {
 		return err
 	}
-	if config.SD.Reliable == "" {
-		config.SD.Reliable = sciond.DefaultSCIONDPath
-	}
-	if config.SD.Unix == "" {
-		config.SD.Unix = "/run/shm/sciond/default-unix.sock"
-	}
+	config.SD.InitDefaults()
 	return nil
 }
 
