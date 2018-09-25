@@ -2,12 +2,12 @@
     "ASes": {
         "1-1": {
             "Sessions": {
-                "0": "foo"
+                "0": "any"
             },
             "PktPolicies": [
                 {
                     "Name": "",
-                    "ClassName": "class-1",
+                    "ClassName": "all",
                     "SessIds": [
                         0
                     ]
@@ -16,23 +16,12 @@
         }
     },
     "Classes": {
-        "class-1": {
-            "CondIPv4": {
-                "MatchSource": {
-                    "Net": "1.1.1.0/24"
-                }
-            }
+        "all": {
+            "CondBool": true
         }
     },
     "Actions": {
         "any": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "0-0#0"
-                }
-            }
-        },
-        "foo": {
             "ActionFilterPaths": {
                 "CondPathPredicate": {
                     "PP": "0-0#0"

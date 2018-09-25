@@ -39,14 +39,15 @@ func TestCompile(t *testing.T) {
 			},
 			Policies: map[addr.IA][]db.Policy{
 				{I: 1, A: 1}: {
-					{Name: "audio", Selectors: "0", TrafficClass: 0},
+					{Name: "audio", Selectors: "1", TrafficClass: 0},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
 				0: {ID: 0, Name: "class-1", CondStr: "src=1.1.1.0/24"},
 			},
 			Selectors: []db.PathSelector{
-				{ID: 0, Name: "foo", Filter: "0-0#0"},
+				{ID: 0, Name: "any", Filter: "0-0#0"},
+				{ID: 1, Name: "foo", Filter: "0-0#0"},
 			},
 		},
 		{
@@ -60,10 +61,10 @@ func TestCompile(t *testing.T) {
 			},
 			Policies: map[addr.IA][]db.Policy{
 				{I: 1, A: 1}: {
-					{Name: "audio", Selectors: "0,1", TrafficClass: 0},
+					{Name: "audio", Selectors: "1,2", TrafficClass: 0},
 				},
 				{I: 2, A: 2}: {
-					{Name: "video", Selectors: "1", TrafficClass: 1},
+					{Name: "video", Selectors: "2", TrafficClass: 1},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
@@ -71,8 +72,9 @@ func TestCompile(t *testing.T) {
 				1: {ID: 1, Name: "class-2", CondStr: "dst=2.2.2.0/24"},
 			},
 			Selectors: []db.PathSelector{
-				{ID: 0, Name: "foo", Filter: "0-0#0"},
-				{ID: 1, Name: "bar", Filter: "0-0#0"},
+				{ID: 0, Name: "any", Filter: "0-0#0"},
+				{ID: 1, Name: "foo", Filter: "0-0#0"},
+				{ID: 2, Name: "bar", Filter: "0-0#0"},
 			},
 		},
 		{
@@ -86,8 +88,8 @@ func TestCompile(t *testing.T) {
 			},
 			Policies: map[addr.IA][]db.Policy{
 				{I: 1, A: 1}: {
-					{Name: "audio", Selectors: "0,1", TrafficClass: 0},
-					{Name: "video", Selectors: "1,2", TrafficClass: 1},
+					{Name: "audio", Selectors: "1,2", TrafficClass: 0},
+					{Name: "video", Selectors: "2,3", TrafficClass: 1},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
@@ -95,10 +97,11 @@ func TestCompile(t *testing.T) {
 				1: {Name: "class-2", CondStr: "tos=0x34"},
 			},
 			Selectors: []db.PathSelector{
-				{ID: 0, Name: "foo", Filter: "1-1#1"},
-				{ID: 1, Name: "bar", Filter: "2-2#2"},
-				{ID: 2, Name: "baz", Filter: "3-3#3"},
-				{ID: 3, Name: "bad", Filter: "4-4#4"},
+				{ID: 0, Name: "any", Filter: "0-0#0"},
+				{ID: 1, Name: "foo", Filter: "1-1#1"},
+				{ID: 2, Name: "bar", Filter: "2-2#2"},
+				{ID: 3, Name: "baz", Filter: "3-3#3"},
+				{ID: 4, Name: "bad", Filter: "4-4#4"},
 			},
 		},
 		{
@@ -112,14 +115,14 @@ func TestCompile(t *testing.T) {
 			},
 			Policies: map[addr.IA][]db.Policy{
 				{I: 1, A: 1}: {
-					{Name: "audio", Selectors: "0,1", TrafficClass: 0},
-					{Name: "video", Selectors: "1,2", TrafficClass: 1},
-					{Name: "http", Selectors: "3,1", TrafficClass: 2},
+					{Name: "audio", Selectors: "1,2", TrafficClass: 0},
+					{Name: "video", Selectors: "2,3", TrafficClass: 1},
+					{Name: "http", Selectors: "4,2", TrafficClass: 2},
 				},
 				{I: 2, A: 2}: {
-					{Name: "audio", Selectors: "4,2", TrafficClass: 2},
-					{Name: "video", Selectors: "1,0", TrafficClass: 4},
-					{Name: "http", Selectors: "0,2", TrafficClass: 3},
+					{Name: "audio", Selectors: "5,3", TrafficClass: 2},
+					{Name: "video", Selectors: "2,1", TrafficClass: 4},
+					{Name: "http", Selectors: "1,3", TrafficClass: 3},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
@@ -131,11 +134,24 @@ func TestCompile(t *testing.T) {
 					CondStr: "ALL(NOT(src=12.12.127.0/24),ANY(tos=0x34, src=1.1.1.0/28))"},
 			},
 			Selectors: []db.PathSelector{
-				{ID: 0, Name: "foo", Filter: "1-1#1"},
-				{ID: 1, Name: "bar", Filter: "2-2#2"},
-				{ID: 2, Name: "baz", Filter: "3-3#3"},
-				{ID: 3, Name: "bad", Filter: "4-4#4"},
-				{ID: 4, Name: "bax", Filter: "5-4#4"},
+				{ID: 0, Name: "any", Filter: "0-0#0"},
+				{ID: 1, Name: "foo", Filter: "1-1#1"},
+				{ID: 2, Name: "bar", Filter: "2-2#2"},
+				{ID: 3, Name: "baz", Filter: "3-3#3"},
+				{ID: 4, Name: "bad", Filter: "4-4#4"},
+				{ID: 5, Name: "bax", Filter: "5-4#4"},
+			},
+		},
+		{
+			Name: "empty AS config",
+			File: "5",
+			Config: &config.Cfg{
+				ASes: map[addr.IA]*config.ASEntry{
+					{I: 1, A: 1}: {},
+				},
+			},
+			Selectors: []db.PathSelector{
+				{ID: 0, Name: "any", Filter: "0-0#0"},
 			},
 		},
 	}

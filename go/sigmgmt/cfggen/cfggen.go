@@ -61,6 +61,15 @@ func Compile(cfg *config.Cfg, policies map[addr.IA][]db.Policy,
 				Condition: cond, Selectors: selectorIDs})
 		}
 
+		// Make sure there is a default policy
+		if len(commands) == 0 {
+			cmd, err := defaultPolicyCommand()
+			if err != nil {
+				return err
+			}
+			commands = []*Command{cmd}
+		}
+
 		// Determine which path selectors are used by the current remote AS
 		sessionMap := newSessionMapper(cfg.Actions)
 		for _, command := range commands {
@@ -92,6 +101,14 @@ func Compile(cfg *config.Cfg, policies map[addr.IA][]db.Policy,
 		}
 	}
 	return nil
+}
+
+func defaultPolicyCommand() (*Command, error) {
+	cond, err := parser.BuildClassTree("bool=true")
+	if err != nil {
+		return nil, err
+	}
+	return &Command{Name: "all", Condition: cond, Selectors: []string{"any"}}, nil
 }
 
 type sessionMapper struct {

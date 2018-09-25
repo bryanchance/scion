@@ -157,6 +157,13 @@
         }
     },
     "Actions": {
+        "any": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "0-0#0"
+                }
+            }
+        },
         "bad": {
             "ActionFilterPaths": {
                 "CondPathPredicate": {

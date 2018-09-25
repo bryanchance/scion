@@ -25,9 +25,25 @@
                 }
             ]
         },
-        "2-2": {}
+        "2-2": {
+            "Sessions": {
+                "0": "any"
+            },
+            "PktPolicies": [
+                {
+                    "Name": "",
+                    "ClassName": "all",
+                    "SessIds": [
+                        0
+                    ]
+                }
+            ]
+        }
     },
     "Classes": {
+        "all": {
+            "CondBool": true
+        },
         "class-1": {
             "CondIPv4": {
                 "MatchDSCP": {
@@ -44,6 +60,13 @@
         }
     },
     "Actions": {
+        "any": {
+            "ActionFilterPaths": {
+                "CondPathPredicate": {
+                    "PP": "0-0#0"
+                }
+            }
+        },
         "bad": {
             "ActionFilterPaths": {
                 "CondPathPredicate": {
