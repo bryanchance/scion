@@ -281,20 +281,20 @@ func TestLoadFromFile(t *testing.T) {
 						Name: "filter-A",
 						Cond: pktcls.CondAnyOf{
 							pktcls.CondAllOf{
-								mustCondPathPredicate(t, "0-0#123"),
-								mustCondPathPredicate(t, "0-0#234"),
+								mustCondPathPredicate(t, "0-123#0"),
+								mustCondPathPredicate(t, "0-234#0"),
 							},
 							pktcls.CondAllOf{
-								mustCondPathPredicate(t, "0-0#345"),
-								mustCondPathPredicate(t, "0-0#456"),
+								mustCondPathPredicate(t, "0-345#0"),
+								mustCondPathPredicate(t, "0-456#0"),
 							},
 						},
 					},
 					"filter-B": &pktcls.ActionFilterPaths{
 						Name: "filter-B",
 						Cond: pktcls.CondAnyOf{
-							mustCondPathPredicate(t, "0-0#123"),
-							mustCondPathPredicate(t, "0-0#134"),
+							mustCondPathPredicate(t, "0-123#0"),
+							mustCondPathPredicate(t, "0-134#0"),
 						},
 					},
 				},

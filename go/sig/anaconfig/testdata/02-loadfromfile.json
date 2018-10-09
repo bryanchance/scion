@@ -124,12 +124,12 @@
                         "CondAllOf": [
                             {
                                 "CondPathPredicate": {
-                                    "PP": "0-0#123"
+                                    "PP": "0-123#0"
                                 }
                             },
                             {
                                 "CondPathPredicate": {
-                                    "PP": "0-0#234"
+                                    "PP": "0-234#0"
                                 }
                             }
                         ]
@@ -138,12 +138,12 @@
                         "CondAllOf": [
                             {
                                 "CondPathPredicate": {
-                                    "PP": "0-0#345"
+                                    "PP": "0-345#0"
                                 }
                             },
                             {
                                 "CondPathPredicate": {
-                                    "PP": "0-0#456"
+                                    "PP": "0-456#0"
                                 }
                             }
                         ]
@@ -156,12 +156,12 @@
                 "CondAnyOf": [
                     {
                         "CondPathPredicate": {
-                            "PP": "0-0#123"
+                            "PP": "0-123#0"
                         }
                     },
                     {
                         "CondPathPredicate": {
-                            "PP": "0-0#134"
+                            "PP": "0-134#0"
                         }
                     }
                 ]

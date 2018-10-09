@@ -101,7 +101,7 @@ func TestPredicateValidation(t *testing.T) {
 		{
 			Name: "nested not, any & all predicate",
 			Predicate: "any(1-ff0:ff1:f2#5,all(0-0#0,1-ff0:ff1:f2#5,0-0#0)," +
-				"all(1-ff0:ff1:f2#5,not(1-0#1)))",
+				"all(1-ff0:ff1:f2#5,not(1-1#1)))",
 			Valid: true,
 		},
 	}
@@ -198,7 +198,7 @@ func TestPredicateTree(t *testing.T) {
 		{
 			Name: "nested not, any & all predicate",
 			Predicate: "any(1-ff0:ff1:f2#5,all(0-0#0,1-ff0:ff1:f2#5,0-0#0)," +
-				"all(1-ff0:ff1:f2#5,not(1-0#1)))",
+				"all(1-ff0:ff1:f2#5,not(1-1#1)))",
 			Tree: pktcls.CondAnyOf{
 				mustCondPathPredicate(t, "1-ff0:ff1:f2#5"),
 				pktcls.CondAllOf{
@@ -209,7 +209,7 @@ func TestPredicateTree(t *testing.T) {
 				pktcls.CondAllOf{
 					mustCondPathPredicate(t, "1-ff0:ff1:f2#5"),
 					pktcls.CondNot{
-						Operand: mustCondPathPredicate(t, "1-0#1"),
+						Operand: mustCondPathPredicate(t, "1-1#1"),
 					},
 				},
 			},
