@@ -59,6 +59,8 @@ func init() {
 
 func main() {
 	os.Setenv("TZ", "UTC")
+	log.AddLogFileFlags()
+	log.AddLogConsFlags()
 	isdas, err := verifyFlags()
 	if err != nil {
 		log.Crit(err.Error())

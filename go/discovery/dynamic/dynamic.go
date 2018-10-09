@@ -139,20 +139,24 @@ func closeZkConn(c *zk.Conn) {
 func updateServices(rt *topology.RawTopo, c *zk.Conn) bool {
 	var ok string
 
-	rt.BeaconService, ok = fillService(c, isd_as, common.BS, rt.BeaconService)
-	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok, "service": common.BS}).Inc()
+	rt.BeaconService, ok = fillService(c, isd_as, proto.ServiceType_bs, rt.BeaconService)
+	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok,
+		"service": proto.ServiceType_bs.String()}).Inc()
 	success := ok == SUCCESS
 
-	rt.CertificateService, ok = fillService(c, isd_as, common.CS, rt.CertificateService)
-	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok, "service": common.CS}).Inc()
+	rt.CertificateService, ok = fillService(c, isd_as, proto.ServiceType_cs, rt.CertificateService)
+	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok,
+		"service": proto.ServiceType_cs.String()}).Inc()
 	success = success && ok == SUCCESS
 
-	rt.PathService, ok = fillService(c, isd_as, common.PS, rt.PathService)
-	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok, "service": common.PS}).Inc()
+	rt.PathService, ok = fillService(c, isd_as, proto.ServiceType_ps, rt.PathService)
+	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok,
+		"service": proto.ServiceType_ps.String()}).Inc()
 	success = success && ok == SUCCESS
 
-	rt.SibraService, ok = fillService(c, isd_as, common.SB, rt.SibraService)
-	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok, "service": common.SB}).Inc()
+	rt.SibraService, ok = fillService(c, isd_as, proto.ServiceType_bs, rt.SibraService)
+	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok,
+		"service": proto.ServiceType_sb.String()}).Inc()
 	return success && ok == SUCCESS
 	// There currently is no RAINS service anywhere, so this would always fail
 	//rt.RainsService, ok = fillService(c, isd_as, common.RS, rt.RainsService)
@@ -175,7 +179,7 @@ func marshallAndUpdate(rt *topology.RawTopo, topo *util.AtomicTopo) error {
 	return nil
 }
 
-func fillService(c *zk.Conn, ia addr.IA, servicetype string,
+func fillService(c *zk.Conn, ia addr.IA, servicetype proto.ServiceType,
 	fallback map[string]*topology.RawSrvInfo) (map[string]*topology.RawSrvInfo, string) {
 	service, err := getZkService(c, ia, servicetype)
 	if err != nil {
@@ -191,7 +195,7 @@ func fillService(c *zk.Conn, ia addr.IA, servicetype string,
 }
 
 func getZkService(connection *zk.Conn, ia addr.IA,
-	servertype string) (map[string]*topology.RawSrvInfo, error) {
+	servertype proto.ServiceType) (map[string]*topology.RawSrvInfo, error) {
 	services := make(map[string]*topology.RawSrvInfo)
 	partybase := fmt.Sprintf("/%s/%s/party", ia, servertype)
 	children, _, err := connection.Children(partybase)
