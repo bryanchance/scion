@@ -19,7 +19,7 @@ var TopoFull *util.AtomicTopo
 var TopoLimited *util.AtomicTopo
 
 // The on-disk topo as it was the last time we loaded it
-var DiskTopo []byte
+var DiskTopo *util.AtomicTopo
 
 const (
 	ERRFILEREAD       = "file-read-error"
@@ -34,6 +34,8 @@ func init() {
 	TopoFull.Store([]byte(nil))
 	TopoLimited = &util.AtomicTopo{}
 	TopoLimited.Store([]byte(nil))
+	DiskTopo = &util.AtomicTopo{}
+	DiskTopo.Store([]byte(nil))
 }
 
 func Load(filename string, usefmod bool) error {
@@ -44,7 +46,7 @@ func Load(filename string, usefmod bool) error {
 		metrics.TotalTopoLoads.With(l).Inc()
 		return common.NewBasicError("Could not load topology.", err, "filename", filename)
 	}
-	DiskTopo = b
+	DiskTopo.Store(b)
 	rt, err := topology.LoadRaw(b)
 	if err != nil {
 		return err

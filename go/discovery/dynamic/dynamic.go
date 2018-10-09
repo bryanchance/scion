@@ -25,10 +25,8 @@ import (
 	"github.com/scionproto/scion/go/proto"
 )
 
-var baseTopo *topology.RawTopo
 var TopoFull *util.AtomicTopo
 var TopoLimited *util.AtomicTopo
-var isd_as addr.IA
 
 const (
 	ERRCONN           = "connect-error"
@@ -55,14 +53,7 @@ func init() {
 	TopoLimited.Store([]byte{})
 }
 
-func Setup(ia addr.IA, basetopofn string) error {
-	var err error
-	isd_as = ia
-	baseTopo, err = topology.LoadRawFromFile(basetopofn)
-	return err
-}
-
-func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
+func UpdateFromZK(zks []string, ia addr.IA, sessionTimeout time.Duration) {
 	// We declare a bunch of variables early so we can use goto freely.
 	var c *zk.Conn
 	var wl wrappedLogger
@@ -85,13 +76,13 @@ func UpdateFromZK(zks []string, id string, sessionTimeout time.Duration) {
 
 	// Get the base topo from the static part of DS so the two version agree as
 	// much as is useful.
-	if err := json.Unmarshal(static.DiskTopo, rt); err != nil {
+	if err := json.Unmarshal(static.DiskTopo.Load(), rt); err != nil {
 		log.Error("Could not re-parse topology", "err", err)
 		labels["result"] = ERRBASETOPOPARSE
 		goto Out
 	}
 	// Check each service and overwrite it with ZK contents iff ZK is non-empty
-	if !updateServices(rt, c) {
+	if !updateServices(rt, ia, c) {
 		// we don't jump to Out here since we still want this degraded topo to
 		// be used to make a new served topology. Also, while it would be nice
 		// to have per-service-type error counts, it's probably not worth the
@@ -136,31 +127,31 @@ func closeZkConn(c *zk.Conn) {
 	}
 }
 
-func updateServices(rt *topology.RawTopo, c *zk.Conn) bool {
+func updateServices(rt *topology.RawTopo, ia addr.IA, c *zk.Conn) bool {
 	var ok string
 
-	rt.BeaconService, ok = fillService(c, isd_as, proto.ServiceType_bs, rt.BeaconService)
+	rt.BeaconService, ok = fillService(c, ia, proto.ServiceType_bs, rt.BeaconService)
 	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok,
 		"service": proto.ServiceType_bs.String()}).Inc()
 	success := ok == SUCCESS
 
-	rt.CertificateService, ok = fillService(c, isd_as, proto.ServiceType_cs, rt.CertificateService)
+	rt.CertificateService, ok = fillService(c, ia, proto.ServiceType_cs, rt.CertificateService)
 	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok,
 		"service": proto.ServiceType_cs.String()}).Inc()
 	success = success && ok == SUCCESS
 
-	rt.PathService, ok = fillService(c, isd_as, proto.ServiceType_ps, rt.PathService)
+	rt.PathService, ok = fillService(c, ia, proto.ServiceType_ps, rt.PathService)
 	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok,
 		"service": proto.ServiceType_ps.String()}).Inc()
 	success = success && ok == SUCCESS
 
-	rt.SibraService, ok = fillService(c, isd_as, proto.ServiceType_bs, rt.SibraService)
+	rt.SibraService, ok = fillService(c, ia, proto.ServiceType_sb, rt.SibraService)
 	metrics.TotalServiceUpdates.With(prometheus.Labels{"result": ok,
 		"service": proto.ServiceType_sb.String()}).Inc()
 	return success && ok == SUCCESS
 	// There currently is no RAINS service anywhere, so this would always fail
-	//rt.RainsService, ok = fillService(c, isd_as, common.RS, rt.RainsService)
-	//metrics.TotalServiceUpdates.With(prometheusLabels{"status": ok, "service": "bs"}).Inc()
+	//rt.RainsService, ok = fillService(c, ia, proto.ServiceType_rs, rt.RainsService)
+	//metrics.TotalServiceUpdates.With(prometheusLabels{"status": ok, "service": common.RS}).Inc()
 	//success = success && ok
 }
 
