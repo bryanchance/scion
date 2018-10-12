@@ -175,8 +175,8 @@ func (f *fetcherHandler) GetPaths(ctx context.Context, req *sciond.PathReq,
 	case <-ctx.Done():
 	}
 	if ctx.Err() == nil {
-		refetchInt := f.config.QueryInterval()
-		_, err = f.pathDB.InsertNextQuery(ctx, req.Dst.IA(), time.Now().Add(refetchInt))
+		_, err = f.pathDB.InsertNextQuery(ctx, req.Dst.IA(),
+			time.Now().Add(f.config.QueryInterval.Duration))
 		if err != nil {
 			f.logger.Warn("Failed to update nextQuery", "err", err)
 		}
@@ -284,7 +284,7 @@ func (f *fetcherHandler) buildSCIONDReplyEntries(paths []*combinator.Path) []sci
 				FwdPath:    x.Bytes(),
 				Mtu:        path.Mtu,
 				Interfaces: path.Interfaces,
-				ExpTime:    util.TimeToSecs(path.ExpTime),
+				ExpTime:    uint32(path.ComputeExpTime().Unix()),
 			},
 			HostInfo: sciond.HostInfoFromTopoBRAddr(*ifInfo.InternalAddrs),
 		})
@@ -437,10 +437,16 @@ func (f *fetcherHandler) fetchAndVerify(ctx context.Context, cancelF context.Can
 		defer timer.Stop()
 	}
 	// verify and store the segments
+	var insertedSegmentIDs []string
 	verifiedSeg := func(ctx context.Context, s *seg.Meta) {
-		if err := segsaver.StoreSeg(ctx, s, f.pathDB, f.logger); err != nil {
+		wasInserted, err := segsaver.StoreSeg(ctx, s, f.pathDB)
+		if err != nil {
 			f.logger.Error("Unable to insert segment into path database",
 				"seg", s.Segment, "err", err)
+			return
+		}
+		if wasInserted {
+			insertedSegmentIDs = append(insertedSegmentIDs, s.Segment.GetLoggingID())
 		}
 	}
 	verifiedRev := func(ctx context.Context, rev *path_mgmt.SignedRevInfo) {
@@ -455,6 +461,9 @@ func (f *fetcherHandler) fetchAndVerify(ctx context.Context, cancelF context.Can
 	revInfos := revcache.FilterNew(f.revocationCache, reply.Recs.SRevInfos)
 	segverifier.Verify(ctx, f.trustStore, ps, reply.Recs.Recs, revInfos,
 		verifiedSeg, verifiedRev, segErr, revErr)
+	if len(insertedSegmentIDs) > 0 {
+		log.Debug("Segments inserted in DB", "segments", insertedSegmentIDs)
+	}
 }
 
 func (f *fetcherHandler) getSegmentsFromNetwork(ctx context.Context,
@@ -499,7 +508,18 @@ func buildPathsToAllDsts(req *sciond.PathReq,
 	for _, dst := range dsts {
 		paths = append(paths, combinator.Combine(req.Src.IA(), dst, ups, cores, downs)...)
 	}
-	return paths
+	return filterExpiredPaths(paths)
+}
+
+func filterExpiredPaths(paths []*combinator.Path) []*combinator.Path {
+	var validPaths []*combinator.Path
+	now := time.Now()
+	for _, path := range paths {
+		if path.ComputeExpTime().After(now) {
+			validPaths = append(validPaths, path)
+		}
+	}
+	return validPaths
 }
 
 // NewExtendedContext returns a new _independent_ context that can extend past

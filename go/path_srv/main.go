@@ -29,15 +29,15 @@ import (
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/infra"
 	"github.com/scionproto/scion/go/lib/infra/infraenv"
+	"github.com/scionproto/scion/go/lib/infra/modules/cleaner"
 	"github.com/scionproto/scion/go/lib/infra/modules/itopo"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb"
 	"github.com/scionproto/scion/go/lib/log"
 	pathdbbe "github.com/scionproto/scion/go/lib/pathdb/sqlite"
+	"github.com/scionproto/scion/go/lib/periodic"
 	"github.com/scionproto/scion/go/lib/revcache/memrevcache"
-	"github.com/scionproto/scion/go/path_srv/internal/cleaner"
 	"github.com/scionproto/scion/go/path_srv/internal/handlers"
-	"github.com/scionproto/scion/go/path_srv/internal/periodic"
 	"github.com/scionproto/scion/go/path_srv/internal/psconfig"
 	"github.com/scionproto/scion/go/path_srv/internal/segsyncer"
 )
@@ -179,11 +179,10 @@ func setup(configName string) error {
 		return err
 	}
 	itopo.SetCurrentTopology(config.General.Topology)
+	environment = infraenv.InitInfraEnvironment(config.General.TopologyPath)
 	if err := env.InitLogging(&config.Logging); err != nil {
 		return err
 	}
 	config.PS.InitDefaults()
-	// TODO(lukedirtwalker): SUPPORT RELOADING!!!
-	environment = env.SetupEnv(nil)
 	return nil
 }
