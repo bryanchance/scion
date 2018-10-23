@@ -1,4 +1,4 @@
-// Copyright 2018 ETH Zurich
+// Copyright 2018 Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,25 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package as_conf
+package memrevcache
 
 import (
 	"testing"
+	"time"
 
+	cache "github.com/patrickmn/go-cache"
 	. "github.com/smartystreets/goconvey/convey"
 
-	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/revcache"
+	"github.com/scionproto/scion/go/lib/revcache/revcachetest"
 )
 
-func Test_MasterKeys(t *testing.T) {
-	Convey("Loading test master keys `testdata/masterX.key`", t, func() {
-		keys, err := LoadMasterKeys("testdata")
-		if err != nil {
-			t.Fatalf("Error loading config: %v", err)
-		}
-		SoMsg("Key0", keys.Key0, ShouldResemble,
-			common.RawBytes("\xac\x93\x08{\xb5\x1c\x1d41\x9b\xd9u\xdd;\x88\xdc"))
-		SoMsg("Key1", keys.Key1, ShouldResemble,
-			common.RawBytes("X\x89\xff9\xa2\x12_#\x82-\xe8J4w\x0c*"))
+func TestRevCacheSuite(t *testing.T) {
+	Convey("RevCache Suite", t, func() {
+		revcachetest.TestRevCache(t,
+			func() revcache.RevCache {
+				return New(cache.NoExpiration, time.Second)
+			},
+			func() {},
+		)
 	})
 }
