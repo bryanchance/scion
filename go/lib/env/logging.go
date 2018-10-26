@@ -1,4 +1,4 @@
-// Copyright 2018 ETH Zurich
+// Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -87,4 +87,16 @@ func setupFileLogging(cfg *Logging) error {
 		)
 	}
 	return nil
+}
+
+// LogSvcStarted should be called by services as soon as logging is initialized.
+func LogSvcStarted(svcType, elemId string) {
+	log.Info("=====================> Service started", "svc", svcType, "id", elemId)
+}
+
+// CleanupLog calls log.LogPanicAndExit and log.Flush
+// it is mainly a helper to have a single defer call in services.
+func CleanupLog() {
+	log.LogPanicAndExit()
+	log.Flush()
 }
