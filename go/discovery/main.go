@@ -53,14 +53,16 @@ func realMain() int {
 	if v, ok := env.CheckFlags(dsconfig.Sample); !ok {
 		return v
 	}
-	config, err := setup(env.ConfigFile())
+	config, err := setupBasic()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
-		flag.Usage()
 		return 1
 	}
-	defer log.LogPanicAndExit()
-
+	defer env.CleanupLog()
+	if err := setup(config); err != nil {
+		log.Crit("Setup failed", "err", err)
+		return 1
+	}
 	http.DefaultServeMux.Handle("/metrics", promhttp.Handler())
 
 	pubMux := http.NewServeMux()

@@ -17,34 +17,39 @@ import (
 	"github.com/scionproto/scion/go/lib/periodic"
 )
 
-func setup(configName string) (*Config, error) {
+func setupBasic() (*Config, error) {
 	config := &Config{}
-	if _, err := toml.DecodeFile(configName, config); err != nil {
-		return nil, err
-	}
-	if err := env.InitGeneral(&config.General); err != nil {
+	if _, err := toml.DecodeFile(env.ConfigFile(), config); err != nil {
 		return nil, err
 	}
 	if err := env.InitLogging(&config.Logging); err != nil {
 		return nil, err
 	}
+	env.LogSvcStarted(common.DS, config.General.ID)
+	return config, nil
+}
+
+func setup(config *Config) error {
+	if err := env.InitGeneral(&config.General); err != nil {
+		return err
+	}
 	config.DS.InitDefaults()
 	if err := validateConfig(config); err != nil {
-		return nil, common.NewBasicError("Unable to validate config", err)
+		return common.NewBasicError("Unable to validate config", err)
 	}
 	ia = config.General.Topology.ISD_AS
 	// metrics must be initialized before the files are loaded.
 	metrics.Init(config.General.ID)
 	if err := loadFiles(config); err != nil {
-		return nil, err
+		return err
 	}
 	startDynUpdater(config)
 	environment = env.SetupEnv(func() {
-		if err := reload(configName); err != nil {
+		if err := reload(env.ConfigFile()); err != nil {
 			log.Error("Unable to reload config", "err", err)
 		}
 	})
-	return config, nil
+	return nil
 }
 
 func reload(configName string) error {
