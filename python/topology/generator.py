@@ -25,8 +25,8 @@ from lib.defines import (
     DEFAULT_SEGMENT_TTL,
     GEN_PATH,
 )
+from topology.ana.config import ConfigGenerator
 from topology.config import (
-    ConfigGenerator,
     DEFAULT_CERTIFICATE_SERVER,
     DEFAULT_SCIOND,
     DEFAULT_PATH_POLICY_FILE,
