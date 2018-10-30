@@ -517,7 +517,7 @@ func (ae *ASEntry) cleanSessions() {
 }
 
 func (ae *ASEntry) setupNet() {
-	ae.egressRing = ringbuf.New(64, nil, "egress",
+	ae.egressRing = ringbuf.New(egress.EgressRemotePkts, nil, "egress",
 		prometheus.Labels{"ringId": ae.IAString, "sessId": ""})
 	ae.Info("Network setup done")
 }
