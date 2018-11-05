@@ -167,7 +167,10 @@ func (f *fetcherHandler) GetPaths(ctx context.Context, req *sciond.PathReq,
 	// and revocation cache.
 	subCtx, cancelF := NewExtendedContext(ctx, DefaultMinWorkerLifetime)
 	earlyTrigger := util.NewTrigger(earlyReplyInterval)
-	go f.fetchAndVerify(subCtx, cancelF, req, earlyTrigger, ps)
+	go func() {
+		defer log.LogPanicAndExit()
+		f.fetchAndVerify(subCtx, cancelF, req, earlyTrigger, ps)
+	}()
 	// Wait for deadlines while also waiting for the early reply.
 	select {
 	case <-earlyTrigger.Done():
@@ -366,7 +369,15 @@ func (f *fetcherHandler) buildPathsFromDB(ctx context.Context,
 		}
 	}
 	paths := buildPathsToAllDsts(req, ups, cores, downs)
-	return f.filterRevokedPaths(ctx, paths)
+	filteredPaths, err := f.filterRevokedPaths(ctx, paths)
+	if err != nil {
+		return nil, err
+	}
+	numpaths := len(filteredPaths)
+	if int(req.MaxPaths) < numpaths {
+		numpaths = int(req.MaxPaths)
+	}
+	return filteredPaths[0:numpaths], nil
 }
 
 func (f *Fetcher) getSegmentsFromDB(ctx context.Context, startsAt,

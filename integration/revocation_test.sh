@@ -17,7 +17,7 @@ set -f
 
 . integration/common.sh
 
-# Get docker flag, container name and BRS
+# Get BRS
 opts "$@"
 shift $((OPTIND-1))
 
@@ -40,5 +40,5 @@ fi
 sleep ${SLEEP}s
 # Do another round of e2e test with retries
 log "Testing connectivity between all the hosts (with retries)."
-run Revocation "python/integration/end2end_test.py -l ERROR --retries 5"
+run Revocation bin/end2end_integration -log.console error -attempts 6
 exit $?

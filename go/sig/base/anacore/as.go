@@ -1,4 +1,5 @@
 // Copyright 2017 ETH Zurich
+// Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -166,9 +167,15 @@ func (ae *ASEntry) addNet(ipnet *net.IPNet) error {
 	}
 	base.NetworkChanged(params)
 	if len(ae.Nets) == 1 {
-		go dispatcher.NewDispatcher(ae.IA, ae.egressRing, ae.PktPolicies).Run()
+		go func() {
+			defer log.LogPanicAndExit()
+			dispatcher.NewDispatcher(ae.IA, ae.egressRing, ae.PktPolicies).Run()
+		}()
 		ae.sigMgrStop = make(chan struct{})
-		go ae.sigMgr()
+		go func() {
+			defer log.LogPanicAndExit()
+			ae.sigMgr()
+		}()
 	}
 	ae.Info("Added network", "net", ipnet)
 	return nil
@@ -357,7 +364,10 @@ func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 	}
 	if len(ae.Sessions) == 1 {
 		ae.healthMonitorStop = make(chan struct{})
-		go ae.monitorHealth()
+		go func() {
+			defer log.LogPanicAndExit()
+			ae.monitorHealth()
+		}()
 	}
 	return nil
 }

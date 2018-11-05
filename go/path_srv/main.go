@@ -18,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"time"
@@ -39,6 +40,7 @@ import (
 	"github.com/scionproto/scion/go/path_srv/internal/handlers"
 	"github.com/scionproto/scion/go/path_srv/internal/psconfig"
 	"github.com/scionproto/scion/go/path_srv/internal/segsyncer"
+	"github.com/scionproto/scion/go/proto"
 )
 
 type Config struct {
@@ -90,7 +92,9 @@ func realMain() int {
 		return 1
 	}
 	topo := itopo.GetCurrentTopology()
-	trustConf := &trust.Config{}
+	trustConf := &trust.Config{
+		ServiceType: proto.ServiceType_ps,
+	}
 	trustStore, err := trust.NewStore(trustDB, topo.ISD_AS,
 		rand.Uint64(), trustConf, log.Root())
 	if err != nil {

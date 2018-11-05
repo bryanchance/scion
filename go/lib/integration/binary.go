@@ -17,8 +17,10 @@ package integration
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -28,6 +30,8 @@ import (
 )
 
 const (
+	// ServerPortReplace is a placeholder for the server port in the arguments.
+	ServerPortReplace = "<ServerPort>"
 	// SrcIAReplace is a placeholder for the source IA in the arguments.
 	SrcIAReplace = "<SRCIA>"
 	// DstIAReplace is a placeholder for the destination IA in the arguments.
@@ -40,12 +44,23 @@ const (
 	// It can be used to guard certain statements, like printing the ReadySignal,
 	// in a program under test.
 	GoIntegrationEnv = "SCION_GO_INTEGRATION"
+	// portString is the string a server prints to specify the port it's listening on.
+	portString = "Port="
+	// DockerCmd is the script to run tests in docker
+	DockerCmd = "./tools/dc"
+)
+
+var (
+	serverPort = "40004"
+	// Docker indicates whether tests should be executed in docker.
+	Docker = flag.Bool("d", false, "Execute tests in dockerized environment")
 )
 
 var _ Integration = (*binaryIntegration)(nil)
 
 type binaryIntegration struct {
 	name        string
+	cmd         string
 	clientArgs  []string
 	serverArgs  []string
 	logRedirect LogRedirect
@@ -56,11 +71,12 @@ type binaryIntegration struct {
 // Use SrcIAReplace and DstIAReplace in arguments as placeholder for the source and destination IAs.
 // When starting a client/server the placeholders will be replaced with the actual values.
 // The server should output the ReadySignal to Stdout once it is ready to accept clients.
-func NewBinaryIntegration(name string, clientArgs, serverArgs []string,
+func NewBinaryIntegration(name string, cmd string, clientArgs, serverArgs []string,
 	logRedirect LogRedirect) Integration {
 
 	return &binaryIntegration{
 		name:        name,
+		cmd:         cmd,
 		clientArgs:  clientArgs,
 		serverArgs:  serverArgs,
 		logRedirect: logRedirect,
@@ -76,9 +92,11 @@ func (bi *binaryIntegration) StartServer(ctx context.Context, dst addr.IA) (Wait
 	startCtx, cancelF := context.WithTimeout(ctx, StartServerTimeout)
 	defer cancelF()
 	args := replacePattern(DstIAReplace, dst.String(), bi.serverArgs)
+	args = replacePattern(ServerPortReplace, serverPort, args)
 	r := &binaryWaiter{
-		exec.CommandContext(ctx, bi.name, args...),
+		exec.CommandContext(ctx, bi.cmd, args...),
 	}
+	r.Env = os.Environ()
 	r.Env = append(r.Env, fmt.Sprintf("%s=1", GoIntegrationEnv))
 	ep, err := r.StderrPipe()
 	if err != nil {
@@ -99,13 +117,19 @@ func (bi *binaryIntegration) StartServer(ctx context.Context, dst addr.IA) (Wait
 		scanner := bufio.NewScanner(sp)
 		for scanner.Scan() {
 			line := scanner.Text()
+			if strings.HasPrefix(line, portString) {
+				serverPort = strings.TrimPrefix(line, portString)
+			}
 			if init && signal == line {
 				close(ready)
 				init = false
 			}
 		}
 	}()
-	go bi.logRedirect("Server", "ServerErr", dst, ep)
+	go func() {
+		defer log.LogPanicAndExit()
+		bi.logRedirect("Server", "ServerErr", dst, ep)
+	}()
 	err = r.Start()
 	if err != nil {
 		return nil, err
@@ -121,15 +145,20 @@ func (bi *binaryIntegration) StartServer(ctx context.Context, dst addr.IA) (Wait
 func (bi *binaryIntegration) StartClient(ctx context.Context, src, dst addr.IA) (Waiter, error) {
 	args := replacePattern(SrcIAReplace, src.String(), bi.clientArgs)
 	args = replacePattern(DstIAReplace, dst.String(), args)
+	args = replacePattern(ServerPortReplace, serverPort, args)
 	r := &binaryWaiter{
-		exec.CommandContext(ctx, bi.name, args...),
+		exec.CommandContext(ctx, bi.cmd, args...),
 	}
+	r.Env = os.Environ()
 	r.Env = append(r.Env, fmt.Sprintf("%s=1", GoIntegrationEnv))
 	ep, err := r.StderrPipe()
 	if err != nil {
 		return nil, err
 	}
-	go bi.logRedirect("Client", "ClientErr", src, ep)
+	go func() {
+		defer log.LogPanicAndExit()
+		bi.logRedirect("Client", "ClientErr", src, ep)
+	}()
 	return r, r.Start()
 }
 
@@ -149,7 +178,6 @@ type LogRedirect func(name, pName string, local addr.IA, ep io.ReadCloser)
 // StdLog tries to parse any log line from the standard format and logs it with the same log level
 // as the original log entry to the log file.
 var StdLog LogRedirect = func(name, pName string, local addr.IA, ep io.ReadCloser) {
-	defer log.LogPanicAndExit()
 	defer ep.Close()
 	logparse.ParseFrom(ep, pName, pName, func(e logparse.LogEntry) {
 		log.Log(e.Level, fmt.Sprintf("%s@%s: %s", name, local, strings.Join(e.Lines, "\n")))
@@ -158,7 +186,6 @@ var StdLog LogRedirect = func(name, pName string, local addr.IA, ep io.ReadClose
 
 // NonStdLog directly logs any lines as error to the log file
 var NonStdLog LogRedirect = func(name, pName string, local addr.IA, ep io.ReadCloser) {
-	defer log.LogPanicAndExit()
 	defer ep.Close()
 	scanner := bufio.NewScanner(ep)
 	for scanner.Scan() {

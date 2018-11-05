@@ -73,9 +73,18 @@ func NewRouter(id, confDir string) (*Router, error) {
 func (r *Router) Run() error {
 	// TODO(sgmonroy) No ACL support, see #1801.
 	//go r.PeriodicPushACL()
-	go r.PacketError()
-	go r.confSig()
-	go rctrl.Control(r.sRevInfoQ)
+	go func() {
+		defer log.LogPanicAndExit()
+		r.PacketError()
+	}()
+	go func() {
+		defer log.LogPanicAndExit()
+		r.confSig()
+	}()
+	go func() {
+		defer log.LogPanicAndExit()
+		rctrl.Control(r.sRevInfoQ)
+	}()
 	// TODO(shitz): Here should be some code to periodically check the discovery
 	// service for updated info.
 	var wait chan struct{}
@@ -85,7 +94,6 @@ func (r *Router) Run() error {
 
 // confSig handles reloading the configuration when SIGHUP is received.
 func (r *Router) confSig() {
-	defer log.LogPanicAndExit()
 	for range sighup {
 		var err error
 		var config *conf.Conf

@@ -28,7 +28,7 @@ jobs:
                 command: docker login -u aopsacct -p $DOCKERHUB_PASSWORD
             - run:
                 name: Pull and tag scion_base image
-                command: ./tools/ci/prepare_image 144a8393fdf659ea79e1dbe0f285a6547e6e218a7aef85d8862120ef558bd0a3
+                command: ./tools/ci/prepare_image 41eb2f50be7ac2195660e5ec22f30f314905c074da7733d1bb563ef7b49b56d7
                 when: always
             - run:
                 name: Build scion:latest image
@@ -64,7 +64,9 @@ jobs:
                 when: always
             - run:
                 name: Integration tests
-                command: ./tools/ci/integration
+                command: |
+                    ./tools/ci/integration_setup
+                    ./tools/ci/integration_run
                 when: always
 
             # Clean up

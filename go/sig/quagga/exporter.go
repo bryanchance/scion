@@ -1,4 +1,4 @@
-// Copyright 2018 Anapaya System
+// Copyright 2018 Anapaya Systems
 
 // Package quagga provides an interface to announce and retract routes to the Quagga Routing Suite.
 package quagga
@@ -47,7 +47,10 @@ func Init() error {
 		RemoteHealthChanged: remoteHealthChanged,
 	}
 	base.AddEventListener("quagga-exporter", cbs)
-	go drain()
+	go func() {
+		defer log.LogPanicAndExit()
+		drain()
+	}()
 	log.Info("Quagga exporter initialized", "socket", *zservApi)
 	return nil
 }

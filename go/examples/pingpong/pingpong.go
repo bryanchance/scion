@@ -1,4 +1,5 @@
 // Copyright 2017 ETH Zurich
+// Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -247,7 +248,10 @@ func (c *client) run() {
 	}
 	c.quicStream = newQuicStream(qstream)
 	log.Debug("Quic stream opened", "local", &local, "remote", &remote)
-	go c.send()
+	go func() {
+		defer log.LogPanicAndExit()
+		c.send()
+	}()
 	c.read()
 }
 
@@ -360,7 +364,10 @@ func (s server) run() {
 			break
 		}
 		log.Info("Quic session accepted", "src", qsess.RemoteAddr())
-		go s.handleClient(qsess)
+		go func() {
+			defer log.LogPanicAndExit()
+			s.handleClient(qsess)
+		}()
 	}
 }
 

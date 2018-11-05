@@ -1,4 +1,5 @@
 // Copyright 2017 ETH Zurich
+// Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -101,7 +102,10 @@ func main() {
 	}
 	egress.Init()
 	disp.Init(sigcmn.CtrlConn)
-	go base.PollReqHdlr()
+	go func() {
+		defer log.LogPanicAndExit()
+		base.PollReqHdlr()
+	}()
 	// Initialize Quagga exporter
 	if err := quagga.Init(); err != nil {
 		fatal("Unable to initalize Quagga Exporter", "err", err)
@@ -110,9 +114,15 @@ func main() {
 	if loadConfig(*cfgPath) != true {
 		fatal("Unable to load config on startup")
 	}
-	go reloadOnSIGHUP(*cfgPath)
+	go func() {
+		defer log.LogPanicAndExit()
+		reloadOnSIGHUP(*cfgPath)
+	}()
 	// Spawn egress reader
-	go reader.NewReader(tunIO).Run()
+	go func() {
+		defer log.LogPanicAndExit()
+		reader.NewReader(tunIO).Run()
+	}()
 	// Spawn ingress Dispatcher.
 	if err := ingress.Init(tunIO); err != nil {
 		fatal("Unable to spawn ingress dispatcher", "err", err)
@@ -174,7 +184,6 @@ func setupTun() (io.ReadWriteCloser, error) {
 }
 
 func reloadOnSIGHUP(path string) {
-	defer log.LogPanicAndExit()
 	log.Info("reloadOnSIGHUP: started")
 	for range sighup {
 		log.Info("reloadOnSIGHUP: reloading...")
