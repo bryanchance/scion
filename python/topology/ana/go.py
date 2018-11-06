@@ -2,6 +2,7 @@
 
 # Stdlib
 import os
+import sys
 import toml
 
 # SCION
@@ -83,3 +84,73 @@ class GoGenerator(VanillaGenerator):
         if self.docker:
             ip = "0.0.0.0"
         return "%s:%s" % (ip, _get_l4_port(addr))
+
+    def generate_ps(self):
+        for topo_id, topo in self.topo_dicts.items():
+            db_user = topo_id.file_fmt()
+            self._generate_ps_postgres_init(topo_id, db_user)
+            for k, v in topo.get("PathService", {}).items():
+                # only a single Go-PS per AS is currently supported
+                if k.endswith("-1"):
+                    base = topo_id.base_dir(self.out_dir)
+                    ps_conf = self._build_ps_conf(topo_id, topo["ISD_AS"], base, k, db_user)
+                    write_file(os.path.join(base, k, "psconfig.toml"), toml.dumps(ps_conf))
+
+    def _build_ps_conf(self, topo_id, ia, base, name, db_user):
+        config_dir = '/share/conf' if self.docker else os.path.join(base, name)
+        log_dir = '/share/logs' if self.docker else 'logs'
+        db_dir = '/share/cache' if self.docker else 'gen-cache'
+        db_host = self._postgres_host()
+        raw_entry = {
+            'general': {
+                'ID': name,
+                'ConfigDir': config_dir,
+            },
+            'logging': {
+                'file': {
+                    'Path': os.path.join(log_dir, "%s.log" % name),
+                    'Level': 'debug',
+                },
+                'console': {
+                    'Level': 'crit',
+                },
+            },
+            'trust': {
+                'TrustDB': os.path.join(db_dir, '%s.trust.db' % name),
+            },
+            'infra': {
+                'Type': "PS"
+            },
+            'ps': {
+                'PathDB': {
+                    'Backend': 'postgres',
+                    # sslmode=disable is because dockerized postgres doesn't have SSL enabled.
+                    'Connection': 'host=%s user=%s password=password' % (db_host, db_user) +
+                                  ' sslmode=disable dbname=pathdb',
+                },
+                'SegSync': True,
+            },
+        }
+        return raw_entry
+
+    def _generate_ps_postgres_init(self, topo_id, db_user):
+        sql = 'CREATE USER "%s" WITH PASSWORD \'password\';\n' % db_user
+        sql += 'ALTER ROLE "%s" SET search_path TO "$user";\n' % db_user
+        sql += 'CREATE SCHEMA AUTHORIZATION "%s";\n' % db_user
+        sql += 'SET search_path TO "%s";\n' % db_user
+        with open('go/path_srv/postgres/schema.sql', 'r') as schema:
+            sql += schema.read()
+        sql += '\nGRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA "%s" TO "%s"\n' % (db_user, db_user)
+        write_file(os.path.join(self.out_dir, 'postgres', 'init', '%s.sql' % db_user), sql)
+
+    def _postgres_host(self):
+        if self.in_docker:
+            addr = os.getenv('DOCKER0')
+            if not addr:
+                print('DOCKER0 env variable required! Exiting!')
+                sys.exit(1)
+        elif self.docker:
+            addr = 'docker0'
+        else:
+            addr = 'localhost'
+        return addr

@@ -1,6 +1,6 @@
 - label: Prepare scion_base and scion images
   command:
-      - ./tools/ci/prepare_image 41eb2f50be7ac2195660e5ec22f30f314905c074da7733d1bb563ef7b49b56d7
+      - ./tools/ci/prepare_image 0e1d5630c21319e7fe8be1c4f06950a1e1f9776d85cb2028ccafb68498d2191f
       - ./docker.sh build
 - wait
 - label: Start container

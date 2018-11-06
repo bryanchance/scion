@@ -87,7 +87,7 @@ class ConfigGenerator(object):
                  zk_config_file=DEFAULT_ZK_CONFIG, network=None,
                  use_mininet=False, use_docker=False, bind_addr=GENERATE_BIND_ADDRESS,
                  pseg_ttl=DEFAULT_SEGMENT_TTL, cs=DEFAULT_CERTIFICATE_SERVER,
-                 sd=DEFAULT_SCIOND, ps=DEFAULT_PATH_SERVER, ds=False):
+                 sd=DEFAULT_SCIOND, ps=DEFAULT_PATH_SERVER, ds=False, in_docker=False):
         """
         Initialize an instance of the class ConfigGenerator.
 
@@ -104,6 +104,7 @@ class ConfigGenerator(object):
         :param string sd: Use go or python implementation of SCIOND
         :param string ps: Use go or python implementation of path server
         :param bool ds: Use discovery service
+        :param bool in_docker: Generator is run inside a docker container
         """
         self.ipv6 = ipv6
         self.out_dir = out_dir
@@ -123,6 +124,7 @@ class ConfigGenerator(object):
         self.sd = sd
         self.ps = ps
         self.ds = ds
+        self.in_docker = in_docker
         if self.docker and self.cs is not DEFAULT_CERTIFICATE_SERVER:
             logging.critical("Cannot use non-default CS with docker!")
             sys.exit(1)
@@ -197,7 +199,7 @@ class ConfigGenerator(object):
         return certgen.generate()
 
     def _generate_go(self, topo_dicts):
-        go_gen = GoGenerator(self.out_dir, topo_dicts, self.docker)
+        go_gen = GoGenerator(self.out_dir, topo_dicts, self.docker, self.in_docker)
         if self.cs == "go":
             go_gen.generate_cs()
         if self.sd == "go":

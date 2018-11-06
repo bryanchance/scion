@@ -18,7 +18,11 @@ cmd_topology() {
         zkclean="y"
     fi
     echo "Create topology, configuration, and execution files."
-    python/topology/generator.py "$@"
+    if is_running_in_docker; then
+        python/topology/generator.py "$@" --in-docker
+    else
+        python/topology/generator.py "$@"
+    fi
     run_zk
     if [ -n "$zkclean" ]; then
         echo "Deleting all Zookeeper state"
@@ -31,6 +35,8 @@ cmd_topology() {
             tools/zkcleanslate --zk 127.0.0.1:2181
         fi
     fi
+    stop_pg
+    run_pg
     if [ ! -e "gen-certs/tls.pem" -o ! -e "gen-certs/tls.key" ]; then
         local old=$(umask)
         echo "Generating TLS cert"
@@ -55,6 +61,16 @@ cmd_run() {
     else
         ./tools/quiet ./supervisor/supervisor.sh start all
     fi
+}
+
+stop_pg() {
+    echo "Stopping postgres / deleting state..."
+    ./tools/quiet ./tools/dc postgres down
+}
+
+run_pg() {
+    echo "Running postgres..."
+    ./tools/quiet ./tools/dc postgres up -d
 }
 
 run_zk() {
@@ -105,6 +121,8 @@ run_setup() {
     local sciond_dir="/run/shm/sciond"
     [ -d "$sciond_dir" ] || mkdir "$sciond_dir"
     [ $(stat -c "%U" "$sciond_dir") == "$LOGNAME" ] || { sudo -p "Fixing ownership of $sciond_dir - [sudo] password for %p: " chown $LOGNAME: "$sciond_dir"; }
+    # Make sure postgres is running.
+    run_pg
 }
 
 cmd_stop() {

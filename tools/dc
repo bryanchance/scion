@@ -34,6 +34,10 @@ cmd_utils() {
     COMPOSE_FILE="gen/base-dc.yml:gen/utils-dc.yml" docker-compose --no-ansi "$@"
 }
 
+cmd_postgres() {
+    COMPOSE_FILE="gen/postgres-dc.yml" docker-compose -p postgres --no-ansi "$@"
+}
+
 cmd_tester() {
     COMPOSE_FILE="gen/base-dc.yml:gen/utils-dc.yml" docker-compose exec tester "$@"
 }
@@ -43,7 +47,7 @@ COMMAND="$1"
 shift
 
 case "$COMMAND" in
-    scion|tester|utils)
-        "cmd_$COMMAND" "$@" ;;
+    scion|tester|utils|postgres)
+	    "cmd_$COMMAND" "$@" ;;
     *)  cmd_help; exit 1 ;;
 esac

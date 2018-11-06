@@ -15,6 +15,7 @@
 # Stdlib
 import copy
 import os
+import subprocess
 from shutil import copyfile
 from string import Template
 # External packages
@@ -46,6 +47,7 @@ class DockerGenerator(object):
         self.dc_util_conf = {'version': '3', 'services': {}}
         self.output_base = os.environ.get('SCION_OUTPUT_BASE', os.getcwd())
         self.user_spec = os.environ.get('SCION_USERSPEC', '$LOGNAME')
+        self.docker_ip = self._docker_ip()
 
     def generate(self):
         self._base_conf()
@@ -61,6 +63,9 @@ class DockerGenerator(object):
                    yaml.dump(self.dc_util_conf, default_flow_style=False))
         write_file(os.path.join(self.out_dir, DOCKER_BASE_CONF),
                    yaml.dump(self.dc_base_conf, default_flow_style=False))
+
+    def _docker_ip(self):
+        return subprocess.check_output(['tools/docker-ip']).decode("utf-8").strip()
 
     def _base_conf(self):
         default_net = {'ipam': {'config': [{'subnet': DEFAULT_DOCKER_NETWORK}]}}
@@ -200,6 +205,8 @@ class DockerGenerator(object):
                                         get_default_sciond_path(ISD_AS(topo["ISD_AS"])))
                 entry['command'].append(k)
                 entry['command'].append('conf')
+            if self.ps == 'go':
+                entry['extra_hosts'] = {'docker0': self.docker_ip}
             self.dc_conf['services'][k] = entry
 
     def _zookeeper_conf(self):

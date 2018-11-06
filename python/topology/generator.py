@@ -70,11 +70,13 @@ def main():
                         help='Path Server implementation to use ("go or "py")')
     parser.add_argument('-ds', '--discovery', action='store_true',
                         help='Generate discovery service')
+    parser.add_argument('--in-docker', action='store_true',
+                        help='Set if running in a docker container')
     args = parser.parse_args()
     confgen = ConfigGenerator(
         args.ipv6, args.output_dir, args.topo_config, args.path_policy, args.zk_config,
         args.network, args.mininet, args.docker, args.bind_addr, args.pseg_ttl, args.cert_server,
-        args.sciond, args.path_server, args.discovery)
+        args.sciond, args.path_server, args.discovery, args.in_docker)
     confgen.generate_all()
 
 

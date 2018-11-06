@@ -38,9 +38,11 @@ type PathSegment struct {
 	RawSData     common.RawBytes        `capnp:"sdata"`
 	SData        *PathSegmentSignedData `capnp:"-"`
 	RawASEntries []*proto.SignedBlobS   `capnp:"asEntries"`
-	ASEntries    []*ASEntry             `capnp:"-"`
-	id           common.RawBytes
-	fullId       common.RawBytes
+	// ASEntries contains the AS entries.
+	// WARNING: Should never be modified! Use AddASEntry or create a new Segment instead.
+	ASEntries []*ASEntry `capnp:"-"`
+	id        common.RawBytes
+	fullId    common.RawBytes
 }
 
 func NewSeg(infoF *spath.InfoField) (*PathSegment, error) {
@@ -100,6 +102,11 @@ func (ps *PathSegment) FullId() (common.RawBytes, error) {
 		ps.fullId = fullId
 	}
 	return ps.fullId, nil
+}
+
+func (ps *PathSegment) invalidateIds() {
+	ps.id = nil
+	ps.fullId = nil
 }
 
 func (ps *PathSegment) calculateHash(hopOnly bool) (common.RawBytes, error) {
@@ -256,7 +263,7 @@ func (ps *PathSegment) AddASEntry(ase *ASEntry, signType proto.SignType,
 		Sign: proto.NewSignS(signType, signSrc),
 	})
 	ps.ASEntries = append(ps.ASEntries, ase)
-	ps.id = nil
+	ps.invalidateIds()
 	return nil
 }
 

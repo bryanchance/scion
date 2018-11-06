@@ -21,6 +21,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/pathdb"
+	postgrespathdb "github.com/scionproto/scion/go/lib/pathdb/postgres"
 	sqlitepathdb "github.com/scionproto/scion/go/lib/pathdb/sqlite"
 	"github.com/scionproto/scion/go/lib/revcache"
 	"github.com/scionproto/scion/go/lib/revcache/memrevcache"
@@ -32,6 +33,11 @@ const (
 	BackendNone   Backend = ""
 	BackendSqlite Backend = "sqlite"
 	BackendMem    Backend = "mem"
+
+	// Intentional break of the group so that scionproto and anapaya code
+	// can have a different indent.
+
+	BackendPostgres Backend = "postgres"
 )
 
 // PathDBConf is the configuration for the connection to the path database.
@@ -92,6 +98,8 @@ func newPathDB(conf PathDBConf) (pathdb.PathDB, error) {
 	switch conf.Backend {
 	case BackendSqlite:
 		return sqlitepathdb.New(conf.Connection)
+	case BackendPostgres:
+		return postgrespathdb.New(conf.Connection)
 	case BackendNone:
 		return nil, nil
 	default:

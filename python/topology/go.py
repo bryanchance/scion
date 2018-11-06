@@ -28,10 +28,11 @@ from topology.common import COMMON_DIR
 
 
 class GoGenerator(object):
-    def __init__(self, out_dir, topo_dicts, docker):
+    def __init__(self, out_dir, topo_dicts, docker, in_docker):
         self.out_dir = out_dir
         self.topo_dicts = topo_dicts
         self.docker = docker
+        self.in_docker = in_docker
 
     def generate_ps(self):
         for topo_id, topo in self.topo_dicts.items():
