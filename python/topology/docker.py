@@ -29,19 +29,20 @@ from lib.util import (
     write_file,
 )
 from topology.common import _prom_addr_br, _prom_addr_infra
+from topology.utils import TesterGenerator
 
 DOCKER_BASE_CONF = 'base-dc.yml'
 DOCKER_SCION_CONF = 'scion-dc.yml'
-DOCKER_UTIL_CONF = 'utils-dc.yml'
 DEFAULT_DOCKER_NETWORK = "172.18.0.0/24"
 
 
 class DockerGenerator(object):
-    def __init__(self, out_dir, topo_dicts, sd, ps):
+    def __init__(self, out_dir, topo_dicts, sd, ps, port_gen):
         self.out_dir = out_dir
         self.topo_dicts = topo_dicts
         self.sd = sd
         self.ps = ps
+        self.port_gen = port_gen
         self.dc_base_conf = {'version': '3', 'networks': {}}
         self.dc_conf = {'version': '3', 'services': {}}
         self.dc_util_conf = {'version': '3', 'services': {}}
@@ -53,16 +54,16 @@ class DockerGenerator(object):
         self._base_conf()
         self._zookeeper_conf()
         self._dispatcher_conf()
-        self._test_conf()
         for topo_id, topo in self.topo_dicts.items():
             base = os.path.join(self.output_base, topo_id.base_dir(self.out_dir))
             self._gen_topo(topo_id, topo, base)
         write_file(os.path.join(self.out_dir, DOCKER_SCION_CONF),
                    yaml.dump(self.dc_conf, default_flow_style=False))
-        write_file(os.path.join(self.out_dir, DOCKER_UTIL_CONF),
-                   yaml.dump(self.dc_util_conf, default_flow_style=False))
         write_file(os.path.join(self.out_dir, DOCKER_BASE_CONF),
                    yaml.dump(self.dc_base_conf, default_flow_style=False))
+
+        tester_gen = TesterGenerator(self.out_dir)
+        tester_gen.generate()
 
     def _docker_ip(self):
         return subprocess.check_output(['tools/docker-ip']).decode("utf-8").strip()
@@ -101,7 +102,7 @@ class DockerGenerator(object):
             entry['container_name'] = k
             entry['volumes'].append('%s:/share/conf:ro' % os.path.join(base, k))
             entry['command'].append('-id=%s' % k)
-            entry['command'].append('-prom=%s' % _prom_addr_br(v))
+            entry['command'].append('-prom=%s' % _prom_addr_br(k, v, self.port_gen))
             self.dc_conf['services'][k] = entry
 
     def _cs_conf(self, topo_id, topo, base):
@@ -131,7 +132,7 @@ class DockerGenerator(object):
             entry = copy.deepcopy(raw_entry)
             entry['container_name'] = k
             entry['volumes'].append('%s:/share/conf:ro' % os.path.join(base, k))
-            entry['command'].append('--prom=%s' % _prom_addr_infra(v))
+            entry['command'].append('--prom=%s' % _prom_addr_infra(k, v, self.port_gen))
             entry['command'].append('--sciond_path=%s' %
                                     get_default_sciond_path(ISD_AS(topo["ISD_AS"])))
             entry['command'].append(k)
@@ -165,7 +166,7 @@ class DockerGenerator(object):
             entry = copy.deepcopy(raw_entry)
             entry['container_name'] = k
             entry['volumes'].append('%s:/share/conf:ro' % os.path.join(base, k))
-            entry['command'].append('--prom=%s' % _prom_addr_infra(v))
+            entry['command'].append('--prom=%s' % _prom_addr_infra(k, v, self.port_gen))
             entry['command'].append('--sciond_path=%s' %
                                     get_default_sciond_path(ISD_AS(topo["ISD_AS"])))
             entry['command'].append(k)
@@ -200,7 +201,7 @@ class DockerGenerator(object):
             entry['volumes'].append('%s:/share/conf:ro' % os.path.join(base, k))
             if self.ps == 'py':
                 entry['command'].append('--spki_cache_dir=cache')
-                entry['command'].append('--prom=%s' % _prom_addr_infra(v))
+                entry['command'].append('--prom=%s' % _prom_addr_infra(k, v, self.port_gen))
                 entry['command'].append('--sciond_path=%s' %
                                         get_default_sciond_path(ISD_AS(topo["ISD_AS"])))
                 entry['command'].append(k)
@@ -282,34 +283,13 @@ class DockerGenerator(object):
         }
         if self.sd == 'py':
             entry['command'] = [
-                    '--api-addr=%s' % os.path.join(SCIOND_API_SOCKDIR, "%s.sock" % name),
-                    '--log_dir=logs',
-                    '--spki_cache_dir=cache',
-                    name,
-                    'conf'
+                '--api-addr=%s' % os.path.join(SCIOND_API_SOCKDIR, "%s.sock" % name),
+                '--log_dir=logs',
+                '--spki_cache_dir=cache',
+                name,
+                'conf'
             ]
         self.dc_conf['services'][name] = entry
-
-    def _test_conf(self):
-        entry = {
-            'image': 'scion_app_builder',
-            'environment': {
-                'PYTHONPATH': 'python/:'
-            },
-            'volumes': [
-                '/run/shm/dispatcher:/run/shm/dispatcher:rw',
-                '/run/shm/sciond:/run/shm/sciond:rw',
-                self.output_base + '/logs:/home/scion/go/src/github.com/scionproto/scion/logs:rw'
-            ],
-            'entrypoint': [],
-            'command': [
-                'tail',
-                '-f',
-                '/dev/null'
-            ]
-        }
-        entry['container_name'] = 'tester'
-        self.dc_util_conf['services']['tester'] = entry
 
     def _sciond_name(self, topo_id):
         return 'sd' + topo_id.file_fmt()

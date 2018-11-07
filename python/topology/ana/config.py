@@ -25,12 +25,12 @@ class ConfigGenerator(VanillaGenerator):
 
     def _generate_docker(self, topo_dicts):
         docker_gen = DockerGenerator(
-            self.out_dir, topo_dicts, self.sd, self.ps)
+            self.out_dir, topo_dicts, self.sd, self.ps, self.port_gen)
         docker_gen.generate()
 
     def _generate_supervisor(self, topo_dicts):
         super_gen = SupervisorGenerator(
-            self.out_dir, topo_dicts, self.mininet, self.cs, self.sd, self.ps)
+            self.out_dir, topo_dicts, self.mininet, self.cs, self.sd, self.ps, self.port_gen)
         super_gen.generate()
 
     def _generate_postgres(self):

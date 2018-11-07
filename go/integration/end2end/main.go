@@ -87,6 +87,7 @@ func (s server) run() {
 	}
 	if len(os.Getenv(libint.GoIntegrationEnv)) > 0 {
 		// Needed for integration test ready signal.
+		fmt.Printf("Port=%d\n", conn.LocalAddr().(*snet.Addr).Host.L4.Port())
 		fmt.Printf("%s%s\n", libint.ReadySignal, integration.Local.IA)
 	}
 	log.Debug("Listening", "local", conn.LocalAddr())
@@ -159,7 +160,7 @@ func (c client) getRemote(n int) error {
 		return nil
 	}
 	// Get paths from sciond
-	ctx, cancelF := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancelF := context.WithTimeout(context.Background(), libint.CtxTimeout)
 	defer cancelF()
 	paths, err := c.sdConn.PathsCtx(ctx, remote.IA, integration.Local.IA, 1,
 		sciond.PathReqFlags{Refresh: n != 0})

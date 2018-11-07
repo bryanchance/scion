@@ -21,7 +21,6 @@ import (
 	"context"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/scionproto/scion/go/lib/addr"
@@ -73,21 +72,15 @@ type Store struct {
 	chainDeduper dedupe.Deduper
 	config       *Config
 	// local AS
-	ia  addr.IA
-	log log.Logger
-	// ID of the last infra message that was sent out by the Store
-	msgID uint64
+	ia    addr.IA
+	log   log.Logger
 	msger infra.Messenger
 }
 
 // NewStore initializes a TRC/Certificate Chain cache/resolver backed by db.
 // Parameter local must specify the AS in which the trust store resides (which
-// is used during request forwarding decisions). When sending infra messages,
-// the trust store will use IDs starting from startID, and increment by one for
-// each message.
-func NewStore(db *trustdb.DB, local addr.IA, startID uint64, options *Config,
-	logger log.Logger) (*Store, error) {
-
+// is used during request forwarding decisions).
+func NewStore(db *trustdb.DB, local addr.IA, options *Config, logger log.Logger) (*Store, error) {
 	if options == nil {
 		options = &Config{}
 	}
@@ -96,7 +89,6 @@ func NewStore(db *trustdb.DB, local addr.IA, startID uint64, options *Config,
 		ia:      local,
 		config:  options,
 		log:     logger,
-		msgID:   startID,
 	}
 	return store, nil
 }
@@ -228,9 +220,9 @@ func (store *Store) getTRC(ctx context.Context, isd addr.ISD, version uint64,
 	return store.getTRCFromNetwork(ctx, &trcRequest{
 		isd:      isd,
 		version:  version,
-		id:       store.nextID(),
+		id:       messenger.NextId(),
 		server:   server,
-		postHook: store.InsertTRCHook,
+		postHook: store.insertTRCHook(),
 	})
 }
 
@@ -249,11 +241,45 @@ func (store *Store) getTRCFromNetwork(ctx context.Context, req *trcRequest) (*tr
 	}
 }
 
-// InsertTRCHook always inserts the TRC into the database.
-func (store *Store) InsertTRCHook(ctx context.Context, trcObj *trc.TRC) error {
+func (store *Store) insertTRCHook() ValidateTRCFunc {
+	if store.config.ServiceType == proto.ServiceType_ps {
+		return store.insertTRCHookForwarding
+	}
+	return store.insertTRCHookLocal
+}
+
+// insertTRCHookLocal always inserts the TRC into the database.
+func (store *Store) insertTRCHookLocal(ctx context.Context, trcObj *trc.TRC) error {
 	if _, err := store.trustdb.InsertTRCCtx(ctx, trcObj); err != nil {
 		return common.NewBasicError("Unable to store TRC in database", err)
 	}
+	return nil
+}
+
+// insertTRCHookForwarding always inserts the TRC into the database and forwards it to the CS.
+func (store *Store) insertTRCHookForwarding(ctx context.Context, trcObj *trc.TRC) error {
+	if err := store.insertTRCHookLocal(ctx, trcObj); err != nil {
+		return err
+	}
+	go func() {
+		defer log.LogPanicAndExit()
+		addr, err := store.ChooseServer(store.ia)
+		if err != nil {
+			log.Error("Failed to select server to forward cert cahin", "err", err)
+		}
+		rawTRC, err := trcObj.Compress()
+		if err != nil {
+			log.Error("Failed to compress TRC for forwarding", "err", err)
+		}
+		forwardCtx, cancelF := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelF()
+		err = store.msger.SendTRC(forwardCtx, &cert_mgmt.TRC{
+			RawTRC: rawTRC,
+		}, addr, messenger.NextId())
+		if err != nil {
+			log.Error("Failed to forward cert chain", "err", err)
+		}
+	}()
 	return nil
 }
 
@@ -292,7 +318,7 @@ func (store *Store) getValidChain(ctx context.Context, ia addr.IA, recurse bool,
 	return store.getChainFromNetwork(ctx, &chainRequest{
 		ia:       ia,
 		version:  scrypto.LatestVer,
-		id:       store.nextID(),
+		id:       messenger.NextId(),
 		server:   server,
 		postHook: store.newChainValidator(trcObj),
 	})
@@ -340,7 +366,7 @@ func (store *Store) getChain(ctx context.Context, ia addr.IA, version uint64,
 	return store.getChainFromNetwork(ctx, &chainRequest{
 		ia:       ia,
 		version:  version,
-		id:       store.nextID(),
+		id:       messenger.NextId(),
 		server:   server,
 		postHook: nil,
 	})
@@ -375,8 +401,9 @@ func (store *Store) newChainValidatorForwarding(validator *trc.TRC) ValidateChai
 			if err != nil {
 				log.Error("Failed to compress chain for forwarding", "err", err)
 			}
-			// TODO(lukedirtwalker): use extended context?
-			err = store.msger.SendCertChain(ctx, &cert_mgmt.Chain{
+			forwardCtx, cancelF := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancelF()
+			err = store.msger.SendCertChain(forwardCtx, &cert_mgmt.Chain{
 				RawChain: rawChain,
 			}, addr, messenger.NextId())
 			if err != nil {
@@ -430,10 +457,6 @@ func (store *Store) getChainFromNetwork(ctx context.Context,
 		return nil, common.NewBasicError("Context canceled while waiting for Chain",
 			nil, "ia", req.ia, "version", req.version)
 	}
-}
-
-func (store *Store) nextID() uint64 {
-	return atomic.AddUint64(&store.msgID, 1)
 }
 
 func (store *Store) LoadAuthoritativeTRC(dir string) error {

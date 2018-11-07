@@ -2,6 +2,10 @@
   command:
       - ./tools/ci/prepare_image 0e1d5630c21319e7fe8be1c4f06950a1e1f9776d85cb2028ccafb68498d2191f
       - ./docker.sh build
+  concurrency: 1
+  concurrency_group: "build-scion"
+# FIXME(worxli): we should commit the built code and push the image, then use that image for the
+# rest of the pipeline
 - wait
 - label: Start container
   command:
