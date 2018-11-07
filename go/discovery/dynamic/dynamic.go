@@ -91,8 +91,6 @@ func UpdateFromZK(zks []string, ia addr.IA, sessionTimeout time.Duration) {
 	}
 	metrics.TotalZkUpdateTime.Add(float64(time.Since(start).Seconds()))
 
-	// Make sure Bind info is removed from the Topo and update timestamp
-	topology.StripBind(rt)
 	updateTimestamps(rt)
 
 	if err = marshallAndUpdate(rt, TopoFull); err != nil {
@@ -101,7 +99,8 @@ func UpdateFromZK(zks []string, ia addr.IA, sessionTimeout time.Duration) {
 		goto Out
 	}
 
-	// Trim non-public services
+	// Trim bind and non-public services
+	topology.StripBind(rt)
 	topology.StripServices(rt)
 
 	if err = marshallAndUpdate(rt, TopoLimited); err != nil {

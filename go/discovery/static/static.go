@@ -63,7 +63,6 @@ func Load(filename string, usefmod bool) error {
 		rt.TimestampHuman = fi.ModTime().Format(common.TimeFmt)
 	}
 
-	topology.StripBind(rt)
 	b, err = util.MarshalToJSON(rt)
 	if err != nil {
 		l["result"] = ERRMARSHALFULL
@@ -73,6 +72,7 @@ func Load(filename string, usefmod bool) error {
 	TopoFull.Store(b)
 
 	// We can edit the topo since we have a "copy" of it in TopoFull now
+	topology.StripBind(rt)
 	topology.StripServices(rt)
 	b, err = util.MarshalToJSON(rt)
 	if err != nil {
