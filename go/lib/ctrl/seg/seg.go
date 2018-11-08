@@ -104,11 +104,6 @@ func (ps *PathSegment) FullId() (common.RawBytes, error) {
 	return ps.fullId, nil
 }
 
-func (ps *PathSegment) invalidateIds() {
-	ps.id = nil
-	ps.fullId = nil
-}
-
 func (ps *PathSegment) calculateHash(hopOnly bool) (common.RawBytes, error) {
 	h := sha256.New()
 	for _, ase := range ps.ASEntries {
@@ -265,6 +260,11 @@ func (ps *PathSegment) AddASEntry(ase *ASEntry, signType proto.SignType,
 	ps.ASEntries = append(ps.ASEntries, ase)
 	ps.invalidateIds()
 	return nil
+}
+
+func (ps *PathSegment) invalidateIds() {
+	ps.id = nil
+	ps.fullId = nil
 }
 
 func (ps *PathSegment) SignLastASEntry(key common.RawBytes) error {

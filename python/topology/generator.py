@@ -27,21 +27,18 @@ from lib.defines import (
 )
 from topology.ana.config import ConfigGenerator
 from topology.config import (
+    ConfigGenArgs,
     DEFAULT_CERTIFICATE_SERVER,
-    DEFAULT_SCIOND,
     DEFAULT_PATH_POLICY_FILE,
     DEFAULT_PATH_SERVER,
+    DEFAULT_SCIOND,
     DEFAULT_TOPOLOGY_FILE,
     DEFAULT_ZK_CONFIG,
     GENERATE_BIND_ADDRESS,
 )
 
 
-def main():
-    """
-    Main function.
-    """
-    parser = argparse.ArgumentParser()
+def add_arguments(parser):
     parser.add_argument('-6', '--ipv6', action='store_true',
                         help='Generate IPv6 addresses')
     parser.add_argument('-c', '--topo-config', default=DEFAULT_TOPOLOGY_FILE,
@@ -72,11 +69,17 @@ def main():
                         help='Generate discovery service')
     parser.add_argument('--in-docker', action='store_true',
                         help='Set if running in a docker container')
-    args = parser.parse_args()
-    confgen = ConfigGenerator(
-        args.ipv6, args.output_dir, args.topo_config, args.path_policy, args.zk_config,
-        args.network, args.mininet, args.docker, args.bind_addr, args.pseg_ttl, args.cert_server,
-        args.sciond, args.path_server, args.discovery, args.in_docker)
+    return parser
+
+
+def main():
+    """
+    Main function.
+    """
+    parser = argparse.ArgumentParser()
+    add_arguments(parser)
+    args = ConfigGenArgs(parser.parse_args())
+    confgen = ConfigGenerator(args)
     confgen.generate_all()
 
 

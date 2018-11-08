@@ -15,10 +15,10 @@ from topology.go import GoGenerator as VanillaGenerator
 class GoGenerator(VanillaGenerator):
 
     def generate_ds(self):
-        for topo_id, topo in self.topo_dicts.items():
+        for topo_id, topo in self.args.topo_dicts.items():
             acl = self._build_ds_acl(topo)
             for k, v in topo.get("DiscoveryService", {}).items():
-                base = topo_id.base_dir(self.out_dir)
+                base = topo_id.base_dir(self.args.output_dir)
                 ds_conf = self._build_ds_conf(topo_id, base, k, v)
                 write_file(os.path.join(base, k, "acl"), acl)
                 write_file(os.path.join(base, k, "dsconfig.toml"), toml.dumps(ds_conf))
@@ -28,7 +28,7 @@ class GoGenerator(VanillaGenerator):
         for k, conf in topo["BorderRouters"].items():
             acl.append("%s/32" % _get_pub_ip(conf["CtrlAddr"]))
         # XXX(roosd): Allow border routers that run on the host.
-        if self.docker:
+        if self.args.docker:
             acl.append(DEFAULT_DOCKER_NETWORK)
         for svc in (
             "BeaconService",
@@ -41,8 +41,8 @@ class GoGenerator(VanillaGenerator):
         return "\n".join(acl)
 
     def _build_ds_conf(self, topo_id, base, name, conf):
-        config_dir = '/share/conf' if self.docker else os.path.join(base, name)
-        log_dir = '/share/logs' if self.docker else 'logs'
+        config_dir = '/share/conf' if self.args.docker else os.path.join(base, name)
+        log_dir = '/share/logs' if self.args.docker else 'logs'
         raw_entry = {
             'general': {
                 'ID': name,
@@ -74,32 +74,32 @@ class GoGenerator(VanillaGenerator):
 
     def _get_zk_instances(self, topo_id):
         zk = []
-        for info in self.topo_dicts[topo_id]["ZookeeperService"].values():
+        for info in self.args.topo_dicts[topo_id]["ZookeeperService"].values():
             zk.append("%s:%d" % (info["Addr"], info["L4Port"]))
         return zk
 
     def _get_laddr(self, addr):
         ip = _get_pub_ip(addr)
         # Allow DS to be reachable through port forwarding.
-        if self.docker:
+        if self.args.docker:
             ip = "0.0.0.0"
         return "%s:%s" % (ip, _get_l4_port(addr))
 
     def generate_ps(self):
-        for topo_id, topo in self.topo_dicts.items():
+        for topo_id, topo in self.args.topo_dicts.items():
             db_user = topo_id.file_fmt()
             self._generate_ps_postgres_init(topo_id, db_user)
             for k, v in topo.get("PathService", {}).items():
                 # only a single Go-PS per AS is currently supported
                 if k.endswith("-1"):
-                    base = topo_id.base_dir(self.out_dir)
+                    base = topo_id.base_dir(self.args.output_dir)
                     ps_conf = self._build_ps_conf(topo_id, topo["ISD_AS"], base, k, db_user)
                     write_file(os.path.join(base, k, "psconfig.toml"), toml.dumps(ps_conf))
 
     def _build_ps_conf(self, topo_id, ia, base, name, db_user):
-        config_dir = '/share/conf' if self.docker else os.path.join(base, name)
-        log_dir = '/share/logs' if self.docker else 'logs'
-        db_dir = '/share/cache' if self.docker else 'gen-cache'
+        config_dir = '/share/conf' if self.args.docker else os.path.join(base, name)
+        log_dir = '/share/logs' if self.args.docker else 'logs'
+        db_dir = '/share/cache' if self.args.docker else 'gen-cache'
         db_host = self._postgres_host()
         raw_entry = {
             'general': {
@@ -141,15 +141,15 @@ class GoGenerator(VanillaGenerator):
         with open('go/path_srv/postgres/schema.sql', 'r') as schema:
             sql += schema.read()
         sql += '\nGRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA "%s" TO "%s"\n' % (db_user, db_user)
-        write_file(os.path.join(self.out_dir, 'postgres', 'init', '%s.sql' % db_user), sql)
+        write_file(os.path.join(self.args.output_dir, 'postgres', 'init', '%s.sql' % db_user), sql)
 
     def _postgres_host(self):
-        if self.in_docker:
+        if self.args.in_docker:
             addr = os.getenv('DOCKER0')
             if not addr:
                 print('DOCKER0 env variable required! Exiting!')
                 sys.exit(1)
-        elif self.docker:
+        elif self.args.docker:
             addr = 'docker0'
         else:
             addr = 'localhost'
