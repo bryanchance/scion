@@ -38,6 +38,11 @@ from topology.config import (
 )
 
 
+def add_ana_args(parser):
+    parser.add_argument('-pdb', '--path-db', default='postgres',
+                        help='The path db backend for the Go-PS ("sqlite" or "postgres")')
+
+
 def add_arguments(parser):
     parser.add_argument('-6', '--ipv6', action='store_true',
                         help='Generate IPv6 addresses')
@@ -78,6 +83,7 @@ def main():
     """
     parser = argparse.ArgumentParser()
     add_arguments(parser)
+    add_ana_args(parser)
     args = ConfigGenArgs(parser.parse_args())
     confgen = ConfigGenerator(args)
     confgen.generate_all()

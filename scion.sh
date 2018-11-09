@@ -64,13 +64,17 @@ cmd_run() {
 }
 
 stop_pg() {
-    echo "Stopping postgres / deleting state..."
-    ./tools/quiet ./tools/dc postgres down
+    if [ -f "gen/postgres-dc.yml" ]; then
+        echo "Stopping postgres / deleting state..."
+        ./tools/quiet ./tools/dc postgres down
+    fi
 }
 
 run_pg() {
-    echo "Running postgres..."
-    ./tools/quiet ./tools/dc postgres up -d
+    if [ -f "gen/postgres-dc.yml" ]; then
+        echo "Running postgres..."
+        ./tools/quiet ./tools/dc postgres up -d
+    fi
 }
 
 run_zk() {
