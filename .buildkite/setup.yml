@@ -1,6 +1,6 @@
 - label: Prepare scion_base and scion images
   command:
-      - ./tools/ci/prepare_image 1a92f154e3b76b1aeffe1f87bbbf204a755fc5d35f2c98649d922710296be42c
+      - ./tools/ci/prepare_image 7a5bfcb18b9894fa56cef9a672064284ff6704ee3cfe128651275b9a5ed00fd4
       - ./docker.sh build
   concurrency: 1
   concurrency_group: "build-scion"
