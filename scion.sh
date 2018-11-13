@@ -77,6 +77,20 @@ run_pg() {
     fi
 }
 
+stop_consul() {
+    if [ -f "gen/consul-dc.yml" ]; then
+        echo "Stopping consul / deleting state..."
+        ./tools/quiet ./tools/dc consul down
+    fi
+}
+
+run_consul() {
+    if [ -f "gen/consul-dc.yml" ]; then
+        echo "Running consul..."
+        ./tools/quiet ./tools/dc consul up -d
+    fi
+}
+
 run_zk() {
     if is_docker; then
         host_zk_stop
@@ -127,6 +141,7 @@ run_setup() {
     [ $(stat -c "%U" "$sciond_dir") == "$LOGNAME" ] || { sudo -p "Fixing ownership of $sciond_dir - [sudo] password for %p: " chown $LOGNAME: "$sciond_dir"; }
     # Make sure postgres is running.
     run_pg
+    run_consul
 }
 
 cmd_stop() {
@@ -136,6 +151,7 @@ cmd_stop() {
     else
         ./tools/quiet ./supervisor/supervisor.sh stop all
     fi
+    stop_consul
     if [ "$1" = "clean" ]; then
         python/integration/set_ipv6_addr.py -d
     fi

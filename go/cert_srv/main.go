@@ -27,6 +27,8 @@ import (
 	"github.com/scionproto/scion/go/cert_srv/internal/csconfig"
 	"github.com/scionproto/scion/go/cert_srv/internal/reiss"
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/consul"
+	"github.com/scionproto/scion/go/lib/consul/consulconfig"
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/infra/infraenv"
 	"github.com/scionproto/scion/go/lib/infra/messenger"
@@ -44,6 +46,8 @@ type Config struct {
 	Infra   env.Infra
 	CS      csconfig.Conf
 	state   *csconfig.State
+
+	Consul consulconfig.Config
 }
 
 var (
@@ -51,6 +55,10 @@ var (
 	environment *env.Env
 	reissRunner *periodic.Runner
 	msgr        *messenger.Messenger
+)
+
+var (
+	ttlUpdater *periodic.Runner
 )
 
 func init() {
@@ -94,8 +102,16 @@ func realMain() int {
 	// Cleanup when the CS exits.
 	defer stop()
 	// Create a channel where prometheus can signal fatal errors
-	fatalC := make(chan error, 1)
+	fatalC := make(chan error, 2)
 	config.Metrics.StartPrometheus(fatalC)
+	// Start periodic health status setter
+	go func() {
+		defer log.LogPanicAndExit()
+		var err error
+		if ttlUpdater, err = startUpdateTTL(); err != nil {
+			fatalC <- err
+		}
+	}()
 	select {
 	case <-environment.AppShutdownSignal:
 		// Whenever we receive a SIGINT or SIGTERM we exit without an error.
@@ -165,6 +181,30 @@ func stopReissRunner() {
 	if reissRunner != nil {
 		reissRunner.Stop()
 	}
+}
+
+func startUpdateTTL() (*periodic.Runner, error) {
+	if !config.Consul.UpdateTTL {
+		return nil, nil
+	}
+	config.Consul.InitDefaults()
+	c, err := config.Consul.Client()
+	if err != nil {
+		return nil, err
+	}
+	svc := &consul.Service{
+		Type:        consul.CS,
+		Agent:       c.Agent(),
+		Logger:      log.New("part", "UpdateTTL"),
+		CheckParams: config.Consul.Health,
+		Check: func() consul.CheckInfo {
+			return consul.CheckInfo{
+				Id:     config.General.ID,
+				Status: consul.StatusPass,
+			}
+		},
+	}
+	return svc.StartUpdateTTL(config.Consul.InitConnPeriod.Duration)
 }
 
 func stop() {

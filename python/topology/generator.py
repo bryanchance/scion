@@ -41,6 +41,7 @@ from topology.config import (
 def add_ana_args(parser):
     parser.add_argument('-pdb', '--path-db', default='postgres',
                         help='The path db backend for the Go-PS ("sqlite" or "postgres")')
+    parser.add_argument('--consul', action="store_true", help='Create consul config')
 
 
 def add_arguments(parser):

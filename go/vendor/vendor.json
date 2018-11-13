@@ -45,6 +45,12 @@
 			"revisionTime": "2017-03-30T21:11:49Z"
 		},
 		{
+			"checksumSHA1": "DUX4pOK9NKSAzC6RRXniLviyByA=",
+			"path": "github.com/armon/go-metrics",
+			"revision": "f0300d1749da6fa982027e449ec0c7a145510c3c",
+			"revisionTime": "2018-09-17T15:23:33Z"
+		},
+		{
 			"checksumSHA1": "YNhwvoScUezhDwq58QMY8vUwuqg=",
 			"license": "MIT,3-BSD",
 			"path": "github.com/axw/gocov",
@@ -185,6 +191,30 @@
 			"revisionTime": "2018-04-16T20:45:19Z"
 		},
 		{
+			"checksumSHA1": "LQOVduohnld12Px2o0MfYDPI7oQ=",
+			"path": "github.com/hashicorp/consul/api",
+			"revision": "2e006415767e9d6d9a7d3e6d3e49995ca0bcb24f",
+			"revisionTime": "2018-11-12T20:58:43Z"
+		},
+		{
+			"checksumSHA1": "Ihile6rE76J6SivxECovHgMROxw=",
+			"path": "github.com/hashicorp/go-cleanhttp",
+			"revision": "e8ab9daed8d1ddd2d3c4efba338fe2eeae2e4f18",
+			"revisionTime": "2018-08-30T03:37:06Z"
+		},
+		{
+			"checksumSHA1": "mCCQqlVo0CPUr29LXH4Oe4Ww3JA=",
+			"path": "github.com/hashicorp/go-immutable-radix",
+			"revision": "27df80928bb34bb1b0d6d0e01b9e679902e7a6b5",
+			"revisionTime": "2018-08-30T03:32:45Z"
+		},
+		{
+			"checksumSHA1": "A1PcINvF3UiwHRKn8UcgARgvGRs=",
+			"path": "github.com/hashicorp/go-rootcerts",
+			"revision": "6bb64b370b90e7ef1fa532be9e591a81c3493e00",
+			"revisionTime": "2016-05-03T14:34:40Z"
+		},
+		{
 			"checksumSHA1": "UquR8kc0nKU285HwLbkievlLQz4=",
 			"path": "github.com/hashicorp/golang-lru",
 			"revision": "0fb14efe8c47ae851c0034ed7a448854d3d34cf3",
@@ -195,6 +225,12 @@
 			"path": "github.com/hashicorp/golang-lru/simplelru",
 			"revision": "0fb14efe8c47ae851c0034ed7a448854d3d34cf3",
 			"revisionTime": "2018-02-01T23:52:37Z"
+		},
+		{
+			"checksumSHA1": "0PeWsO2aI+2PgVYlYlDPKfzCLEQ=",
+			"path": "github.com/hashicorp/serf/coordinate",
+			"revision": "75714e08b2cf6cc7409a3f5a49e20293528acf69",
+			"revisionTime": "2018-10-25T21:30:09Z"
 		},
 		{
 			"checksumSHA1": "S1lxMekj2Rxqp/lA47z9UGeNHjs=",
@@ -391,6 +427,18 @@
 			"path": "github.com/matttproud/golang_protobuf_extensions/pbutil",
 			"revision": "c12348ce28de40eed0136aa2b644d0ee0650e56c",
 			"revisionTime": "2016-04-24T11:30:07Z"
+		},
+		{
+			"checksumSHA1": "a58zUNtDH/gEd6F6KI3FqT2iEo0=",
+			"path": "github.com/mitchellh/go-homedir",
+			"revision": "ae18d6b8b3205b561c79e8e5f69bff09736185f4",
+			"revisionTime": "2018-08-24T00:42:36Z"
+		},
+		{
+			"checksumSHA1": "J+g0oZePWp2zSIISD2dZZKTxmgg=",
+			"path": "github.com/mitchellh/mapstructure",
+			"revision": "3536a929edddb9a5b34bd6861dc4a9647cb459fe",
+			"revisionTime": "2018-10-05T04:51:35Z"
 		},
 		{
 			"checksumSHA1": "UxUZJQBZ6+20IuA5ngSZif28Z0g=",

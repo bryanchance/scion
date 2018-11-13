@@ -26,6 +26,8 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/consul"
+	"github.com/scionproto/scion/go/lib/consul/consulconfig"
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/infra"
 	"github.com/scionproto/scion/go/lib/infra/infraenv"
@@ -50,11 +52,17 @@ type Config struct {
 	Trust   env.Trust
 	Infra   env.Infra
 	PS      psconfig.Config
+
+	Consul consulconfig.Config
 }
 
 var (
 	config      Config
 	environment *env.Env
+)
+
+var (
+	ttlUpdater *periodic.Runner
 )
 
 func init() {
@@ -158,12 +166,20 @@ func realMain() int {
 	}
 	msger.AddHandler(infra.SegRev, handlers.NewRevocHandler(args))
 	// Create a channel where prometheus can signal fatal errors
-	fatalC := make(chan error, 1)
+	fatalC := make(chan error, 2)
 	config.Metrics.StartPrometheus(fatalC)
 	// Start handling requests/messages
 	go func() {
 		defer log.LogPanicAndExit()
 		msger.ListenAndServe()
+	}()
+	// Start periodic health status setter
+	go func() {
+		defer log.LogPanicAndExit()
+		var err error
+		if ttlUpdater, err = startUpdateTTL(); err != nil {
+			fatalC <- err
+		}
 	}()
 	cleaner := periodic.StartPeriodicTask(cleaner.New(pathDB),
 		time.NewTicker(300*time.Second), 295*time.Second)
@@ -204,4 +220,28 @@ func setup() error {
 	environment = infraenv.InitInfraEnvironment(config.General.TopologyPath)
 	config.PS.InitDefaults()
 	return nil
+}
+
+func startUpdateTTL() (*periodic.Runner, error) {
+	if !config.Consul.UpdateTTL {
+		return nil, nil
+	}
+	config.Consul.InitDefaults()
+	c, err := config.Consul.Client()
+	if err != nil {
+		return nil, err
+	}
+	svc := &consul.Service{
+		Type:        consul.PS,
+		Agent:       c.Agent(),
+		Logger:      log.New("part", "UpdateTTL"),
+		CheckParams: config.Consul.Health,
+		Check: func() consul.CheckInfo {
+			return consul.CheckInfo{
+				Id:     config.General.ID,
+				Status: consul.StatusPass,
+			}
+		},
+	}
+	return svc.StartUpdateTTL(config.Consul.InitConnPeriod.Duration)
 }

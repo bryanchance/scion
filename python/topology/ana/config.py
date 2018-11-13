@@ -1,6 +1,11 @@
 # Copyright 2018 Anapaya Systems
 
+# StdLib
+import logging
+import sys
+
 # SCION
+from topology.ana.consul import ConsulGenArgs, ConsulGenerator
 from topology.ana.docker import DockerGenerator
 from topology.ana.go import GoGenerator
 from topology.ana.postgres import PostgresGenArgs, PostgresGenerator
@@ -10,9 +15,16 @@ from topology.config import ConfigGenerator as VanillaGenerator
 
 class ConfigGenerator(VanillaGenerator):
 
+    def __init__(self, args):
+        super().__init__(args)
+        if self.args.consul and self.args.docker:
+            logging.critical("Currently cannot use consul with docker!")
+            sys.exit(1)
+
     def _generate_with_topo(self, topo_dicts):
         super()._generate_with_topo(topo_dicts)
         self._generate_postgres(topo_dicts)
+        self._generate_consul(topo_dicts)
 
     def _generate_go(self, topo_dicts):
         args = self._go_args(topo_dicts)
@@ -43,3 +55,7 @@ class ConfigGenerator(VanillaGenerator):
         args = self._postgres_args(topo_dicts)
         pg_gen = PostgresGenerator(args)
         pg_gen.generate()
+
+    def _generate_consul(self, topo_dicts):
+        consul_gen = ConsulGenerator(ConsulGenArgs(self.args, topo_dicts))
+        consul_gen.generate()

@@ -19,6 +19,10 @@ cmd_help() {
 	Usage:
 	    $PROGRAM scion [docker-compose command]
 	        Run docker-compose command for scion services.
+	    $PROGRAM postgres [docker-compose command]
+	        Run docker-compose command for postgres services.
+	    $PROGRAM consul [docker-compose command]
+	        Run docker-compose command for consul services.
 	    $PROGRAM tester [docker-compose command]
 	        Run docker-compose command for tester services.
 	_EOF
@@ -49,14 +53,20 @@ cmd_postgres() {
     COMPOSE_FILE="gen/postgres-dc.yml" docker-compose -p postgres --no-ansi "$@"
 }
 
+cmd_consul() {
+    COMPOSE_FILE="gen/consul-dc.yml" docker-compose -p consul --no-ansi "$@"
+}
+
 PROGRAM="${0##*/}"
 COMMAND="$1"
 shift
 
 case "$COMMAND" in
-	scion|tester|postgres)
+	scion|tester)
 	    "cmd_$COMMAND" "$@" ;;
 	exec_tester)
 		"exec_tester" "$@" ;;
+	postgres|consul)
+	    "cmd_$COMMAND" "$@" ;;
 	*)  cmd_help; exit 1 ;;
 esac
