@@ -172,6 +172,10 @@ func (sr *SignedRevInfo) RevInfo() (*RevInfo, error) {
 	return sr.revInfo, err
 }
 
+func (sr *SignedRevInfo) Pack() (common.RawBytes, error) {
+	return proto.PackRoot(sr)
+}
+
 func (sr *SignedRevInfo) String() string {
 	return fmt.Sprintf("SignedRevInfo: %s %s", sr.Blob, sr.Sign)
 }

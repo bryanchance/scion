@@ -16,7 +16,7 @@
 . integration/common.sh
 
 GO_INFRA_TEST="go test -tags infrarunning"
-for i in ./go/lib/{snet,pathmgr,infra/disp,pathdb/postgres}; do
+for i in ./go/lib/{snet,pathmgr,infra/disp,pathdb/postgres,revcache/pgrevcache}; do
     run "Go Infra: $i" ${GO_INFRA_TEST} $i
     result=$((result+$?))
 done

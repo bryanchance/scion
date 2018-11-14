@@ -25,6 +25,7 @@ import (
 	sqlitepathdb "github.com/scionproto/scion/go/lib/pathdb/sqlite"
 	"github.com/scionproto/scion/go/lib/revcache"
 	"github.com/scionproto/scion/go/lib/revcache/memrevcache"
+	"github.com/scionproto/scion/go/lib/revcache/pgrevcache"
 )
 
 type Backend string
@@ -91,7 +92,7 @@ func sameBackend(pdbConf PathDBConf, rcConf RevCacheConf) bool {
 func newCombinedBackend(pdbConf PathDBConf,
 	rcConf RevCacheConf) (pathdb.PathDB, revcache.RevCache, error) {
 
-	panic("Combined backend not supported")
+	return buildCombinedBackend(pdbConf, rcConf)
 }
 
 func newPathDB(conf PathDBConf) (pathdb.PathDB, error) {
@@ -111,6 +112,8 @@ func newRevCache(conf RevCacheConf) (revcache.RevCache, error) {
 	switch conf.Backend {
 	case BackendMem:
 		return memrevcache.New(cache.NoExpiration, time.Second), nil
+	case BackendPostgres:
+		return pgrevcache.New(conf.Connection)
 	case BackendNone:
 		return nil, nil
 	default:

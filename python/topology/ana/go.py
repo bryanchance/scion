@@ -107,19 +107,24 @@ class GoGenerator(VanillaGenerator):
             'Connection': 'host=%s user=%s password=password' % (db_host, db_user) +
                           ' sslmode=disable dbname=pathdb',
         }
+        raw_entry['ps']['RevCache'] = {
+            'Backend': 'postgres',
+        }
         return raw_entry
 
     def _generate_ps_postgres_init(self, topo_id):
         if self.args.path_db != 'postgres':
             return
         db_user = self._postgres_db_user(topo_id)
+        schema_name = db_user
         sql = 'CREATE USER "%s" WITH PASSWORD \'password\';\n' % db_user
-        sql += 'ALTER ROLE "%s" SET search_path TO "$user";\n' % db_user
-        sql += 'CREATE SCHEMA AUTHORIZATION "%s";\n' % db_user
-        sql += 'SET search_path TO "%s";\n' % db_user
+        sql += 'ALTER ROLE "%s" SET search_path TO "%s";\n' % (db_user, schema_name)
+        sql += 'CREATE SCHEMA "%s" AUTHORIZATION "%s";\n' % (schema_name, db_user)
+        sql += 'SET search_path TO "%s";\n' % schema_name
         with open('go/path_srv/postgres/schema.sql', 'r') as schema:
             sql += schema.read()
-        sql += '\nGRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA "%s" TO "%s"\n' % (db_user, db_user)
+        sql += '\nGRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA "%s" TO "%s";\n' % (schema_name,
+                                                                                   db_user)
         write_file(os.path.join(self.args.output_dir, 'postgres', 'init', '%s.sql' % db_user), sql)
 
     def _postgres_db_user(self, topo_id):
