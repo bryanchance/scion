@@ -125,7 +125,7 @@ func main() {
 	}()
 	// Spawn ingress Dispatcher.
 	if err := ingress.Init(tunIO); err != nil {
-		fatal("Unable to spawn ingress dispatcher", "err", err)
+		fatal("Ingress dispatcher error", "err", err)
 	}
 }
 

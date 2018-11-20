@@ -32,10 +32,10 @@ import (
 	"github.com/scionproto/scion/go/lib/infra/modules/cleaner"
 	"github.com/scionproto/scion/go/lib/infra/modules/itopo"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust"
-	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/pathstorage"
 	"github.com/scionproto/scion/go/lib/periodic"
+	"github.com/scionproto/scion/go/lib/truststorage"
 	"github.com/scionproto/scion/go/proto"
 	"github.com/scionproto/scion/go/sciond/internal/fetcher"
 	"github.com/scionproto/scion/go/sciond/internal/sdconfig"
@@ -50,7 +50,7 @@ type Config struct {
 	General env.General
 	Logging env.Logging
 	Metrics env.Metrics
-	Trust   env.Trust
+	TrustDB truststorage.TrustDBConf
 	SD      sdconfig.Config
 }
 
@@ -87,7 +87,7 @@ func realMain() int {
 		log.Crit("Unable to initialize path storage", "err", err)
 		return 1
 	}
-	trustDB, err := trustdb.New(config.Trust.TrustDB)
+	trustDB, err := config.TrustDB.New()
 	if err != nil {
 		log.Crit("Unable to initialize trustDB", "err", err)
 		return 1
@@ -139,7 +139,7 @@ func realMain() int {
 	// Create a channel where server goroutines can signal fatal errors
 	fatalC := make(chan error, 3)
 	cleaner := periodic.StartPeriodicTask(cleaner.New(pathDB),
-		time.NewTicker(300*time.Second), 295*time.Second)
+		periodic.NewTicker(300*time.Second), 295*time.Second)
 	defer cleaner.Stop()
 	// Start servers
 	rsockServer, shutdownF := NewServer("rsock", config.SD.Reliable, handlers, log.Root())

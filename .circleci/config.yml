@@ -22,7 +22,7 @@ jobs:
             - checkout
             - run:
                 name: Update docker
-                command: ./tools/ci/docker_update
+                command: sudo apt-get update && sudo ./tools/install_docker
             - run:
                 name: Docker login
                 command: docker login -u aopsacct -p $DOCKERHUB_PASSWORD
@@ -94,7 +94,7 @@ jobs:
             - checkout
             - run:
                 name: Update docker
-                command: ./tools/ci/docker_update
+                command: sudo apt-get update && sudo ./tools/install_docker
             - run:
                 name: Build base
                 command: ./docker.sh base

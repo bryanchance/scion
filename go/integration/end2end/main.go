@@ -125,9 +125,7 @@ func (c client) run() int {
 		integration.LogFatal("Unable to listen", "err", err)
 	}
 	log.Debug("Send on", "local", c.conn.LocalAddr())
-	if c.sdConn, err = snet.DefNetwork.Sciond().Connect(); err != nil {
-		integration.LogFatal("Unable to connect to SCIOND", "err", err)
-	}
+	c.sdConn = snet.DefNetwork.Sciond()
 	return integration.AttemptRepeatedly("End2End", c.attemptRequest)
 }
 
@@ -162,7 +160,7 @@ func (c client) getRemote(n int) error {
 	// Get paths from sciond
 	ctx, cancelF := context.WithTimeout(context.Background(), libint.CtxTimeout)
 	defer cancelF()
-	paths, err := c.sdConn.PathsCtx(ctx, remote.IA, integration.Local.IA, 1,
+	paths, err := c.sdConn.Paths(ctx, remote.IA, integration.Local.IA, 1,
 		sciond.PathReqFlags{Refresh: n != 0})
 	if err != nil {
 		return err

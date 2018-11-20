@@ -3,8 +3,6 @@
 package main
 
 import (
-	"time"
-
 	"github.com/BurntSushi/toml"
 
 	"github.com/scionproto/scion/go/discovery/acl"
@@ -109,7 +107,7 @@ func startDynUpdater(config *Config) {
 			Instances: config.DS.Zoo.Instances,
 			Timeout:   config.DS.Zoo.Timeout.Duration,
 		},
-		time.NewTicker(config.DS.Zoo.QueryInterval.Duration),
+		periodic.NewTicker(config.DS.Zoo.QueryInterval.Duration),
 		config.DS.Zoo.Timeout.Duration,
 	)
 }

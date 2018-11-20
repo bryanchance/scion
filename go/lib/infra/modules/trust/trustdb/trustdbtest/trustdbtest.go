@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package trustdb
+package trustdbtest
 
 import (
 	"context"
@@ -22,6 +22,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/scionproto/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb"
 	"github.com/scionproto/scion/go/lib/scrypto"
 	"github.com/scionproto/scion/go/lib/scrypto/cert"
 	"github.com/scionproto/scion/go/lib/scrypto/trc"
@@ -29,17 +30,37 @@ import (
 )
 
 var (
-	ctxTimeout = time.Second
+	Timeout = time.Second
 )
 
-func TestTRC(t *testing.T) {
-	Convey("Initialize DB and load TRC", t, func() {
-		db := newDatabase(t)
-		defer db.Close()
-		ctx, cancelF := context.WithTimeout(context.Background(), ctxTimeout)
+// TestTrustDB should be used to test any implementation of the TrustDB interface.
+// An implementation of the TrustDB interface should at least have on test method that calls
+// this test-suite. The calling test code should have a top level Convey block.
+//
+// setup should return a TrustDB in a clean state, i.e. no entries in the DB.
+// cleanup can be used to release any resources that have been allocated during setup.
+func TestTrustDB(t *testing.T, setup func() trustdb.TrustDB, cleanup func(trustdb.TrustDB)) {
+	testWrapper := func(test func(*testing.T, trustdb.TrustDB)) func() {
+		return func() {
+			db := setup()
+			test(t, db)
+			cleanup(db)
+		}
+	}
+	Convey("TestTRC", testWrapper(testTRC))
+	Convey("TestTRCGetAll", testWrapper(testTRCGetAll))
+	Convey("TestIssCert", testWrapper(testIssCert))
+	Convey("TestLeafCert", testWrapper(testLeafCert))
+	Convey("TestChain", testWrapper(testChain))
+	Convey("TestChainGetAll", testWrapper(testChainGetAll))
+}
+
+func testTRC(t *testing.T, db trustdb.TrustDB) {
+	Convey("Initialize DB and load TRC", func() {
+		ctx, cancelF := context.WithTimeout(context.Background(), Timeout)
 		defer cancelF()
 
-		trcobj, err := trc.TRCFromFile("testdata/ISD1-V1.trc", false)
+		trcobj, err := trc.TRCFromFile("../trustdbtest/testdata/ISD1-V1.trc", false)
 		SoMsg("err trc", err, ShouldBeNil)
 		SoMsg("trc", trcobj, ShouldNotBeNil)
 		Convey("Insert into database", func() {
@@ -79,10 +100,8 @@ func TestTRC(t *testing.T) {
 	})
 }
 
-func TestTRCGetAll(t *testing.T) {
-	Convey("Test get all TRCs", t, func() {
-		db := newDatabase(t)
-		defer db.Close()
+func testTRCGetAll(t *testing.T, db trustdb.TrustDB) {
+	Convey("Test get all TRCs", func() {
 		ctx, cancelF := context.WithTimeout(context.Background(), time.Second)
 		defer cancelF()
 		Convey("GetAllTRCs on empty DB does not fail and returns nil", func() {
@@ -106,22 +125,22 @@ func TestTRCGetAll(t *testing.T) {
 	})
 }
 
-func insertTRCFromFile(t *testing.T, ctx context.Context, fName string, db *DB) *trc.TRC {
-	trcobj, err := trc.TRCFromFile(fName, false)
+func insertTRCFromFile(t *testing.T, ctx context.Context,
+	fName string, db trustdb.TrustDB) *trc.TRC {
+
+	trcobj, err := trc.TRCFromFile("../trustdbtest/"+fName, false)
 	xtest.FailOnErr(t, err)
 	_, err = db.InsertTRC(ctx, trcobj)
 	xtest.FailOnErr(t, err)
 	return trcobj
 }
 
-func TestIssCert(t *testing.T) {
-	Convey("Initialize DB and load issuer Cert", t, func() {
-		db := newDatabase(t)
-		defer db.Close()
-		ctx, cancelF := context.WithTimeout(context.Background(), ctxTimeout)
+func testIssCert(t *testing.T, db trustdb.TrustDB) {
+	Convey("Initialize DB and load issuer Cert", func() {
+		ctx, cancelF := context.WithTimeout(context.Background(), Timeout)
 		defer cancelF()
 
-		chain, err := cert.ChainFromFile("testdata/ISD1-ASff00_0_311-V1.crt", false)
+		chain, err := cert.ChainFromFile("../trustdbtest/testdata/ISD1-ASff00_0_311-V1.crt", false)
 		if err != nil {
 			t.Fatalf("Unable to load certificate chain")
 		}
@@ -165,14 +184,12 @@ func TestIssCert(t *testing.T) {
 	})
 }
 
-func TestLeafCert(t *testing.T) {
-	Convey("Initialize DB and load leaf Cert", t, func() {
-		db := newDatabase(t)
-		defer db.Close()
-		ctx, cancelF := context.WithTimeout(context.Background(), ctxTimeout)
+func testLeafCert(t *testing.T, db trustdb.TrustDB) {
+	Convey("Initialize DB and load leaf Cert", func() {
+		ctx, cancelF := context.WithTimeout(context.Background(), Timeout)
 		defer cancelF()
 
-		chain, err := cert.ChainFromFile("testdata/ISD1-ASff00_0_311-V1.crt", false)
+		chain, err := cert.ChainFromFile("../trustdbtest/testdata/ISD1-ASff00_0_311-V1.crt", false)
 		if err != nil {
 			t.Fatalf("Unable to load certificate chain")
 		}
@@ -216,14 +233,12 @@ func TestLeafCert(t *testing.T) {
 	})
 }
 
-func TestChain(t *testing.T) {
-	Convey("Initialize DB and load Chain", t, func() {
-		db := newDatabase(t)
-		defer db.Close()
-		ctx, cancelF := context.WithTimeout(context.Background(), ctxTimeout)
+func testChain(t *testing.T, db trustdb.TrustDB) {
+	Convey("Initialize DB and load Chain", func() {
+		ctx, cancelF := context.WithTimeout(context.Background(), Timeout)
 		defer cancelF()
 
-		chain, err := cert.ChainFromFile("testdata/ISD1-ASff00_0_311-V1.crt", false)
+		chain, err := cert.ChainFromFile("../trustdbtest/testdata/ISD1-ASff00_0_311-V1.crt", false)
 		xtest.FailOnErr(t, err)
 		ia := addr.IA{I: 1, A: 0xff0000000311}
 		Convey("Insert into database", func() {
@@ -262,10 +277,8 @@ func TestChain(t *testing.T) {
 	})
 }
 
-func TestChainGetAll(t *testing.T) {
-	Convey("Test get all chains", t, func() {
-		db := newDatabase(t)
-		defer db.Close()
+func testChainGetAll(t *testing.T, db trustdb.TrustDB) {
+	Convey("Test get all chains", func() {
 		ctx, cancelF := context.WithTimeout(context.Background(), time.Second)
 		defer cancelF()
 		Convey("GetAllChains on empty DB does not fails and return nil", func() {
@@ -289,16 +302,12 @@ func TestChainGetAll(t *testing.T) {
 	})
 }
 
-func insertChainFromFile(t *testing.T, ctx context.Context, fName string, db *DB) *cert.Chain {
-	chain, err := cert.ChainFromFile(fName, false)
+func insertChainFromFile(t *testing.T, ctx context.Context,
+	fName string, db trustdb.TrustDB) *cert.Chain {
+
+	chain, err := cert.ChainFromFile("../trustdbtest/"+fName, false)
 	xtest.FailOnErr(t, err)
 	_, err = db.InsertChain(ctx, chain)
 	xtest.FailOnErr(t, err)
 	return chain
-}
-
-func newDatabase(t *testing.T) *DB {
-	db, err := New(":memory:")
-	xtest.FailOnErr(t, err)
-	return db
 }

@@ -1,4 +1,5 @@
 // Copyright 2017 ETH Zurich
+// Copyright 2018 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,7 +53,7 @@ var (
 var (
 	IA       addr.IA
 	Host     addr.HostAddr
-	PathMgr  *pathmgr.PR
+	PathMgr  pathmgr.Resolver
 	CtrlConn snet.Conn
 	MgmtAddr *mgmt.Addr
 )
@@ -75,13 +76,15 @@ func Init(ia addr.IA, ip net.IP) error {
 	MgmtAddr = mgmt.NewAddr(Host, uint16(*CtrlPort), uint16(*EncapPort))
 
 	// Initialize custom network context.
-	timers := &pathmgr.Timers{
+	timers := pathmgr.Timers{
 		NormalRefire: 10 * time.Second,
 	}
-	sd := sciond.NewService(*sciondPath)
-	if PathMgr, err = pathmgr.New(sd, timers, log.Root()); err != nil {
-		return common.NewBasicError("Error creating path manager", err)
+	sd := sciond.NewService(*sciondPath, true)
+	connector, err := sd.Connect()
+	if err != nil {
+		return common.NewBasicError("Error connecting to SCIOND", err)
 	}
+	PathMgr = pathmgr.New(connector, timers, log.Root())
 	network := snet.NewNetworkWithPR(ia, *dispatcherPath, PathMgr)
 	// Initialize SCION local networking module
 	err = initSNET(network, initAttempts, initInterval)
@@ -89,8 +92,8 @@ func Init(ia addr.IA, ip net.IP) error {
 		return common.NewBasicError("Error initializing SCION Network module", err)
 	}
 	l4 := addr.NewL4UDPInfo(uint16(*CtrlPort))
-	CtrlConn, err = snet.ListenSCION(
-		"udp4", &snet.Addr{IA: IA, Host: &addr.AppAddr{L3: Host, L4: l4}})
+	CtrlConn, err = snet.ListenSCIONWithBindSVC("udp4",
+		&snet.Addr{IA: IA, Host: &addr.AppAddr{L3: Host, L4: l4}}, nil, addr.SvcSIG)
 	if err != nil {
 		return common.NewBasicError("Error creating ctrl socket", err)
 	}

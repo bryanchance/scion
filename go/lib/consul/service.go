@@ -51,7 +51,7 @@ func (s *Service) StartUpdateTTL(connPeriod time.Duration) (*periodic.Runner, er
 	if err != nil {
 		return nil, err
 	}
-	r := periodic.StartPeriodicTask(t, time.NewTicker(s.CheckParams.Interval.Duration),
+	r := periodic.StartPeriodicTask(t, periodic.NewTicker(s.CheckParams.Interval.Duration),
 		s.CheckParams.Timeout.Duration)
 	return r, nil
 }

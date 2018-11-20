@@ -34,10 +34,10 @@ import (
 	"github.com/scionproto/scion/go/lib/infra/modules/cleaner"
 	"github.com/scionproto/scion/go/lib/infra/modules/itopo"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust"
-	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/pathstorage"
 	"github.com/scionproto/scion/go/lib/periodic"
+	"github.com/scionproto/scion/go/lib/truststorage"
 	"github.com/scionproto/scion/go/path_srv/internal/cryptosyncer"
 	"github.com/scionproto/scion/go/path_srv/internal/handlers"
 	"github.com/scionproto/scion/go/path_srv/internal/psconfig"
@@ -49,7 +49,7 @@ type Config struct {
 	General env.General
 	Logging env.Logging
 	Metrics env.Metrics
-	Trust   env.Trust
+	TrustDB truststorage.TrustDBConf
 	Infra   env.Infra
 	PS      psconfig.Config
 
@@ -94,7 +94,7 @@ func realMain() int {
 		log.Crit("Unable to initialize path storage", "err", err)
 		return 1
 	}
-	trustDB, err := trustdb.New(config.Trust.TrustDB)
+	trustDB, err := config.TrustDB.New()
 	if err != nil {
 		log.Crit("Unable to initialize trustDB", "err", err)
 		return 1
@@ -182,13 +182,13 @@ func realMain() int {
 		}
 	}()
 	cleaner := periodic.StartPeriodicTask(cleaner.New(pathDB),
-		time.NewTicker(300*time.Second), 295*time.Second)
+		periodic.NewTicker(300*time.Second), 295*time.Second)
 	defer cleaner.Stop()
 	cryptosyncer := periodic.StartPeriodicTask(&cryptosyncer.Syncer{
 		DB:    trustDB,
 		Msger: msger,
 		IA:    topo.ISD_AS,
-	}, time.NewTicker(30*time.Second), 30*time.Second)
+	}, periodic.NewTicker(30*time.Second), 30*time.Second)
 	defer cryptosyncer.Stop()
 	select {
 	case <-environment.AppShutdownSignal:
