@@ -4,7 +4,6 @@
 package quagga
 
 import (
-	"flag"
 	"net"
 	"sync"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/sig/base"
+	"github.com/scionproto/scion/go/sig/internal/sigconfig"
 	"github.com/scionproto/scion/go/sig/sigcmn"
 )
 
@@ -23,21 +23,19 @@ const (
 )
 
 var (
-	cli          *zebra.Client
-	lock         sync.Mutex
-	exportRoutes = flag.Bool("exportRoutes", false, "Whether to export SIG routes to Zebra")
-	zservApi     = flag.String("zservApi", "/var/run/quagga/zserv.api", "Path to the zserv socket")
+	cli  *zebra.Client
+	lock sync.Mutex
 )
 
-func Init() error {
-	if !*exportRoutes {
+func Init(cfg sigconfig.Conf) error {
+	if !cfg.ExportRoutes {
 		return nil
 	}
 	if cli != nil {
 		return common.NewBasicError("Quagga exporter can only be initialized once", nil)
 	}
 	var err error
-	cli, err = zebra.NewClient("unix", *zservApi, sigRouteType, zebraAPIVersion)
+	cli, err = zebra.NewClient("unix", cfg.ZServApi, sigRouteType, zebraAPIVersion)
 	if err != nil {
 		return err
 	}
@@ -51,7 +49,7 @@ func Init() error {
 		defer log.LogPanicAndExit()
 		drain()
 	}()
-	log.Info("Quagga exporter initialized", "socket", *zservApi)
+	log.Info("Quagga exporter initialized", "socket", cfg.ZServApi)
 	return nil
 }
 

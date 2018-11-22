@@ -20,7 +20,7 @@ var (
 	TotalACLCheckTime      *prometheus.CounterVec
 	TotalTopoLoads         *prometheus.CounterVec
 	TotalZkUpdateTime      prometheus.Counter
-	ZKLastUpdate           prometheus.Counter
+	ZKLastUpdate           prometheus.Gauge
 	TotalZkUpdates         *prometheus.CounterVec
 	TotalServiceUpdates    *prometheus.CounterVec
 	TotalDynamicUpdateTime prometheus.Counter
@@ -33,14 +33,13 @@ func Init(elem string) {
 	loadLabels := []string{"result"}
 
 	newC := func(name, help string) prometheus.Counter {
-		v := prom.NewCounter(namespace, "", name, help, constLabels)
-		prometheus.MustRegister(v)
-		return v
+		return prom.NewCounter(namespace, "", name, help, constLabels)
 	}
 	newCVec := func(name, help string, lNames []string) *prometheus.CounterVec {
-		v := prom.NewCounterVec(namespace, "", name, help, constLabels, lNames)
-		prometheus.MustRegister(v)
-		return v
+		return prom.NewCounterVec(namespace, "", name, help, constLabels, lNames)
+	}
+	newG := func(name, help string) prometheus.Gauge {
+		return prom.NewGauge(namespace, "", name, help, constLabels)
 	}
 	// Global counters used by both the static and the dynamic part
 	TotalRequests = newCVec("total_requests", "Number of requests served", reqLabels)
@@ -64,7 +63,7 @@ func Init(elem string) {
 	// Metrics used only by the dynamic part
 	TotalZkUpdateTime = newC("total_zookeeper_update_time",
 		"Total amount of time spent on getting updates from Zookeeper")
-	ZKLastUpdate = newC("zookeeper_last_update", "Time of last successful update from Zookeeper")
+	ZKLastUpdate = newG("zookeeper_last_update", "Time of last successful update from Zookeeper")
 	TotalZkUpdates = newCVec("total_zookeeper_updates",
 		"Total number of (attempted) updates from zookeeper", loadLabels)
 	TotalServiceUpdates = newCVec("total_service_updates",

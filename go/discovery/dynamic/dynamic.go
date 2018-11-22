@@ -111,7 +111,7 @@ func UpdateFromZK(zks []string, ia addr.IA, sessionTimeout time.Duration) {
 
 	// We only want to update these if the update was successful, so the Out
 	// label has to be below
-	metrics.ZKLastUpdate.Set(float64(time.Now().Unix()))
+	metrics.ZKLastUpdate.SetToCurrentTime()
 	metrics.TotalDynamicUpdateTime.Add(float64(time.Since(start).Seconds()))
 
 Out:
