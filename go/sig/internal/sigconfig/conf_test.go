@@ -39,7 +39,7 @@ func TestSample(t *testing.T) {
 		var cfg TestConfig
 		// Set to wrong string to make sure value from file is taken.
 		cfg.Sig.Dispatcher = "wrong one"
-		cfg.Sig.ExportRoutes = true
+		cfg.Sig.Quagga.ExportRoutes = true
 		_, err := toml.Decode(Sample, &cfg)
 		SoMsg("err", err, ShouldBeNil)
 
@@ -54,8 +54,8 @@ func TestSample(t *testing.T) {
 		SoMsg("Tun correct", cfg.Sig.Tun, ShouldEqual, "sig")
 		SoMsg("TunRTableId correct", cfg.Sig.TunRTableId, ShouldEqual, DefaultTunRTableId)
 
-		SoMsg("ExportRoutes correct", cfg.Sig.ExportRoutes, ShouldBeFalse)
-		SoMsg("ZServApi correct", cfg.Sig.ZServApi, ShouldEqual, DefaultZServApi)
+		SoMsg("ExportRoutes correct", cfg.Sig.Quagga.ExportRoutes, ShouldBeFalse)
+		SoMsg("ZServApi correct", cfg.Sig.Quagga.ZServApi, ShouldEqual, DefaultZServApi)
 
 		// Sciond values
 		SoMsg("SCIOND Path correct", cfg.Sciond.Path, ShouldEqual, sciond.DefaultSCIONDPath)

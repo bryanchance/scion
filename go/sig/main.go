@@ -201,7 +201,7 @@ func setup() error {
 	egress.Init()
 	disp.Init(sigcmn.CtrlConn)
 	// Initialize Quagga exporter
-	if err := quagga.Init(cfg.Sig); err != nil {
+	if err := quagga.Init(cfg.Sig.Quagga); err != nil {
 		return common.NewBasicError("Unable to initalize Quagga Exporter", err)
 	}
 	// Parse sig config

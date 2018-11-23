@@ -27,7 +27,7 @@ var (
 	lock sync.Mutex
 )
 
-func Init(cfg sigconfig.Conf) error {
+func Init(cfg sigconfig.Quagga) error {
 	if !cfg.ExportRoutes {
 		return nil
 	}

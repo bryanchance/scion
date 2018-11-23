@@ -43,6 +43,7 @@ const Sample = `
   # Id of the routing table (default 11)
   TunRTableId = 11
 
+[sig.Quagga]
   # Whether to export SIG routes to Zebra. (default false)
   ExportRoutes = false
 

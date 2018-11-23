@@ -49,10 +49,8 @@ type Conf struct {
 	Tun string
 	// TunRTableId the id of the routing table used in the SIG. (default DefaultTunRTableId)
 	TunRTableId int
-	// ExportRoutes, whether to export SIG routes to Zebra. (default false)
-	ExportRoutes bool
-	// ZServApi the path to the zserv socket. (default DefaultZServApi)
-	ZServApi string
+	// Quagga is the quagga configuration.
+	Quagga Quagga
 }
 
 // Validate validate the config and returns an error if a value is not valid.
@@ -89,6 +87,19 @@ func (c *Conf) InitDefaults() {
 	if c.TunRTableId == 0 {
 		c.TunRTableId = DefaultTunRTableId
 	}
+	c.Quagga.InitDefaults()
+}
+
+// Quagga is the configuration for the Quagga module.
+type Quagga struct {
+	// ExportRoutes, whether to export SIG routes to Zebra. (default false)
+	ExportRoutes bool
+	// ZServApi the path to the zserv socket. (default DefaultZServApi)
+	ZServApi string
+}
+
+// InitDefaults sets the default values to unset values.
+func (c *Quagga) InitDefaults() {
 	if c.ZServApi == "" {
 		c.ZServApi = DefaultZServApi
 	}
