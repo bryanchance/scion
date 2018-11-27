@@ -5,7 +5,7 @@ import copy
 import os
 
 # SCION
-from topology.common import _get_l4_port, _get_pub
+from topology.common import get_l4_port, _get_pub
 from topology.docker import DockerGenerator as VanillaGenerator
 
 
@@ -36,6 +36,6 @@ class DockerGenerator(VanillaGenerator):
             entry['container_name'] = k
             entry['volumes'].append('%s:/share/conf:ro' % os.path.join(base, k))
             ip = _get_pub(v['Addrs'])["Public"]["Addr"].ip
-            port = _get_l4_port(v['Addrs'])
+            port = get_l4_port(v['Addrs'])
             entry['ports'] = ['%s:%d:%d' % (ip, port, port)]
             self.dc_conf['services'][k] = entry

@@ -7,7 +7,7 @@ import toml
 import yaml
 
 from lib.util import write_file
-from topology.common import _get_pub_ip, ArgsTopoDicts, _get_l4_port
+from topology.common import get_l4_port, get_pub_ip, ArgsTopoDicts
 
 CLIENT_DIR = 'consul'
 SERVER_DIR = 'consul_server'
@@ -80,7 +80,7 @@ class ConsulGenerator(object):
     def _generate_client_config(self, topo_id, topo, base):
         # Only one agent is created per AS in the test topology.
         for k, v in topo.get("CertificateService", {}).items():
-            ip = str(_get_pub_ip(v['Addrs']))
+            ip = str(get_pub_ip(v['Addrs']))
             break
         self._generate_client_general(topo_id, base, ip)
         self._generate_client_services(topo_id, topo, base, ip)
@@ -134,8 +134,8 @@ class ConsulGenerator(object):
             'services': [{
                 'name': '%s/%s' % (topo_id, svc),
                 'id': elem_id,
-                'address': str(_get_pub_ip(v['Addrs'])),
-                'port': _get_l4_port(v['Addrs']),
+                'address': str(get_pub_ip(v['Addrs'])),
+                'port': get_l4_port(v['Addrs']),
                 'checks': checks,
             }]
         }

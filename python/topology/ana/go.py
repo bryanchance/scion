@@ -7,7 +7,7 @@ import toml
 
 # SCION
 from lib.util import write_file
-from topology.common import _get_l4_port, _get_pub_ip
+from topology.common import get_l4_port, get_pub_ip
 from topology.docker import DEFAULT_DOCKER_NETWORK
 from topology.go import GoGenerator as VanillaGenerator
 
@@ -26,7 +26,7 @@ class GoGenerator(VanillaGenerator):
     def _build_ds_acl(self, topo):
         acl = []
         for k, conf in topo["BorderRouters"].items():
-            acl.append("%s/32" % _get_pub_ip(conf["CtrlAddr"]))
+            acl.append("%s/32" % get_pub_ip(conf["CtrlAddr"]))
         # XXX(roosd): Allow border routers that run on the host.
         if self.args.docker:
             acl.append(DEFAULT_DOCKER_NETWORK)
@@ -37,7 +37,7 @@ class GoGenerator(VanillaGenerator):
             "PathService",
         ):
             for k, conf in topo[svc].items():
-                acl.append("%s/32" % _get_pub_ip(conf["Addrs"]))
+                acl.append("%s/32" % get_pub_ip(conf["Addrs"]))
         return "\n".join(acl)
 
     def _build_ds_conf(self, topo_id, base, name, conf):
@@ -79,11 +79,11 @@ class GoGenerator(VanillaGenerator):
         return zk
 
     def _get_laddr(self, addr):
-        ip = _get_pub_ip(addr)
+        ip = get_pub_ip(addr)
         # Allow DS to be reachable through port forwarding.
         if self.args.docker:
             ip = "0.0.0.0"
-        return "%s:%s" % (ip, _get_l4_port(addr))
+        return "%s:%s" % (ip, get_l4_port(addr))
 
     def generate_ps(self):
         for topo_id, topo in self.args.topo_dicts.items():
