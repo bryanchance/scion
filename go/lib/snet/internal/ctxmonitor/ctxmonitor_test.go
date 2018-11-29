@@ -27,6 +27,7 @@ import (
 
 const (
 	sleepForCallback = 10 * time.Millisecond
+	maxWaitTime      = time.Second
 )
 
 func TestMonitor(t *testing.T) {
@@ -46,9 +47,10 @@ func TestMonitor(t *testing.T) {
 			So(m.Count(), ShouldEqual, 2)
 		})
 		Convey("Add one context, wait for it to expire, count is 0", func() {
-			m.WithTimeout(context.Background(), time.Millisecond)
-			time.Sleep(5 * time.Millisecond)
+			ctx, cancelF := m.WithTimeout(context.Background(), time.Millisecond)
+			xtest.AssertReadReturnsBefore(t, ctx.Done(), maxWaitTime)
 			So(m.Count(), ShouldEqual, 0)
+			cancelF()
 		})
 		Convey("Add one context, cancel it, count is 0", func() {
 			_, cancelF := m.WithTimeout(context.Background(), time.Millisecond)
@@ -58,7 +60,7 @@ func TestMonitor(t *testing.T) {
 		Convey("Add one context, wait for parent to expire, count is 0", func() {
 			parent, cancelF := context.WithTimeout(context.Background(), time.Microsecond)
 			m.WithTimeout(parent, time.Second)
-			time.Sleep(5 * time.Millisecond)
+			xtest.AssertReadReturnsBefore(t, parent.Done(), maxWaitTime)
 			So(m.Count(), ShouldEqual, 0)
 			cancelF()
 		})
@@ -89,6 +91,13 @@ func TestMonitor(t *testing.T) {
 			ctx, cancelF := m.WithTimeout(context.Background(), time.Second)
 			SoMsg("count", m.Count(), ShouldEqual, 0)
 			SoMsg("err", ctx.Err(), ShouldNotBeNil)
+			cancelF()
+		})
+		Convey("Set deadline in future, add context with deadline after, ctx is not Done", func() {
+			deadline := time.Now().Add(5 * time.Second)
+			m.SetDeadline(deadline)
+			ctx, cancelF := m.WithDeadline(context.Background(), deadline.Add(time.Second))
+			SoMsg("err", ctx.Err(), ShouldBeNil)
 			cancelF()
 		})
 	})
