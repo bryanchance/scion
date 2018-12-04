@@ -7,13 +7,13 @@ import toml
 import yaml
 
 from lib.util import write_file
-from topology.common import get_l4_port, get_pub_ip, ArgsTopoDicts
+from topology.common import docker_host, get_l4_port, get_pub_ip, ArgsTopoDicts
 
 CLIENT_DIR = 'consul'
 SERVER_DIR = 'consul_server'
 CONSUL_DC = 'consul-dc.yml'
 
-SERVER_IP = '127.0.0.1'
+CLIENT_BASE_PORT = 8505
 
 
 class ConsulGenArgs(ArgsTopoDicts):
@@ -26,6 +26,7 @@ class ConsulGenerator(object):
         self.args = args
         self.dc_conf = {'version': '3', 'services': {}}
         self.output_base = os.environ.get('SCION_OUTPUT_BASE', os.getcwd())
+        self.docker_ip = docker_host(self.args.in_docker, self.args.docker)
 
     def generate(self):
         if not self.args.consul:
@@ -43,7 +44,12 @@ class ConsulGenerator(object):
         entry = {
             'image': 'consul:latest',
             'container_name': self._server_name(),
-            'network_mode': 'host',
+            'network_mode': 'bridge',
+            'ports': [
+                '8301:8301',  # serf_lan
+                '8302:8302',  # serf_wan
+                '8500:8500',  # http
+            ],
             'volumes': [
                 '%s:/consul/config' % os.path.join(self.output_base,
                                                    self.args.output_dir, SERVER_DIR)
@@ -52,59 +58,68 @@ class ConsulGenerator(object):
         self.dc_conf['services'][self._server_name()] = entry
 
     def _generate_server_general(self):
-        conf = self._generate_consul_config('server', SERVER_IP)
-        conf.update({'server': True})
+        conf = self._generate_consul_config('server', self.docker_ip)
+        conf.update({
+            'server': True,
+            'ui': True,
+        })
         write_file(os.path.join(self.args.output_dir, SERVER_DIR, 'general.json'),
                    json.dumps(conf, indent=4))
 
     def _generate_client_agents(self):
+        port = CLIENT_BASE_PORT
         for topo_id, topo in self.args.topo_dicts.items():
             base = os.path.join(self.output_base, topo_id.base_dir(self.args.output_dir))
-            self._generate_client_dc(topo_id, topo, base)
-            self._generate_client_config(topo_id, topo, base)
+            self._generate_client_dc(topo_id, topo, base, port)
+            self._generate_client_config(topo_id, topo, base, port)
+            port = port + 1
 
-    def _generate_client_dc(self, topo_id, topo, base):
+    def _generate_client_dc(self, topo_id, topo, base, port):
         entry = {
             'image': 'consul:latest',
-            'container_name': self._agent_name(topo_id.file_fmt()),
+            'container_name': _agent_name(topo_id.file_fmt()),
             'depends_on': [
                 self._server_name(),
             ],
-            'network_mode': 'host',
+            'network_mode': 'bridge',
+            'ports': [
+                '%s:%s' % (port, port)
+            ],
             'volumes': [
                 '%s:/consul/config' % os.path.join(base, CLIENT_DIR)
             ],
         }
-        self.dc_conf['services'][self._agent_name(topo_id.file_fmt())] = entry
+        self.dc_conf['services'][_agent_name(topo_id.file_fmt())] = entry
 
-    def _generate_client_config(self, topo_id, topo, base):
+    def _generate_client_config(self, topo_id, topo, base, port):
         # Only one agent is created per AS in the test topology.
         for k, v in topo.get("CertificateService", {}).items():
             ip = str(get_pub_ip(v['Addrs']))
             break
-        self._generate_client_general(topo_id, base, ip)
-        self._generate_client_services(topo_id, topo, base, ip)
+        self._generate_client_general(topo_id, base, ip, port)
+        self._generate_client_services(topo_id, topo, base, port)
 
-    def _generate_client_general(self, topo_id, base, ip):
-        conf = self._generate_consul_config(self._agent_name(topo_id), ip)
+    def _generate_client_general(self, topo_id, base, ip, port):
+        conf = self._generate_consul_config(_agent_name(topo_id), ip)
         conf.update({
             'leave_on_terminate': True,
-            'retry_join': [SERVER_IP],
+            'retry_join': [self.docker_ip],
         })
+        conf['ports']['http'] = port
         write_file(os.path.join(base, CLIENT_DIR, 'general.json'),
                    json.dumps(conf, indent=4))
 
     def _generate_consul_config(self, name, ip):
         return {
             'datacenter': 'scion',
-            'ui': True,
             'node_name': name,
+            'server': False,
             "client_addr": ip,
-            "bind_addr": ip,
+            "bind_addr": '0.0.0.0',
             # Contrary to what the doc suggests, the addresses
             # do not default to client_addr.
             "addresses": {
-                "http": ip,
+                "http": '0.0.0.0',
             },
             # Default ports are also a lie.
             "ports": {
@@ -113,13 +128,13 @@ class ConsulGenerator(object):
             }
         }
 
-    def _generate_client_services(self, topo_id, topo, base, agent_ip):
+    def _generate_client_services(self, topo_id, topo, base, port):
         for svc, conf in {'BeaconService': 'bsconfig.toml',
                           'CertificateService': 'csconfig.toml',
                           'PathService': 'psconfig.toml'}.items():
             for elem_id, v in topo.get(svc, {}).items():
                 self._generate_client_svc(topo_id, topo, base, svc, elem_id, v)
-                self._add_consul_to_conf(base, elem_id, conf, agent_ip)
+                self._add_consul_to_conf(base, elem_id, conf, port)
 
     def _generate_client_svc(self, topo_id, topo, base, svc, elem_id, v):
         checks = [{
@@ -142,7 +157,7 @@ class ConsulGenerator(object):
         write_file(os.path.join(base, CLIENT_DIR, '%s.json' % elem_id),
                    json.dumps(svc, indent=4))
 
-    def _add_consul_to_conf(self, base, elem_id, conf, agent_ip):
+    def _add_consul_to_conf(self, base, elem_id, conf, port):
         file = os.path.join(base, elem_id, conf)
         if not Path(file).is_file():
             return
@@ -150,7 +165,7 @@ class ConsulGenerator(object):
             consul_entry = {
                 'consul': {
                     'UpdateTTL': True,
-                    'Agent': '%s:8500' % agent_ip,
+                    'Agent': '%s:%s' % (self.docker_ip, port)
                 },
             }
             f.write(toml.dumps(consul_entry))
@@ -158,5 +173,6 @@ class ConsulGenerator(object):
     def _server_name(self):
         return 'consul_server_docker' if self.args.in_docker else 'consul_server'
 
-    def _agent_name(self, name):
-        return 'agent-%s' % name
+
+def _agent_name(name):
+    return 'consul_agent-%s' % name

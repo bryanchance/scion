@@ -2,12 +2,11 @@
 
 # Stdlib
 import os
-import sys
 import toml
 
 # SCION
 from lib.util import write_file
-from topology.common import get_l4_port, get_pub_ip
+from topology.common import docker_host, get_l4_port, get_pub_ip
 from topology.docker import DEFAULT_DOCKER_NETWORK
 from topology.go import GoGenerator as VanillaGenerator
 
@@ -100,7 +99,7 @@ class GoGenerator(VanillaGenerator):
         if self.args.path_db != "postgres":
             return raw_entry
         db_user = self._postgres_db_user(topo_id)
-        db_host = self._postgres_host()
+        db_host = docker_host(self.args.in_docker, self.args.docker, 'localhost')
         raw_entry['ps']['PathDB'] = {
             'Backend': 'postgres',
             # sslmode=disable is because dockerized postgres doesn't have SSL enabled.
@@ -129,15 +128,3 @@ class GoGenerator(VanillaGenerator):
 
     def _postgres_db_user(self, topo_id):
         return topo_id.file_fmt()
-
-    def _postgres_host(self):
-        if self.args.in_docker:
-            addr = os.getenv('DOCKER0')
-            if not addr:
-                print('DOCKER0 env variable required! Exiting!')
-                sys.exit(1)
-        elif self.args.docker:
-            addr = 'docker0'
-        else:
-            addr = 'localhost'
-        return addr

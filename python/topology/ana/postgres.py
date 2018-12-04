@@ -32,6 +32,7 @@ class PostgresGenerator(object):
         entry = {
             'image': 'postgres:latest',
             'container_name': name,
+            'network_mode': 'bridge',
             'environment': {
                 'POSTGRES_USER': 'pathdb',
                 'POSTGRES_PASSWORD': 'password',
