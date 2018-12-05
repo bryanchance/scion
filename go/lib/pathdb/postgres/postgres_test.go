@@ -33,12 +33,12 @@ func init() {
 		dbHost = "localhost"
 	}
 	// sslmode=disable is because dockerized postgres doesn't have SSL enabled.
-	connection = fmt.Sprintf("host=%s port=5432 user=pathdb password=password sslmode=disable",
+	connection = fmt.Sprintf("host=%s port=5432 user=psdb password=password sslmode=disable",
 		dbHost)
 }
 
 func (b *Backend) dropSchema(ctx context.Context) error {
-	_, err := b.db.ExecContext(ctx, "DROP SCHEMA IF EXISTS pathdb CASCADE;")
+	_, err := b.db.ExecContext(ctx, "DROP SCHEMA IF EXISTS psdb CASCADE;")
 	return err
 }
 
@@ -46,7 +46,7 @@ func (b *Backend) initSchema(ctx context.Context) error {
 	if err := b.dropSchema(ctx); err != nil {
 		return err
 	}
-	if _, err := b.db.ExecContext(ctx, "CREATE SCHEMA pathdb;"); err != nil {
+	if _, err := b.db.ExecContext(ctx, "CREATE SCHEMA psdb;"); err != nil {
 		return err
 	}
 	sql, err := ioutil.ReadFile("../../../path_srv/postgres/schema.sql")

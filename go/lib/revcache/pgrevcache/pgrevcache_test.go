@@ -34,7 +34,7 @@ func init() {
 		dbHost = "localhost"
 	}
 	// sslmode=disable is because dockerized postgres doesn't have SSL enabled.
-	connection = fmt.Sprintf("host=%s port=5432 user=pathdb password=password sslmode=disable",
+	connection = fmt.Sprintf("host=%s port=5432 user=psdb password=password sslmode=disable",
 		dbHost)
 }
 
@@ -45,7 +45,7 @@ type testRevCache struct {
 }
 
 func (c *testRevCache) dropSchema(ctx context.Context) error {
-	_, err := c.db.ExecContext(ctx, "DROP SCHEMA IF EXISTS pathdb CASCADE;")
+	_, err := c.db.ExecContext(ctx, "DROP SCHEMA IF EXISTS psdb CASCADE;")
 	return err
 }
 
@@ -53,7 +53,7 @@ func (c *testRevCache) initSchema(ctx context.Context) error {
 	if err := c.dropSchema(ctx); err != nil {
 		return err
 	}
-	if _, err := c.db.ExecContext(ctx, "CREATE SCHEMA pathdb;"); err != nil {
+	if _, err := c.db.ExecContext(ctx, "CREATE SCHEMA psdb;"); err != nil {
 		return err
 	}
 	sql, err := ioutil.ReadFile("../../../path_srv/postgres/schema.sql")

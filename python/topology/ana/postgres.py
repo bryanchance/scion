@@ -9,6 +9,8 @@ from topology.common import ArgsTopoDicts
 
 
 PG_CONF = 'postgres-dc.yml'
+PSDB_NAME = 'psdb'
+PSDB_PORT = 5432
 
 
 class PostgresGenArgs(ArgsTopoDicts):
@@ -28,22 +30,25 @@ class PostgresGenerator(object):
     def generate(self):
         if self.args.path_server == 'py' or self.args.path_db != 'postgres':
             return
-        name = 'postgres_docker' if self.args.in_docker else 'postgres'
+        self._gen_dc('postgres_ps', PSDB_NAME, PSDB_PORT)
+        write_file(os.path.join(self.args.output_dir, PG_CONF),
+                   yaml.dump(self.pg_conf, default_flow_style=False))
+
+    def _gen_dc(self, name_prefix, user, exp_port):
+        name = '%s_docker' % name_prefix if self.args.in_docker else name_prefix
         entry = {
-            'image': 'postgres:latest',
+            'image': 'postgres:10',
             'container_name': name,
             'network_mode': 'bridge',
             'environment': {
-                'POSTGRES_USER': 'pathdb',
+                'POSTGRES_USER': user,
                 'POSTGRES_PASSWORD': 'password',
             },
             'volumes': [
-                self.output_base + '/gen/postgres/init:/docker-entrypoint-initdb.d:ro'
+                self.output_base + '/gen/%s/init:/docker-entrypoint-initdb.d:ro' % name_prefix
             ],
             'ports': [
-                '5432:5432'
-            ]
+                '%s:5432' % exp_port
+            ],
         }
         self.pg_conf['services'][name] = entry
-        write_file(os.path.join(self.args.output_dir, PG_CONF),
-                   yaml.dump(self.pg_conf, default_flow_style=False))

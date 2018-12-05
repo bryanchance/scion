@@ -9,6 +9,7 @@ from lib.util import write_file
 from topology.common import docker_host, get_l4_port, get_pub_ip
 from topology.docker import DEFAULT_DOCKER_NETWORK
 from topology.go import GoGenerator as VanillaGenerator
+from topology.ana.postgres import PSDB_NAME, PSDB_PORT
 
 
 class GoGenerator(VanillaGenerator):
@@ -86,45 +87,58 @@ class GoGenerator(VanillaGenerator):
 
     def generate_ps(self):
         for topo_id, topo in self.args.topo_dicts.items():
-            self._generate_ps_postgres_init(topo_id)
+            schema_name = self._pg_db_schema(topo_id, 'pspath')
+            self._generate_path_postgres_init(topo_id, schema_name)
             for k, v in topo.get("PathService", {}).items():
                 # only a single Go-PS per AS is currently supported
                 if k.endswith("-1"):
                     base = topo_id.base_dir(self.args.output_dir)
                     ps_conf = self._build_ps_conf(topo_id, topo["ISD_AS"], base, k)
                     write_file(os.path.join(base, k, "psconfig.toml"), toml.dumps(ps_conf))
+                    self._genereate_pg_user_init(topo_id, 'ps', k, schema_name)
 
     def _build_ps_conf(self, topo_id, ia, base, name):
         raw_entry = super()._build_ps_conf(topo_id, ia, base, name)
         if self.args.path_db != "postgres":
             return raw_entry
-        db_user = self._postgres_db_user(topo_id)
+        db_user = name
         db_host = docker_host(self.args.in_docker, self.args.docker, 'localhost')
         raw_entry['ps']['PathDB'] = {
             'Backend': 'postgres',
             # sslmode=disable is because dockerized postgres doesn't have SSL enabled.
             'Connection': 'host=%s user=%s password=password' % (db_host, db_user) +
-                          ' sslmode=disable dbname=pathdb',
+                          ' sslmode=disable dbname=%s port=%s' % (PSDB_NAME, PSDB_PORT),
         }
         raw_entry['ps']['RevCache'] = {
             'Backend': 'postgres',
         }
         return raw_entry
 
-    def _generate_ps_postgres_init(self, topo_id):
+    def _generate_path_postgres_init(self, topo_id, schema_name):
         if self.args.path_db != 'postgres':
             return
-        db_user = self._postgres_db_user(topo_id)
-        schema_name = db_user
-        sql = 'CREATE USER "%s" WITH PASSWORD \'password\';\n' % db_user
-        sql += 'ALTER ROLE "%s" SET search_path TO "%s";\n' % (db_user, schema_name)
-        sql += 'CREATE SCHEMA "%s" AUTHORIZATION "%s";\n' % (schema_name, db_user)
-        sql += 'SET search_path TO "%s";\n' % schema_name
-        with open('go/path_srv/postgres/schema.sql', 'r') as schema:
-            sql += schema.read()
-        sql += '\nGRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA "%s" TO "%s";\n' % (schema_name,
-                                                                                   db_user)
-        write_file(os.path.join(self.args.output_dir, 'postgres', 'init', '%s.sql' % db_user), sql)
+        self._generate_postgres_init(topo_id, 'ps', schema_name, 'go/path_srv/postgres/schema.sql')
 
-    def _postgres_db_user(self, topo_id):
-        return topo_id.file_fmt()
+    def _generate_postgres_init(self, topo_id, svc, schema_name, schema_file):
+        sql = 'CREATE SCHEMA "%s";\n' % schema_name
+        sql += 'SET search_path TO "%s";\n' % schema_name
+        with open(schema_file, 'r') as schema:
+            sql += schema.read()
+        write_file(self._pg_init_file_path(topo_id, svc), sql)
+
+    def _genereate_pg_user_init(self, topo_id, svc, db_user, schema_name):
+        sql = 'CREATE USER "%s" WITH PASSWORD \'password\';\n' % db_user
+        sql += 'GRANT ALL ON SCHEMA "%s" TO "%s";\n' % (schema_name, db_user)
+        sql += 'GRANT ALL ON ALL TABLES IN SCHEMA "%s" TO "%s";\n' % (schema_name, db_user)
+        sql += 'GRANT ALL ON ALL SEQUENCES IN SCHEMA "%s" TO "%s";\n' % (schema_name, db_user)
+        sql += 'GRANT ALL ON ALL FUNCTIONS IN SCHEMA "%s" TO "%s";\n' % (schema_name, db_user)
+        sql += 'ALTER ROLE "%s" SET search_path TO "%s";\n' % (db_user, schema_name)
+        with open(self._pg_init_file_path(topo_id, svc), 'a') as init_file:
+            init_file.write(sql)
+
+    def _pg_init_file_path(self, topo_id, svc):
+        return os.path.join(self.args.output_dir, 'postgres_%s' % svc,
+                            'init', '%s.sql' % topo_id.file_fmt())
+
+    def _pg_db_schema(self, topo_id, prefix):
+        return '%s_%s' % (prefix, topo_id.file_fmt())
