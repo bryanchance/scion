@@ -12,6 +12,7 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
+	"github.com/scionproto/scion/go/lib/ctrl/path_mgmt"
 	"github.com/scionproto/scion/go/lib/revcache"
 	"github.com/scionproto/scion/go/lib/revcache/revcachetest"
 	"github.com/scionproto/scion/go/lib/xtest"
@@ -37,12 +38,18 @@ func init() {
 		dbHost)
 }
 
-func (c *pgRevCache) dropSchema(ctx context.Context) error {
+var _ (revcachetest.TestableRevCache) = (*testRevCache)(nil)
+
+type testRevCache struct {
+	*pgRevCache
+}
+
+func (c *testRevCache) dropSchema(ctx context.Context) error {
 	_, err := c.db.ExecContext(ctx, "DROP SCHEMA IF EXISTS pathdb CASCADE;")
 	return err
 }
 
-func (c *pgRevCache) initSchema(ctx context.Context) error {
+func (c *testRevCache) initSchema(ctx context.Context) error {
 	if err := c.dropSchema(ctx); err != nil {
 		return err
 	}
@@ -57,14 +64,38 @@ func (c *pgRevCache) initSchema(ctx context.Context) error {
 	return err
 }
 
+func (c *testRevCache) InsertExpired(t *testing.T, ctx context.Context,
+	rev *path_mgmt.SignedRevInfo) {
+
+	newInfo, err := rev.RevInfo()
+	xtest.FailOnErr(t, err)
+	k := revcache.NewKey(newInfo.IA(), newInfo.IfID)
+	packedRev, err := rev.Pack()
+	xtest.FailOnErr(t, err)
+	tx, err := c.db.BeginTx(ctx, nil)
+	xtest.FailOnErr(t, err)
+	query := `
+		INSERT INTO Revocations 
+			(IsdID, AsID, IfID, LinkType, RawTimeStamp, RawTTL, RawSignedRev, Expiration)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
+	_, err = tx.ExecContext(ctx, query, k.IA.I, k.IA.A, k.IfId, newInfo.LinkType,
+		newInfo.RawTimestamp, newInfo.RawTTL, packedRev, newInfo.Expiration())
+	xtest.FailOnErr(t, err)
+	err = tx.Commit()
+	xtest.FailOnErr(t, err)
+}
+
 func TestRevcacheSuite(t *testing.T) {
 	Convey("RevCache Suite", t, func() {
-		c, err := New(connection)
+		db, err := New(connection)
 		xtest.FailOnErr(t, err)
+		c := &testRevCache{
+			pgRevCache: db,
+		}
 		err = c.initSchema(context.Background())
 		xtest.FailOnErr(t, err)
 		revcachetest.TestRevCache(t,
-			func() revcache.RevCache {
+			func() revcachetest.TestableRevCache {
 				_, err = c.db.Exec("DELETE FROM Revocations")
 				xtest.FailOnErr(t, err)
 				return c

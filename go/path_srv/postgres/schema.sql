@@ -52,5 +52,6 @@ CREATE TABLE Revocations(
     RawTimeStamp bigint NOT NULL,
     RawTTL bigint NOT NULL,
     RawSignedRev bytea NOT NULL,
+    Expiration  timestamp with time zone NOT NULL,
     UNIQUE (IsdID, AsID, IfID)
 );
