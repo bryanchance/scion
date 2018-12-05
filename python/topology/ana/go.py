@@ -7,9 +7,11 @@ import toml
 # SCION
 from lib.util import write_file
 from topology.common import docker_host, get_l4_port, get_pub_ip
-from topology.docker import DEFAULT_DOCKER_NETWORK
 from topology.go import GoGenerator as VanillaGenerator
 from topology.ana.postgres import PSDB_NAME, PSDB_PORT
+
+# FIXME(sgmonroy): anacion/301 Below var does not exists in scionproto anymore.
+DEFAULT_DOCKER_NETWORK = "172.18.0.0/24"
 
 
 class GoGenerator(VanillaGenerator):
