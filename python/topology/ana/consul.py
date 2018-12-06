@@ -14,6 +14,8 @@ SERVER_DIR = 'consul_server'
 CONSUL_DC = 'consul-dc.yml'
 
 CLIENT_BASE_PORT = 8505
+CONSUL_VERSION = '1.3.1'
+CFG_FILE = 'general.json'
 
 
 class ConsulGenArgs(ArgsTopoDicts):
@@ -42,7 +44,7 @@ class ConsulGenerator(object):
 
     def _generate_server_dc(self):
         entry = {
-            'image': 'consul:latest',
+            'image': 'consul:%s' % CONSUL_VERSION,
             'container_name': self._server_name(),
             'network_mode': 'bridge',
             'ports': [
@@ -51,9 +53,11 @@ class ConsulGenerator(object):
                 '8500:8500',  # http
             ],
             'volumes': [
-                '%s:/consul/config' % os.path.join(self.output_base,
-                                                   self.args.output_dir, SERVER_DIR)
-            ]
+                '%s:/consul/cfg:ro' % os.path.join(self.output_base, self.args.output_dir,
+                                                   SERVER_DIR)
+            ],
+            # First args are from dockerfile. We need to overwrite because of custom cfg dir.
+            'command': ['agent', '-dev', '-client', '0.0.0.0', '-config-dir=/consul/cfg']
         }
         self.dc_conf['services'][self._server_name()] = entry
 
@@ -63,7 +67,7 @@ class ConsulGenerator(object):
             'server': True,
             'ui': True,
         })
-        write_file(os.path.join(self.args.output_dir, SERVER_DIR, 'general.json'),
+        write_file(os.path.join(self.args.output_dir, SERVER_DIR, CFG_FILE),
                    json.dumps(conf, indent=4))
 
     def _generate_client_agents(self):
@@ -76,18 +80,16 @@ class ConsulGenerator(object):
 
     def _generate_client_dc(self, topo_id, topo, base, port):
         entry = {
-            'image': 'consul:latest',
+            'image': 'consul:%s' % CONSUL_VERSION,
             'container_name': _agent_name(topo_id.file_fmt()),
-            'depends_on': [
-                self._server_name(),
-            ],
             'network_mode': 'bridge',
             'ports': [
                 '%s:%s' % (port, port)
             ],
             'volumes': [
-                '%s:/consul/config' % os.path.join(base, CLIENT_DIR)
+                '%s:/consul/cfg:ro' % os.path.join(base, CLIENT_DIR)
             ],
+            'command': ['agent', '-dev', '-client', '0.0.0.0', '-config-dir=/consul/cfg']
         }
         self.dc_conf['services'][_agent_name(topo_id.file_fmt())] = entry
 
@@ -106,8 +108,7 @@ class ConsulGenerator(object):
             'retry_join': [self.docker_ip],
         })
         conf['ports']['http'] = port
-        write_file(os.path.join(base, CLIENT_DIR, 'general.json'),
-                   json.dumps(conf, indent=4))
+        write_file(os.path.join(base, CLIENT_DIR, CFG_FILE), json.dumps(conf, indent=4))
 
     def _generate_consul_config(self, name, ip):
         return {

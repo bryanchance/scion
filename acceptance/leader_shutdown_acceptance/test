@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Copyright 2018 Anapaya Systems
+
+# Test that shutting down a leader properly hands over leader to the other server.
+# While testing this we also test that only one is leader at a time.
+
+TEST_NAME="leader_shutdown"
+PROGRAM=$(basename "$0")
+COMMAND="$1"
+
+. acceptance/leaderutil/common.sh
+
+test_run() {
+    set -e
+    ./bin/leader_acceptance -id 1 -agent "$(ip_of $AGENT_NAME1):8500" -key foo/bar -log.console trace &> logs/"$TEST_NAME"_1.log &
+    CLIENT1=$!
+    ./bin/leader_acceptance -id 2 -agent "$(ip_of $AGENT_NAME2):8500" -key foo/bar -log.console trace &> logs/"$TEST_NAME"_2.log &
+    CLIENT2=$!
+    sleep 5
+    if ! is_leader 1 && ! is_leader 2; then
+        echo "NO Leader found in time"
+        return 1
+    fi
+    if is_leader 1 && is_leader 2; then
+        echo "FAIL 2 leaders"
+        return 1
+    fi
+    # now shutdown the leader to see if the other can take over.
+    if is_leader 1; then
+        kill "$CLIENT1"
+    fi
+    if is_leader 2; then
+        kill "$CLIENT2"
+    fi
+    # leader switch can take some time.
+    sleep 5
+    is_leader 1 || { echo "Client 1 should have been leader, but wasn't"; return 1; }
+    is_leader 2 || { echo "Client 2 should have been leader, but wasn't"; return 1; }
+}
+
+test_teardown() {
+    pkill -f leader_acceptance
+    kill_consul
+}
+
+do_command $PROGRAM $COMMAND $TEST_NAME ${@:3}

@@ -17,12 +17,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/BurntSushi/toml"
+	consulapi "github.com/hashicorp/consul/api"
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
@@ -173,14 +175,16 @@ func realMain() int {
 		defer log.LogPanicAndExit()
 		msger.ListenAndServe()
 	}()
-	// Start periodic health status setter
-	go func() {
-		defer log.LogPanicAndExit()
-		var err error
-		if ttlUpdater, err = startUpdateTTL(); err != nil {
-			fatalC <- err
-		}
-	}()
+	// TODO(lukedirtwalker): We should have a top level config to indicate
+	// whether consul should be used or not.
+	c, err := setupConsul(fatalC, topo.ISD_AS)
+	if err != nil {
+		log.Crit("Unable to start consul", "err", err)
+		return 1
+	}
+	if c != nil {
+		defer c.Close()
+	}
 	cleaner := periodic.StartPeriodicTask(cleaner.New(pathDB),
 		periodic.NewTicker(300*time.Second), 295*time.Second)
 	defer cleaner.Stop()
@@ -222,7 +226,13 @@ func setup() error {
 	return nil
 }
 
-func startUpdateTTL() (*periodic.Runner, error) {
+type closerFunc func() error
+
+func (cf closerFunc) Close() error {
+	return cf()
+}
+
+func setupConsul(fatalC chan error, localIA addr.IA) (io.Closer, error) {
 	if !config.Consul.UpdateTTL {
 		return nil, nil
 	}
@@ -231,6 +241,26 @@ func startUpdateTTL() (*periodic.Runner, error) {
 	if err != nil {
 		return nil, err
 	}
+	startHealthCheck(c, fatalC)
+	le := consul.StartLeaderElector(c, fmt.Sprintf("path_srv/leader/%s", localIA.FileFmt(false)),
+		consul.LeaderElectorConf{})
+	return closerFunc(func() error {
+		le.Stop()
+		return nil
+	}), nil
+}
+
+func startHealthCheck(c *consulapi.Client, fatalC chan error) {
+	go func() {
+		defer log.LogPanicAndExit()
+		var err error
+		if ttlUpdater, err = startUpdateTTL(c); err != nil {
+			fatalC <- err
+		}
+	}()
+}
+
+func startUpdateTTL(c *consulapi.Client) (*periodic.Runner, error) {
 	svc := &consul.Service{
 		Type:        consul.PS,
 		Agent:       c.Agent(),

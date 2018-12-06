@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Copyright 2018 Anapaya Systems
+
+# Test that killing the agent of a client is connected to leads to a loss of leader.
+# This test simulates losing the connection to the consul agent.
+# If we don't have a connection we should assume we lost leader immediately.
+
+TEST_NAME="leader_agentdead"
+PROGRAM=$(basename "$0")
+COMMAND="$1"
+
+. acceptance/leaderutil/common.sh
+
+test_run() {
+    set -e
+    ./bin/leader_acceptance -id 1 -agent "$(ip_of $AGENT_NAME1):8500" -key foo/bar -log.console trace &> logs/"$TEST_NAME"_1.log &
+    CLIENT1=$!
+    ./bin/leader_acceptance -id 2 -agent "$(ip_of $AGENT_NAME2):8500" -key foo/bar -log.console trace &> logs/"$TEST_NAME"_2.log &
+    CLIENT2=$!
+    sleep 5
+    if ! is_leader 1 && ! is_leader 2; then
+        echo "NO Leader found in time"
+        return 1
+    fi
+    if is_leader 1 && is_leader 2; then
+        echo "FAIL 2 leaders"
+        return 1
+    fi
+    # now kill the leader's agent to see if the other can take over, and it loses leader.
+    if is_leader 1; then
+        docker stop "$AGENT_NAME1"
+        FIRST_LEADER=1
+    fi
+    if is_leader 2; then
+        docker stop "$AGENT_NAME2"
+        FIRST_LEADER=2
+    fi
+    sleep 5
+    # check leader is lost
+    lost_leader "$FIRST_LEADER" || { echo "Client $FIRST_LEADER should have lost leader, agent is dead"; return 1; }
+    # leader switch can take some time. 
+    sleep 5
+    is_leader 1 || { echo "Client 1 should have been leader, but wasn't"; return 1; }
+    is_leader 2 || { echo "Client 2 should have been leader, but wasn't"; return 1; }
+}
+
+test_teardown() {
+    pkill -f leader_acceptance
+    kill_consul
+}
+
+do_command $PROGRAM $COMMAND $TEST_NAME ${@:3}
