@@ -29,6 +29,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/env"
+	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sig/base"
@@ -104,14 +105,12 @@ func realMain() int {
 		defer log.LogPanicAndExit()
 		reader.NewReader(tunIO).Run()
 	}()
-	// Create error channel for ingress dispatcher and prometheus
-	fatalC := make(chan error, 2)
-	spawnIngressDispatcher(tunIO, fatalC)
-	cfg.Metrics.StartPrometheus(fatalC)
+	spawnIngressDispatcher(tunIO)
+	cfg.Metrics.StartPrometheus(fatal.Chan())
 	select {
 	case <-environment.AppShutdownSignal:
 		return 0
-	case err := <-fatalC:
+	case err := <-fatal.Chan():
 		// Prometheus or the ingress dispatcher encountered a fatal error, thus we exit.
 		log.Crit("Fatal error during execution", "err", err)
 		return 1
@@ -151,11 +150,19 @@ func setupTun() (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = xnet.AddRoute(cfg.Sig.TunRTableId, tunLink, sigcmn.DefV4Net); err != nil {
+	src := cfg.Sig.SrcIP4
+	if len(src) == 0 && cfg.Sig.IP.To4() != nil {
+		src = cfg.Sig.IP
+	}
+	if err = xnet.AddRoute(cfg.Sig.TunRTableId, tunLink, sigcmn.DefV4Net, src); err != nil {
 		return nil,
 			common.NewBasicError("Unable to add default IPv4 route to SIG routing table", err)
 	}
-	if err = xnet.AddRoute(cfg.Sig.TunRTableId, tunLink, sigcmn.DefV6Net); err != nil {
+	src = cfg.Sig.SrcIP6
+	if len(src) == 0 && cfg.Sig.IP.To16() != nil && cfg.Sig.IP.To4() == nil {
+		src = cfg.Sig.IP
+	}
+	if err = xnet.AddRoute(cfg.Sig.TunRTableId, tunLink, sigcmn.DefV6Net, src); err != nil {
 		return nil,
 			common.NewBasicError("Unable to add default IPv6 route to SIG routing table", err)
 	}
@@ -221,12 +228,12 @@ func loadConfig(path string) bool {
 	return true
 }
 
-func spawnIngressDispatcher(tunIO io.ReadWriteCloser, fatalC chan error) {
+func spawnIngressDispatcher(tunIO io.ReadWriteCloser) {
 	d := ingress.NewDispatcher(tunIO)
 	go func() {
 		if err := d.Run(); err != nil {
 			log.Crit("Ingress dispatcher error", "err", err)
-			fatalC <- err
+			fatal.Fatal(err)
 		}
 	}()
 }

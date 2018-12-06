@@ -51,6 +51,10 @@ type Conf struct {
 	TunRTableId int
 	// Quagga is the quagga configuration.
 	Quagga Quagga
+	// IPv4 source address hint to put into routing table.
+	SrcIP4 net.IP
+	// IPv6 source address hint to put into routing table.
+	SrcIP6 net.IP
 }
 
 // Validate validate the config and returns an error if a value is not valid.
