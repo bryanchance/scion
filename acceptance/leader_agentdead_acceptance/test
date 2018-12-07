@@ -29,11 +29,11 @@ test_run() {
     fi
     # now kill the leader's agent to see if the other can take over, and it loses leader.
     if is_leader 1; then
-        docker stop "$AGENT_NAME1"
+        cmd_dc stop "$AGENT_NAME1"
         FIRST_LEADER=1
     fi
     if is_leader 2; then
-        docker stop "$AGENT_NAME2"
+        cmd_dc stop "$AGENT_NAME2"
         FIRST_LEADER=2
     fi
     sleep 5

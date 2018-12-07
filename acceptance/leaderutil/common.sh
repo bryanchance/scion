@@ -23,26 +23,18 @@ log() {
     echo "$(date -u --rfc-3339=seconds) $@"
 }
 
+cmd_dc() {
+    COMPOSE_FILE="acceptance/leaderutil/consul-dc.yml" docker-compose --no-ansi "$@"
+}
+
 test_setup() {
     set -e
-    docker run -d --name="$SERVER_NAME1" -e 'CONSUL_LOCAL_CONFIG={"session_ttl_min": "1s"}' \
-                                         -e CONSUL_BIND_INTERFACE=eth0 consul
-    docker run -d --name="$SERVER_NAME2" -e 'CONSUL_LOCAL_CONFIG={"session_ttl_min": "1s"}' \
-                                         -e CONSUL_BIND_INTERFACE=eth0 consul agent -server \
-                                         -join="$(ip_of $SERVER_NAME1)"
-    docker run -d --name="$AGENT_NAME1" -e 'CONSUL_LOCAL_CONFIG={"session_ttl_min": "1s"}' \
-                                        -e CONSUL_CLIENT_INTERFACE=eth0 \
-                                        -e CONSUL_BIND_INTERFACE=eth0 consul agent \
-                                        -join="$(ip_of $SERVER_NAME1)"
-    docker run -d --name="$AGENT_NAME2" -e 'CONSUL_LOCAL_CONFIG={"session_ttl_min": "1s"}' \
-                                        -e CONSUL_CLIENT_INTERFACE=eth0 \
-                                        -e CONSUL_BIND_INTERFACE=eth0 consul agent \
-                                        -join="$(ip_of $SERVER_NAME2)"
-    sleep 5 # To make sure the system is ready to accept clients.
+    cmd_dc up -d
+    sleep 2 # To make sure the system is ready to accept clients.
 }
 
 kill_consul() {
-    docker rm -f "$SERVER_NAME1" "$SERVER_NAME2" "$AGENT_NAME1" "$AGENT_NAME2" || true
+    cmd_dc down || true
 }
 
 print_help() {
