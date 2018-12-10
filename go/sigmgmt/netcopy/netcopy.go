@@ -143,7 +143,7 @@ func VerifyConfigVersion(ctx context.Context, site *db.Site, version uint64,
 }
 
 // verifyConfigVersionHost attempts multiple version verifications until one
-// suceeds, for as long as ctx allows.
+// succeeds, for as long as ctx allows.
 func verifyConfigVersionHost(ctx context.Context, host *db.Host, port uint16, version uint64,
 	logger log.Logger) error {
 	url := fmt.Sprintf("http://%s:%d/configversion", host.Name, port)

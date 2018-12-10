@@ -81,6 +81,7 @@ func realMain() int {
 		return 1
 	}
 	defer env.CleanupLog()
+	defer env.LogSvcStopped(common.CS, config.General.ID)
 	// Setup the state and the messenger
 	if err := setup(); err != nil {
 		log.Crit("Setup failed", "err", err)
@@ -148,6 +149,7 @@ func reload() error {
 func startReissRunner() {
 	if !config.CS.AutomaticRenewal {
 		log.Info("Reissue disabled, not starting reiss task.")
+		return
 	}
 	if config.General.Topology.Core {
 		log.Info("Starting periodic reiss.Self task")

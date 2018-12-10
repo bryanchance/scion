@@ -1,0 +1,8 @@
+#!/bin/bash
+
+set -e
+
+BASE_IMG=${BASE_IMG:-2e56be24baf11aec778e8b3cfdc45a9491c4d18953348e30fa2b67a2b0a9bd64}
+
+./tools/ci/prepare_image "$BASE_IMG"
+./docker.sh build
