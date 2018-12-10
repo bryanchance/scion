@@ -11,6 +11,7 @@ import (
 	consulapi "github.com/hashicorp/consul/api"
 
 	"github.com/scionproto/scion/go/lib/consul"
+	"github.com/scionproto/scion/go/lib/consul/consulconfig"
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/log"
 )
@@ -37,33 +38,26 @@ func realMain() int {
 		log.Crit("Error during setup", "err", err)
 		return 1
 	}
-	le := consul.StartLeaderElector(c, *key, consul.LeaderElectorConf{
-		Interval: 100 * time.Millisecond,
-		Timeout:  5 * time.Second,
+	le, err := consul.StartLeaderElector(c, *key, consulconfig.LeaderElectorConf{
+		Timeout: 5 * time.Second,
 		// Use a low lock delay for tests to have a faster handover.
 		LockDelay:  1 * time.Second,
 		SessionTTL: "1s",
+		AcquiredLeader: func() {
+			log.Info("ISLEADER", "id", *id)
+		},
+		LostLeader: func() {
+			log.Info("LOSTLEADER", "id", *id)
+		},
 	})
+	if err != nil {
+		log.Crit("Error during start of leader elector", "err", err)
+		return 1
+	}
 	log.Trace("election started")
-	wasLeader := false
-	runTicker := time.NewTicker(time.Second)
-	for {
-		if le.IsLeader() {
-			if !wasLeader {
-				log.Info("ISLEADER", "id", *id)
-				wasLeader = true
-			}
-		} else {
-			if wasLeader {
-				log.Info("LOSTLEADER", "id", *id)
-			}
-			wasLeader = false
-		}
-		select {
-		case <-environ.AppShutdownSignal:
-			le.Stop()
-			return 0
-		case <-runTicker.C:
-		}
+	select {
+	case <-environ.AppShutdownSignal:
+		le.Stop()
+		return 0
 	}
 }

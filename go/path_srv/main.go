@@ -242,8 +242,12 @@ func setupConsul(fatalC chan error, localIA addr.IA) (io.Closer, error) {
 		return nil, err
 	}
 	startHealthCheck(c, fatalC)
-	le := consul.StartLeaderElector(c, fmt.Sprintf("path_srv/leader/%s", localIA.FileFmt(false)),
-		consul.LeaderElectorConf{})
+	leaderKey := fmt.Sprintf("path_srv/leader/%s", localIA.FileFmt(false))
+	le, err := consul.StartLeaderElector(c, leaderKey, consulconfig.LeaderElectorConf{
+		// TODO(lukedirtwalker): Add actual callbacks here.
+		AcquiredLeader: func() {},
+		LostLeader:     func() {},
+	})
 	return closerFunc(func() error {
 		le.Stop()
 		return nil

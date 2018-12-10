@@ -7,7 +7,12 @@ import (
 
 	consulapi "github.com/hashicorp/consul/api"
 
+	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/util"
+)
+
+const (
+	DefaultLETimeout = 5 * time.Minute
 )
 
 var (
@@ -54,4 +59,39 @@ func (c *Config) Client() (*consulapi.Client, error) {
 	cfg := consulapi.DefaultConfig()
 	cfg.Address = c.Agent
 	return consulapi.NewClient(cfg)
+}
+
+type LeaderElectorConf struct {
+	// Timeout indicates how long the leader elector should blockingly wait for leader changes.
+	// If not set the default DefaultLETimeout is used.
+	Timeout time.Duration
+	// LockDelay is the lock delay passed to the consul API.
+	// If set to zero the default of the consul API is used.
+	// See also: https://www.consul.io/api/session.html#lockdelay
+	LockDelay time.Duration
+	// SessionTTL is the TTL of the session. By default this should be 10s.
+	// See https://www.consul.io/api/session.html#ttl
+	SessionTTL string
+	// AcquiredLeader is called if leadership is acquired.
+	// AcquiredLeader should be non-blocking/short-running
+	AcquiredLeader func()
+	// LostLeader is called if leadership is lost. LostLeader is allowed to block.
+	// As long as LostLeader blocks, leadership is not acquired.
+	LostLeader func()
+}
+
+func (c *LeaderElectorConf) Validate() error {
+	if c.AcquiredLeader == nil || c.LostLeader == nil {
+		return common.NewBasicError("Acquired-/LostLeader has to be set", nil)
+	}
+	return nil
+}
+
+func (c *LeaderElectorConf) InitDefaults() {
+	if c.Timeout == 0 {
+		c.Timeout = DefaultLETimeout
+	}
+	if c.SessionTTL == "" {
+		c.SessionTTL = "10s" // minimum (see https://www.consul.io/api/session.html#ttl)
+	}
 }
