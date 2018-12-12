@@ -6,12 +6,9 @@ import toml
 
 # SCION
 from lib.util import write_file
-from topology.common import docker_host, get_l4_port, get_pub_ip
+from topology.common import docker_host, get_l4_port, get_pub, get_pub_ip
 from topology.go import GoGenerator as VanillaGenerator
 from topology.ana.postgres import PSDB_NAME, PSDB_PORT
-
-# FIXME(sgmonroy): anacion/301 Below var does not exists in scionproto anymore.
-DEFAULT_DOCKER_NETWORK = "172.18.0.0/24"
 
 
 class GoGenerator(VanillaGenerator):
@@ -28,10 +25,7 @@ class GoGenerator(VanillaGenerator):
     def _build_ds_acl(self, topo):
         acl = []
         for k, conf in topo["BorderRouters"].items():
-            acl.append("%s/32" % get_pub_ip(conf["CtrlAddr"]))
-        # XXX(roosd): Allow border routers that run on the host.
-        if self.args.docker:
-            acl.append(DEFAULT_DOCKER_NETWORK)
+            acl.append("%s/32" % get_pub(conf["InternalAddrs"])['PublicOverlay']['Addr'].ip)
         for svc in (
             "BeaconService",
             "DiscoveryService",
