@@ -75,7 +75,7 @@ func realMain() int {
 		return 1
 	}
 	defer env.CleanupLog()
-	defer env.LogSvcStopped("SIG", cfg.Sig.ID)
+	defer env.LogAppStopped("SIG", cfg.Sig.ID)
 	if err := validateConfig(); err != nil {
 		log.Crit("Validation of config failed", "err", err)
 		return 1
@@ -127,7 +127,7 @@ func setupBasic() error {
 	if err := env.InitLogging(&cfg.Logging); err != nil {
 		return err
 	}
-	return env.LogSvcStarted("SIG", cfg.Sig.ID)
+	return env.LogAppStarted("SIG", cfg.Sig.ID)
 }
 
 func validateConfig() error {

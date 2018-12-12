@@ -23,7 +23,7 @@ func setupBasic() (*Config, error) {
 	if err := env.InitLogging(&config.Logging); err != nil {
 		return nil, err
 	}
-	env.LogSvcStarted(common.DS, config.General.ID)
+	env.LogAppStarted(common.DS, config.General.ID)
 	return config, nil
 }
 
