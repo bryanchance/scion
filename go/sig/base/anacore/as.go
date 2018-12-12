@@ -207,11 +207,7 @@ func (ae *ASEntry) delNet(ipnet *net.IPNet) error {
 		Added:    false,
 	}
 	base.NetworkChanged(params)
-	if len(ae.Nets) == 0 {
-		ae.egressRing.Close()
-		ae.egressRing = nil
-		ae.sigMgrStop <- struct{}{}
-	}
+	ae.checkNetsEmpty()
 	ae.Info("Removed network", "net", ipnet)
 	return nil
 }
@@ -327,7 +323,7 @@ func (ae *ASEntry) delOldSessions(cfgs config.SessionSet) egress.SessionSet {
 		// we don't need to optimize this yet.
 		if _, ok := cfgs[sess.ID()]; !ok {
 			session := ae.Sessions[sess.ID()]
-			delete(ae.Sessions, sess.ID())
+			ae.delSession(sess.ID())
 			deleted[session.ID()] = session
 		}
 	}
@@ -373,8 +369,23 @@ func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 	return nil
 }
 
-// TODO(kormat): add DelSession
-// len(ae.Sessions) == 0 { ae.healthMonitorStop <- struct{}{} }
+// DelSession deletes a session and stops the healthMonitor if no session is left
+func (ae *ASEntry) DelSession(sessId mgmt.SessionType) {
+	ae.Lock()
+	defer ae.Unlock()
+	ae.delSession(sessId)
+	if len(ae.Sessions) == 0 {
+		ae.healthMonitorStop <- struct{}{}
+	}
+}
+
+func (ae *ASEntry) delSession(sessId mgmt.SessionType) {
+	if _, ok := ae.Sessions[sessId]; ok {
+		delete(ae.Sessions, sessId)
+	} else {
+		ae.Error("delSession: Session not found", "sessId", sessId)
+	}
+}
 
 func (ae *ASEntry) buildNewPktPolicies(cfgPktPols []*config.PktPolicy,
 	classes pktcls.ClassMap) []*sessselector.PktPolicy {
@@ -503,24 +514,29 @@ func (ae *ASEntry) checkHealth() bool {
 func (ae *ASEntry) Cleanup() error {
 	ae.Lock()
 	defer ae.Unlock()
-	// Clean up sigMgr goroutine.
-	ae.sigMgrStop <- struct{}{}
-	// Clean up health monitor
-	ae.healthMonitorStop <- struct{}{}
+	ae.checkNetsEmpty()
 	// Clean up NetMap entries
 	for _, v := range ae.Nets {
 		if err := ae.delNet(v); err != nil {
 			ae.Error("Error removing networks during cleanup", "err", err)
 		}
 	}
-	ae.egressRing.Close()
 	// Clean up sessions, and associated workers.
 	ae.cleanSessions()
 	return nil
 }
 
+func (ae *ASEntry) checkNetsEmpty() {
+	if len(ae.Nets) == 0 {
+		ae.egressRing.Close()
+		ae.egressRing = nil
+		ae.sigMgrStop <- struct{}{}
+	}
+}
+
 func (ae *ASEntry) cleanSessions() {
-	for _, s := range ae.Sessions {
+	for id, s := range ae.Sessions {
+		ae.DelSession(id)
 		if err := s.Cleanup(); err != nil {
 			s.Error("Error cleaning up session", "err", err)
 		}
