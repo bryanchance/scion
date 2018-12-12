@@ -45,7 +45,7 @@ class ConsulGenerator(object):
     def _generate_server_dc(self):
         entry = {
             'image': 'consul:%s' % CONSUL_VERSION,
-            'container_name': self._server_name(),
+            'container_name': 'consul_server_docker' if self.args.in_docker else 'consul_server',
             'network_mode': 'bridge',
             'ports': [
                 '8301:8301',  # serf_lan
@@ -59,7 +59,7 @@ class ConsulGenerator(object):
             # First args are from dockerfile. We need to overwrite because of custom cfg dir.
             'command': ['agent', '-dev', '-client', '0.0.0.0', '-config-dir=/consul/cfg']
         }
-        self.dc_conf['services'][self._server_name()] = entry
+        self.dc_conf['services']['consul_server'] = entry
 
     def _generate_server_general(self):
         conf = self._generate_consul_config('server', self.docker_ip)
@@ -79,9 +79,10 @@ class ConsulGenerator(object):
             port = port + 1
 
     def _generate_client_dc(self, topo_id, topo, base, port):
+        name_pref = 'consul_agent_docker' if self.args.in_docker else 'consul_agent',
         entry = {
             'image': 'consul:%s' % CONSUL_VERSION,
-            'container_name': _agent_name(topo_id.file_fmt()),
+            'container_name': '%s-%s' % (name_pref, topo_id.file_fmt()),
             'network_mode': 'bridge',
             'ports': [
                 '%s:%s' % (port, port)
@@ -91,7 +92,7 @@ class ConsulGenerator(object):
             ],
             'command': ['agent', '-dev', '-client', '0.0.0.0', '-config-dir=/consul/cfg']
         }
-        self.dc_conf['services'][_agent_name(topo_id.file_fmt())] = entry
+        self.dc_conf['services']['consul_agent-%s' % topo_id.file_fmt()] = entry
 
     def _generate_client_config(self, topo_id, topo, base, port):
         # Only one agent is created per AS in the test topology.
@@ -102,7 +103,7 @@ class ConsulGenerator(object):
         self._generate_client_services(topo_id, topo, base, port)
 
     def _generate_client_general(self, topo_id, base, ip, port):
-        conf = self._generate_consul_config(_agent_name(topo_id), ip)
+        conf = self._generate_consul_config('consul_agent-%s' % topo_id, ip)
         conf.update({
             'leave_on_terminate': True,
             'retry_join': [self.docker_ip],
@@ -170,10 +171,3 @@ class ConsulGenerator(object):
                 },
             }
             f.write(toml.dumps(consul_entry))
-
-    def _server_name(self):
-        return 'consul_server_docker' if self.args.in_docker else 'consul_server'
-
-
-def _agent_name(name):
-    return 'consul_agent-%s' % name

@@ -51,4 +51,4 @@ class PostgresGenerator(object):
                 '%s:5432' % exp_port
             ],
         }
-        self.pg_conf['services'][name] = entry
+        self.pg_conf['services'][name_prefix] = entry
