@@ -36,14 +36,10 @@ import (
 	"github.com/scionproto/scion/go/sig/egress/router"
 	"github.com/scionproto/scion/go/sig/egress/session"
 	"github.com/scionproto/scion/go/sig/egress/worker"
-	"github.com/scionproto/scion/go/sig/internal/sigconfig"
 	"github.com/scionproto/scion/go/sig/mgmt"
-	"github.com/scionproto/scion/go/sig/sigcmn"
-	"github.com/scionproto/scion/go/sig/siginfo"
 )
 
 const (
-	sigMgrTick        = 10 * time.Second
 	healthMonitorTick = 5 * time.Second
 	DefSessId         = mgmt.SessionType(0)
 )
@@ -52,11 +48,9 @@ const (
 type ASEntry struct {
 	sync.RWMutex
 	Nets              map[string]*net.IPNet
-	Sigs              *siginfo.SigMap
 	IA                addr.IA
 	IAString          string
 	egressRing        *ringbuf.Ring
-	sigMgrStop        chan struct{}
 	healthMonitorStop chan struct{}
 	version           uint64 // used to track certain changes made to ASEntry
 	log.Logger
@@ -71,7 +65,6 @@ func newASEntry(ia addr.IA) (*ASEntry, error) {
 		IA:       ia,
 		IAString: ia.String(),
 		Nets:     make(map[string]*net.IPNet),
-		Sigs:     &siginfo.SigMap{},
 	}
 	ae.PktPolicies = sessselector.NewSyncPktPols()
 	ae.Sessions = make(egress.SessionSet)
@@ -83,9 +76,7 @@ func (ae *ASEntry) ReloadConfig(cfg *config.ASEntry, classes pktcls.ClassMap,
 	ae.Lock()
 	defer ae.Unlock()
 	// Method calls first to prevent skips due to logical short-circuit
-	s := ae.addNewSIGS(cfg.Sigs)
-	s = ae.delOldSIGS(cfg.Sigs) && s
-	s = ae.addNewNets(cfg.Nets) && s
+	s := ae.addNewNets(cfg.Nets)
 	s = ae.delOldNets(cfg.Nets) && s
 
 	sessionCfgs, err := config.BuildSessions(cfg.Sessions, actions)
@@ -172,11 +163,6 @@ func (ae *ASEntry) addNet(ipnet *net.IPNet) error {
 			defer log.LogPanicAndExit()
 			dispatcher.NewDispatcher(ae.IA, ae.egressRing, ae.PktPolicies).Run()
 		}()
-		ae.sigMgrStop = make(chan struct{})
-		go func() {
-			defer log.LogPanicAndExit()
-			ae.sigMgr()
-		}()
 	}
 	ae.Info("Added network", "net", ipnet)
 	return nil
@@ -210,89 +196,6 @@ func (ae *ASEntry) delNet(ipnet *net.IPNet) error {
 	ae.checkNetsEmpty()
 	ae.Info("Removed network", "net", ipnet)
 	return nil
-}
-
-// addNewSIGS adds the SIGs in sigs that are not currently configured.
-func (ae *ASEntry) addNewSIGS(sigs config.SIGSet) bool {
-	s := true
-	for _, sig := range sigs {
-		ctrlPort := int(sig.CtrlPort)
-		if ctrlPort == 0 {
-			ctrlPort = sigconfig.DefaultCtrlPort
-		}
-		encapPort := int(sig.EncapPort)
-		if encapPort == 0 {
-			encapPort = sigconfig.DefaultEncapPort
-		}
-		err := ae.AddSig(sig.Id, sig.Addr, ctrlPort, encapPort, true)
-		if err != nil {
-			ae.Error("Unable to add SIG", "sig", sig, "err", err)
-			s = false
-		}
-	}
-	return s
-}
-
-// delOldSIGS deletes the currently configured SIGs that are not in sigs.
-func (ae *ASEntry) delOldSIGS(sigs config.SIGSet) bool {
-	s := true
-	ae.Sigs.Range(func(id siginfo.SigIdType, sig *siginfo.Sig) bool {
-		if !sig.Static {
-			return true
-		}
-		if _, ok := sigs[sig.Id]; !ok {
-			err := ae.DelSig(sig.Id)
-			if err != nil {
-				ae.Error("Unable to delete SIG", "err", err)
-				s = false
-			}
-		}
-		return true
-	})
-	return s
-}
-
-// AddSig idempotently adds a SIG for the remote IA.
-func (ae *ASEntry) AddSig(id siginfo.SigIdType, ip net.IP, ctrlPort, encapPort int,
-	static bool) error {
-	// ae.Sigs is thread safe, no master lock needed
-	if len(id) == 0 {
-		return common.NewBasicError("AddSig: SIG id empty", nil, "ia", ae.IA)
-	}
-	if ip == nil {
-		return common.NewBasicError("AddSig: SIG address empty", nil, "ia", ae.IA)
-	}
-	if err := sigcmn.ValidatePort("remote ctrl", ctrlPort); err != nil {
-		return common.NewBasicError("Remote ctrl port validation failed", err,
-			"ia", ae.IA, "id", id)
-	}
-	if err := sigcmn.ValidatePort("remote encap", encapPort); err != nil {
-		return common.NewBasicError("Remote encap port validation failed", err,
-			"ia", ae.IA, "id", id)
-	}
-	if sig, ok := ae.Sigs.Load(id); ok {
-		sig.Host = addr.HostFromIP(ip)
-		sig.CtrlL4Port = ctrlPort
-		sig.EncapL4Port = encapPort
-		ae.Info("Updated SIG", "sig", sig)
-	} else {
-		sig := siginfo.NewSig(ae.IA, id, addr.HostFromIP(ip), ctrlPort, encapPort, static)
-		ae.Sigs.Store(id, sig)
-		ae.Info("Added SIG", "sig", sig)
-	}
-	return nil
-}
-
-// DelSIG removes an SIG for the remote IA.
-func (ae *ASEntry) DelSig(id siginfo.SigIdType) error {
-	// ae.Sigs is thread safe, no master lock needed
-	se, ok := ae.Sigs.Load(id)
-	if !ok {
-		return common.NewBasicError("DelSig: no SIG found", nil, "ia", ae.IA, "id", id)
-	}
-	ae.Sigs.Delete(id)
-	ae.Info("Removed SIG", "id", id)
-	return se.Cleanup()
 }
 
 // addNewSessions adds the sessions in cfgs that are not currently configured.
@@ -346,7 +249,7 @@ func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 			return err
 		}
 		// Session does not exist, so we create a new one
-		s, err := session.NewSession(ae.IA, sessId, ae.Sigs, ae.Logger, pool, worker.DefaultFactory)
+		s, err := session.NewSession(ae.IA, sessId, ae.Logger, pool, worker.DefaultFactory)
 		if err != nil {
 			return err
 		}
@@ -425,30 +328,6 @@ func (ae *ASEntry) addPktPolicy(name string, cls *pktcls.Class,
 	ppols = append(ppols, p)
 	ae.PktPolicies.Store(ppols)
 	return nil
-}
-
-// manage the Sig map
-func (ae *ASEntry) sigMgr() {
-	defer log.LogPanicAndExit()
-	ticker := time.NewTicker(sigMgrTick)
-	defer ticker.Stop()
-	ae.Info("sigMgr starting")
-Top:
-	for {
-		// TODO(kormat): handle adding new SIGs from discovery, and updating existing ones.
-		select {
-		case <-ae.sigMgrStop:
-			break Top
-		case <-ticker.C:
-			ae.Sigs.Range(func(id siginfo.SigIdType, sig *siginfo.Sig) bool {
-				sig.ExpireFails()
-				return true
-			})
-		}
-	}
-	close(ae.sigMgrStop)
-	ae.sigMgrStop = nil
-	ae.Info("sigMgr stopping")
 }
 
 func (ae *ASEntry) monitorHealth() {
@@ -530,7 +409,6 @@ func (ae *ASEntry) checkNetsEmpty() {
 	if len(ae.Nets) == 0 {
 		ae.egressRing.Close()
 		ae.egressRing = nil
-		ae.sigMgrStop <- struct{}{}
 	}
 }
 

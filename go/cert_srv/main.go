@@ -29,6 +29,7 @@ import (
 	"github.com/scionproto/scion/go/lib/consul"
 	"github.com/scionproto/scion/go/lib/consul/consulconfig"
 	"github.com/scionproto/scion/go/lib/env"
+	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/infra/infraenv"
 	"github.com/scionproto/scion/go/lib/infra/messenger"
 	"github.com/scionproto/scion/go/lib/infra/modules/itopo"
@@ -71,6 +72,7 @@ func main() {
 }
 
 func realMain() int {
+	fatal.Init()
 	env.AddFlags()
 	flag.Parse()
 	if v, ok := env.CheckFlags(csconfig.Sample); !ok {
@@ -80,8 +82,9 @@ func realMain() int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	defer env.CleanupLog()
+	defer log.Flush()
 	defer env.LogAppStopped(common.CS, config.General.ID)
+	defer log.LogPanicAndExit()
 	// Setup the state and the messenger
 	if err := setup(); err != nil {
 		log.Crit("Setup failed", "err", err)
@@ -102,24 +105,20 @@ func realMain() int {
 	})
 	// Cleanup when the CS exits.
 	defer stop()
-	// Create a channel where prometheus can signal fatal errors
-	fatalC := make(chan error, 2)
-	config.Metrics.StartPrometheus(fatalC)
+	config.Metrics.StartPrometheus()
 	// Start periodic health status setter
 	go func() {
 		defer log.LogPanicAndExit()
 		var err error
 		if ttlUpdater, err = startUpdateTTL(); err != nil {
-			fatalC <- err
+			fatal.Fatal(err)
 		}
 	}()
 	select {
 	case <-environment.AppShutdownSignal:
 		// Whenever we receive a SIGINT or SIGTERM we exit without an error.
 		return 0
-	case err := <-fatalC:
-		// Prometheus encountered a fatal error, thus we exit.
-		log.Crit("Unable to listen and serve", "err", err)
+	case <-fatal.Chan():
 		return 1
 	}
 }

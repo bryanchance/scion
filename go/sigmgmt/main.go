@@ -124,17 +124,6 @@ func configureRouter(cfg *config.Global, dbase *gorm.DB) http.Handler {
 		"/api/networks/{network}": {
 			"DELETE": c.DeleteNetwork,
 		},
-		"/api/ases/{as}/sigs": {
-			"GET":  c.GetSIGs,
-			"POST": c.PostSIG,
-		},
-		"/api/sigs/default": {
-			"GET": c.GetDefaultSIG,
-		},
-		"/api/sigs/{sig}": {
-			"PUT":    c.UpdateSIG,
-			"DELETE": c.DeleteSIG,
-		},
 		"/api/token/refresh": {
 			"POST": auth.RefreshToken,
 		},

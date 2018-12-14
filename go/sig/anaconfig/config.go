@@ -19,8 +19,6 @@ import (
 // source/anapaya versions via a single import change.
 
 type IPNet = config.IPNet
-type SIG = config.SIG
-type SIGSet = config.SIGSet
 
 // Cfg is a direct Go representation of the JSON file format.
 type Cfg struct {
@@ -50,10 +48,6 @@ func LoadFromFile(path string) (*Cfg, error) {
 // reference valid objects.
 func (cfg *Cfg) postprocess() error {
 	for ia, ae := range cfg.ASes {
-		for id, sig := range ae.Sigs {
-			sig.Id = id
-		}
-
 		// Check that each session references an action that exists
 		for sessId, actName := range ae.Sessions {
 			if actName == "" {
@@ -87,7 +81,6 @@ type ASEntry struct {
 	// Common with open source ASEntry
 
 	Nets []*config.IPNet `json:",omitempty"`
-	Sigs config.SIGSet   `json:",omitempty"`
 
 	// Anapaya specific
 

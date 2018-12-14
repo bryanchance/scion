@@ -5,18 +5,6 @@
                 "192.168.1.0/24",
                 "2001:db8::/48"
             ],
-            "Sigs": {
-                "remote-1": {
-                    "Addr": "10.0.1.1",
-                    "CtrlPort": 1234,
-                    "EncapPort": 5678
-                },
-                "remote-2": {
-                    "Addr": "10.0.1.2",
-                    "CtrlPort": 65535,
-                    "EncapPort": 0
-                }
-            },
             "Sessions": {
                 "3": "filter-A",
                 "4": "filter-B"
@@ -43,25 +31,16 @@
             "Nets": [
                 "2.0.0.0/16"
             ],
-            "Sigs": {},
             "Sessions": null,
             "PktPolicies": null
         },
         "1-ff00:0:3": {
             "Nets": [],
-            "Sigs": {},
             "Sessions": null,
             "PktPolicies": null
         },
         "1-ff00:0:4": {
             "Nets": [],
-            "Sigs": {
-                "remote-3": {
-                    "Addr": "2001:db8::4",
-                    "CtrlPort": 0,
-                    "EncapPort": 0
-                }
-            },
             "Sessions": {
                 "0": ""
             },

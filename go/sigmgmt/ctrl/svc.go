@@ -125,11 +125,7 @@ func (c *Controller) getSiteConfig(siteID uint) (*config.Cfg, *db.Site, string, 
 		if err != nil {
 			return nil, nil, "Could not convert Networks", err
 		}
-		sigs, err := db.SIGSetFromSIGs(as.SIGs)
-		if err != nil {
-			return nil, nil, "Could not convert SIGs", err
-		}
-		cfg.ASes[ia] = &config.ASEntry{Nets: networks, Sigs: sigs}
+		cfg.ASes[ia] = &config.ASEntry{Nets: networks}
 	}
 	return cfg, &site, "", nil
 }

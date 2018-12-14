@@ -19,6 +19,7 @@ class ConfigGenerator(VanillaGenerator):
     def _generate_go(self, topo_dicts):
         args = self._go_args(topo_dicts)
         go_gen = GoGenerator(args)
+        go_gen.generate_br()
         if self.args.cert_server == "go":
             go_gen.generate_cs()
         if self.args.sciond == "go":

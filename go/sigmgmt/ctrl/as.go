@@ -10,8 +10,6 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/scionproto/scion/go/lib/common"
-	"github.com/scionproto/scion/go/sig/sigcmn"
 	"github.com/scionproto/scion/go/sigmgmt/db"
 	"github.com/scionproto/scion/go/sigmgmt/util"
 )
@@ -220,79 +218,6 @@ func (c *Controller) PostNetwork(w http.ResponseWriter, r *http.Request, _ http.
 
 func (c *Controller) DeleteNetwork(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
 	if err := c.db.Delete(&db.Network{}, mux.Vars(r)["network"]).Error; err != nil {
-		respondError(w, err, DBDeleteError, http.StatusBadRequest)
-		return
-	}
-	respondEmpty(w)
-}
-
-func (c *Controller) GetSIGs(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var sigs []db.SIG
-	if err := c.db.Where("as_entry_id = ?", mux.Vars(r)["as"]).Find(&sigs).Error; err != nil {
-		respondError(w, err, DBFindError, http.StatusBadRequest)
-		return
-	}
-	respondJSON(w, sigs)
-}
-
-func (c *Controller) GetDefaultSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	respondJSON(w, db.SIG{CtrlPort: sigcmn.DefaultCtrlPort, EncapPort: sigcmn.DefaultEncapPort})
-}
-
-func (c *Controller) PostSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var sig *db.SIG
-	if err := json.NewDecoder(r.Body).Decode(&sig); err != nil {
-		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
-		return
-	}
-	if addr := net.ParseIP(sig.Address); addr == nil {
-		respondError(
-			w, common.NewBasicError(IPParseError, nil, "address", sig.Address), IPParseError, 400)
-		return
-	}
-	var as db.ASEntry
-	if !c.findOne(w, mux.Vars(r)["as"], &as) {
-		return
-	}
-	sig.ASEntryID = as.ID
-	if !c.createOne(w, &sig) {
-		return
-	}
-	respondJSON(w, sig)
-}
-
-func (c *Controller) UpdateSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var sig *db.SIG
-	if err := json.NewDecoder(r.Body).Decode(&sig); err != nil {
-		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
-		return
-	}
-	if addr := net.ParseIP(sig.Address); addr == nil {
-		respondError(
-			w, common.NewBasicError(IPParseError, nil, "address", sig.Address), IPParseError, 400)
-		return
-	}
-	id, err := strconv.Atoi(mux.Vars(r)["sig"])
-	if err != nil || int(sig.ID) != id {
-		respondError(w, nil, IDChangeError, http.StatusBadRequest)
-		return
-	}
-	err = c.db.Model(&sig).Updates(
-		map[string]interface{}{
-			"Name":      sig.Name,
-			"Address":   sig.Address,
-			"CtrlPort":  sig.CtrlPort,
-			"EncapPort": sig.EncapPort,
-		}).Error
-	if err != nil {
-		respondError(w, err, DBUpdateError, http.StatusBadRequest)
-		return
-	}
-	respondEmpty(w)
-}
-
-func (c *Controller) DeleteSIG(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	if err := c.db.Delete(&db.SIG{}, mux.Vars(r)["sig"]).Error; err != nil {
 		respondError(w, err, DBDeleteError, http.StatusBadRequest)
 		return
 	}

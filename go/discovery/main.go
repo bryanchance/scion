@@ -58,7 +58,6 @@ func realMain() int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	defer env.CleanupLog()
 	if err := setup(config); err != nil {
 		log.Crit("Setup failed", "err", err)
 		return 1

@@ -31,6 +31,7 @@ import (
 	"github.com/scionproto/scion/go/lib/consul"
 	"github.com/scionproto/scion/go/lib/consul/consulconfig"
 	"github.com/scionproto/scion/go/lib/env"
+	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/infra"
 	"github.com/scionproto/scion/go/lib/infra/infraenv"
 	"github.com/scionproto/scion/go/lib/infra/modules/cleaner"
@@ -77,6 +78,7 @@ func main() {
 }
 
 func realMain() int {
+	fatal.Init()
 	env.AddFlags()
 	flag.Parse()
 	if v, ok := env.CheckFlags(psconfig.Sample); !ok {
@@ -86,8 +88,9 @@ func realMain() int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	defer env.CleanupLog()
+	defer log.Flush()
 	defer env.LogAppStopped(common.PS, config.General.ID)
+	defer log.LogPanicAndExit()
 	if err := setup(); err != nil {
 		log.Crit("Setup failed", "err", err)
 		return 1
@@ -168,9 +171,7 @@ func realMain() int {
 		}
 	}
 	msger.AddHandler(infra.SegRev, handlers.NewRevocHandler(args))
-	// Create a channel where prometheus can signal fatal errors
-	fatalC := make(chan error, 2)
-	config.Metrics.StartPrometheus(fatalC)
+	config.Metrics.StartPrometheus()
 	// Start handling requests/messages
 	go func() {
 		defer log.LogPanicAndExit()
@@ -178,7 +179,7 @@ func realMain() int {
 	}()
 	// TODO(lukedirtwalker): We should have a top level config to indicate
 	// whether consul should be used or not.
-	c, err := setupConsul(fatalC, topo.ISD_AS)
+	c, err := setupConsul(topo.ISD_AS)
 	if err != nil {
 		log.Crit("Unable to start consul", "err", err)
 		return 1
@@ -199,9 +200,7 @@ func realMain() int {
 	case <-environment.AppShutdownSignal:
 		// Whenever we receive a SIGINT or SIGTERM we exit without an error.
 		return 0
-	case err := <-fatalC:
-		// Prometheus encountered a fatal error, thus we exit.
-		log.Crit("Unable to listen and serve", "err", err)
+	case <-fatal.Chan():
 		return 1
 	}
 }
@@ -232,7 +231,8 @@ func (cf closerFunc) Close() error {
 	return cf()
 }
 
-func setupConsul(fatalC chan error, localIA addr.IA) (io.Closer, error) {
+func setupConsul(localIA addr.IA) (io.Closer, error) {
+	fatal.Check()
 	if !config.Consul.UpdateTTL {
 		return nil, nil
 	}
@@ -241,7 +241,7 @@ func setupConsul(fatalC chan error, localIA addr.IA) (io.Closer, error) {
 	if err != nil {
 		return nil, err
 	}
-	startHealthCheck(c, fatalC)
+	startHealthCheck(c)
 	leaderKey := fmt.Sprintf("path_srv/leader/%s", localIA.FileFmt(false))
 	le, err := consul.StartLeaderElector(c, leaderKey, consulconfig.LeaderElectorConf{
 		// TODO(lukedirtwalker): Add actual callbacks here.
@@ -254,12 +254,12 @@ func setupConsul(fatalC chan error, localIA addr.IA) (io.Closer, error) {
 	}), nil
 }
 
-func startHealthCheck(c *consulapi.Client, fatalC chan error) {
+func startHealthCheck(c *consulapi.Client) {
 	go func() {
 		defer log.LogPanicAndExit()
 		var err error
 		if ttlUpdater, err = startUpdateTTL(c); err != nil {
-			fatalC <- err
+			fatal.Fatal(err)
 		}
 	}()
 }

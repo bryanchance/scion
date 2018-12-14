@@ -113,11 +113,12 @@ func LogAppStarted(svcType, elemId string) error {
 		return common.NewBasicError("Unable to determine if running in docker", err)
 	}
 	info := fmt.Sprintf("=====================> Service started %s %s\n"+
-		"%s  %s\n  %s\n  %s\n",
+		"%s  %s\n  %s\n  %s\n  %s\n",
 		svcType,
 		elemId,
 		VersionInfo(),
 		fmt.Sprintf("In docker:     %v", inDocker),
+		fmt.Sprintf("pid:           %d", os.Getpid()),
 		fmt.Sprintf("euid/egid:     %d %d", os.Geteuid(), os.Getegid()),
 		fmt.Sprintf("cmd line:      %q", os.Args),
 	)
@@ -136,11 +137,4 @@ func VersionInfo() string {
 
 func LogAppStopped(svcType, elemId string) {
 	log.Info(fmt.Sprintf("=====================> Service stopped %s %s", svcType, elemId))
-}
-
-// CleanupLog calls log.LogPanicAndExit and log.Flush
-// it is mainly a helper to have a single defer call in services.
-func CleanupLog() {
-	log.LogPanicAndExit()
-	log.Flush()
 }
