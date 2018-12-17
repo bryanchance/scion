@@ -185,7 +185,7 @@ func stopReissRunner() {
 }
 
 func startUpdateTTL() (*periodic.Runner, error) {
-	if !config.Consul.UpdateTTL {
+	if !config.Consul.Enabled {
 		return nil, nil
 	}
 	config.Consul.InitDefaults()

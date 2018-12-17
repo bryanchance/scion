@@ -20,3 +20,12 @@ class SupervisorGenerator(VanillaGenerator):
             conf = os.path.join(base, k, "dsconfig.toml")
             entries.append((k, ["bin/discovery", "-config", conf]))
         return entries
+
+    def _ps_entries(self, topo, base):
+        if self.args.path_server == "py" or not self.args.consul:
+            return super()._ps_entries(topo, base)
+        entries = []
+        for k, v in topo.get("PathService", {}).items():
+            conf = os.path.join(base, k, "psconfig.toml")
+            entries.append((k, ["bin/path_srv", "-config", conf]))
+        return entries

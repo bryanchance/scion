@@ -85,10 +85,10 @@ class GoGenerator(VanillaGenerator):
         for topo_id, topo in self.args.topo_dicts.items():
             schema_name = self._pg_db_schema(topo_id, 'pspath')
             self._generate_path_postgres_init(topo_id, schema_name)
+            base = topo_id.base_dir(self.args.output_dir)
             for k, v in topo.get("PathService", {}).items():
-                # only a single Go-PS per AS is currently supported
-                if k.endswith("-1"):
-                    base = topo_id.base_dir(self.args.output_dir)
+                # without consul only a single go PS is supported
+                if k.endswith("-1") or self.args.consul:
                     ps_conf = self._build_ps_conf(topo_id, topo["ISD_AS"], base, k)
                     write_file(os.path.join(base, k, "psconfig.toml"), toml.dumps(ps_conf))
                     self._genereate_pg_user_init(topo_id, 'ps', k, schema_name)

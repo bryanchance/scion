@@ -39,8 +39,8 @@ func (h *HealthCheck) InitDefaults() {
 }
 
 type Config struct {
+	Enabled        bool
 	Agent          string
-	UpdateTTL      bool
 	Health         HealthCheck
 	InitConnPeriod util.DurWrap `toml:"InitialConnectPeriod"`
 }
@@ -62,6 +62,8 @@ func (c *Config) Client() (*consulapi.Client, error) {
 }
 
 type LeaderElectorConf struct {
+	// Name is the name of the service. Used as the session name in consul.
+	Name string
 	// Timeout indicates how long the leader elector should blockingly wait for leader changes.
 	// If not set the default DefaultLETimeout is used.
 	Timeout time.Duration

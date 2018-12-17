@@ -178,18 +178,18 @@ func realMain() int {
 		msger:   msger,
 		trustDB: trustDB,
 	}
-	tasks.Start()
-	defer tasks.Kill()
-	// TODO(lukedirtwalker): We should have a top level config to indicate
-	// whether consul should be used or not.
-	c, err := setupConsul(topo.ISD_AS)
-	if err != nil {
-		log.Crit("Unable to start consul", "err", err)
-		return 1
-	}
-	if c != nil {
+	if config.Consul.Enabled {
+		c, err := setupConsul()
+		if err != nil {
+			log.Crit("Unable to start consul", "err", err)
+			return 1
+		}
 		defer c.Close()
+	} else {
+		tasks.Start()
+		defer tasks.Kill()
 	}
+
 	select {
 	case <-environment.AppShutdownSignal:
 		// Whenever we receive a SIGINT or SIGTERM we exit without an error.
@@ -277,22 +277,19 @@ func (cf closerFunc) Close() error {
 	return cf()
 }
 
-func setupConsul(localIA addr.IA) (io.Closer, error) {
+func setupConsul() (io.Closer, error) {
 	fatal.Check()
-	if !config.Consul.UpdateTTL {
-		return nil, nil
-	}
 	config.Consul.InitDefaults()
 	c, err := config.Consul.Client()
 	if err != nil {
 		return nil, err
 	}
 	startHealthCheck(c)
-	leaderKey := fmt.Sprintf("path_srv/leader/%s", localIA.FileFmt(false))
+	leaderKey := fmt.Sprintf("path_srv/leader/%s", config.General.Topology.ISD_AS.FileFmt(false))
 	le, err := consul.StartLeaderElector(c, leaderKey, consulconfig.LeaderElectorConf{
-		// TODO(lukedirtwalker): Add actual callbacks here.
-		AcquiredLeader: func() {},
-		LostLeader:     func() {},
+		Name:           config.General.ID,
+		AcquiredLeader: tasks.Start,
+		LostLeader:     tasks.Kill,
 	})
 	return closerFunc(func() error {
 		le.Stop()

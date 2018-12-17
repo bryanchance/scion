@@ -6,6 +6,7 @@ from topology.ana.docker import DockerGenerator
 from topology.ana.go import GoGenerator
 from topology.ana.postgres import PostgresGenArgs, PostgresGenerator
 from topology.ana.supervisor import SupervisorGenerator
+from topology.ana.topo import TopoGenerator
 from topology.config import ConfigGenerator as VanillaGenerator
 
 
@@ -28,6 +29,10 @@ class ConfigGenerator(VanillaGenerator):
             go_gen.generate_ps()
         if self.args.discovery:
             go_gen.generate_ds()
+
+    def _generate_topology(self):
+        topo_gen = TopoGenerator(self._topo_args())
+        return topo_gen.generate()
 
     def _generate_docker(self, topo_dicts):
         args = self._docker_args(topo_dicts)

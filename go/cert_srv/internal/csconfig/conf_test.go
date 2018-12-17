@@ -22,6 +22,7 @@ import (
 	"github.com/BurntSushi/toml"
 	. "github.com/smartystreets/goconvey/convey"
 
+	"github.com/scionproto/scion/go/lib/consul/consulconfig"
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/truststorage"
 )
@@ -33,6 +34,8 @@ type TestConfig struct {
 	Infra   env.Infra
 	TrustDB truststorage.TrustDBConf
 	CS      Conf
+
+	Consul consulconfig.Config
 }
 
 func TestSampleCorrect(t *testing.T) {
@@ -40,6 +43,8 @@ func TestSampleCorrect(t *testing.T) {
 		var cfg TestConfig
 		// Make sure AutomaticRenweal is set during decoding.
 		cfg.CS.AutomaticRenewal = true
+		// Make sure consul enabled is set.
+		cfg.Consul.Enabled = true
 		_, err := toml.Decode(Sample, &cfg)
 		SoMsg("err", err, ShouldBeNil)
 
@@ -63,6 +68,16 @@ func TestSampleCorrect(t *testing.T) {
 		SoMsg("IssuerReissTime correct", cfg.CS.IssuerReissueLeadTime.Duration, ShouldEqual,
 			IssuerReissTime)
 		SoMsg("AutomaticRenewal correct", cfg.CS.AutomaticRenewal, ShouldBeFalse)
+
+		// Consul specific
+		SoMsg("Consul.Enabled correct", cfg.Consul.Enabled, ShouldBeFalse)
+		SoMsg("Consul.Agent correct", cfg.Consul.Agent, ShouldEqual, consulconfig.DefaultAgent)
+		SoMsg("Consul.Health.Interval correct", cfg.Consul.Health.Interval.Duration,
+			ShouldEqual, consulconfig.DefaultHealthInterval)
+		SoMsg("Consul.Health.Timeout correct", cfg.Consul.Health.Timeout.Duration,
+			ShouldEqual, consulconfig.DefaultHealthTimeout)
+		SoMsg("Consul.InitConnPeriod correct", cfg.Consul.InitConnPeriod.Duration,
+			ShouldEqual, consulconfig.DefaultInitConnPeriod)
 	})
 }
 

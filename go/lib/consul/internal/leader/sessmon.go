@@ -84,7 +84,7 @@ func (s *sessMon) run() {
 
 func (s *sessMon) createSession() (string, chan struct{}, error) {
 	se := &consulapi.SessionEntry{
-		Name:      s.key,
+		Name:      s.cfg.Name,
 		TTL:       s.cfg.SessionTTL,
 		LockDelay: s.cfg.LockDelay,
 	}

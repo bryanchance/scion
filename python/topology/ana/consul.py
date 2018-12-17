@@ -79,7 +79,7 @@ class ConsulGenerator(object):
             port = port + 1
 
     def _generate_client_dc(self, topo_id, topo, base, port):
-        name_pref = 'consul_agent_docker' if self.args.in_docker else 'consul_agent',
+        name_pref = 'consul_agent_docker' if self.args.in_docker else 'consul_agent'
         entry = {
             'image': 'consul:%s' % CONSUL_VERSION,
             'container_name': '%s-%s' % (name_pref, topo_id.file_fmt()),
@@ -166,7 +166,7 @@ class ConsulGenerator(object):
         with open(file, 'a') as f:
             consul_entry = {
                 'consul': {
-                    'UpdateTTL': True,
+                    'Enabled': True,
                     'Agent': '%s:%s' % (self.docker_ip, port)
                 },
             }

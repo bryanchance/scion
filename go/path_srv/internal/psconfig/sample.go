@@ -82,4 +82,19 @@ const Sample = `[general]
   [ps.RevCache]
     Backend = "mem"
 
+[consul]
+  # Enables consul. (default: false)
+  Enabled = false
+
+  # The consul agent to connect to. (default: 127.0.0.1:8500)
+  Agent = "127.0.0.1:8500"
+
+  # The maximum time the initial connection to consul can take. (default 5s)
+  InitialConnectPeriod = "5s"
+
+  [consul.Health]
+    # The interval at which the health status should be reported to consul. (default 5s)
+    Interval = "5s"
+    # The timeout for setting the health status. (default 1s)
+    Timeout = "1s"
 `
