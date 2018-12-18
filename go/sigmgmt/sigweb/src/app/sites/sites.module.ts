@@ -9,7 +9,6 @@ import { MouseoverDirective } from '../mouseover.directive'
 import { ASDetailComponent } from './as/asdetail/asdetail.component'
 import { PoliciesComponent } from './as/asdetail/policies/policies.component'
 import { NetworksComponent } from './as/asdetail/networks/networks.component'
-import { SigsComponent } from './as/asdetail/sigs/sigs.component'
 import { ASListComponent } from './as/aslist/aslist.component'
 import { PathSelectorComponent } from './path-selector/path-selector.component'
 import { SiteConfigurationComponent } from './site-configuration/site-configuration.component'
@@ -44,7 +43,6 @@ import { BoolComponent } from './traffic-class-details/cond/bool/bool.component'
     ASListComponent,
     ASDetailComponent,
     NetworksComponent,
-    SigsComponent,
     PoliciesComponent,
     TrafficClassesComponent,
     CondComponent,

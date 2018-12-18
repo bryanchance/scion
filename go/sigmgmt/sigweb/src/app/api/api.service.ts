@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http'
 import { Injectable } from '@angular/core'
 import { map } from 'rxjs/operators'
 
-import { ASEntry, CIDR, PathSelector, SIG, Site, Policy } from '../sites/models/models'
+import { ASEntry, CIDR, PathSelector, Site, Policy } from '../sites/models/models'
 import { TrafficClass, TrafficClassFromJSON } from '../sites/models/models'
 import { User } from './user.service'
 
@@ -159,27 +159,6 @@ export class ApiService {
 
   deleteNetwork(as: ASEntry, network: CIDR) {
     return this.http.delete('networks/' + network.ID)
-  }
-
-  /** SIGS */
-  getSIGs(as: ASEntry) {
-    return this.http.get<SIG[]>('ases/' + as.ID + '/sigs')
-  }
-
-  getDefaultSIG() {
-    return this.http.get<SIG>('sigs/default')
-  }
-
-  createSIG(as: ASEntry, sig: SIG) {
-    return this.http.post<SIG>('ases/' + as.ID + '/sigs', sig)
-  }
-
-  updateSIG(sig: SIG) {
-    return this.http.put<SIG>('sigs/' + sig.ID, sig)
-  }
-
-  deleteSIG(sig: SIG) {
-    return this.http.delete('sigs/' + sig.ID)
   }
 
   /** Authentication */

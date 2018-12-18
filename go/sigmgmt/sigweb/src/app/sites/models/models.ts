@@ -47,14 +47,6 @@ export class CIDR {
     CIDR: string
 }
 
-export class SIG {
-    ID: number
-    Name: string
-    Address: string
-    EncapPort: number
-    CtrlPort: number
-}
-
 export class TrafficClass {
     ID: number
     Name: string

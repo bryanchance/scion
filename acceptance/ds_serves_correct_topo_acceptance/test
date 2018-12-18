@@ -165,7 +165,7 @@ query_topo() {
 }
 
 test_teardown() {
-    ./tools/dc down
+    ./scion.sh stop
 }
 
 print_help() {
