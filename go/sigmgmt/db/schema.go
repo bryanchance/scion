@@ -34,17 +34,16 @@ type PathSelector struct {
 }
 
 type ASEntry struct {
-	ID             uint
-	Name           string
-	ISD            string    `gorm:"column:isd_id"`
-	AS             string    `gorm:"column:as_id"`
-	Policies       string    `gorm:"column:policies"`
-	SiteID         uint      `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name, isd_id, as_id)" json:"-"`
-	SIGs           []SIG     `json:",omitempty"`
-	Networks       []Network `json:",omitempty"`
-	Policy         []Policy  `json:",omitempty"`
-	SigMgmt        string    `json:",omitempty"`
-	StagedNetworks []Network `json:",omitempty"`
+	ID                   uint
+	Name                 string
+	ISD                  string    `gorm:"column:isd_id"`
+	AS                   string    `gorm:"column:as_id"`
+	Policies             string    `gorm:"column:policies"`
+	SiteID               uint      `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name, isd_id, as_id)" json:"-"`
+	SIGs                 []SIG     `json:",omitempty"`
+	Networks             []Network `json:",omitempty"`
+	Policy               []Policy  `json:",omitempty"`
+	IPAllocationProvider string    `json:",omitempty"`
 }
 
 func (ASEntry) TableName() string {
