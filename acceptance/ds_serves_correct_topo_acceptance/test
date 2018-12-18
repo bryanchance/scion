@@ -27,7 +27,7 @@ test_setup() {
         printf "\n$PRIVILEGED/32" >> $ds/acl
         sed -i '/\[ds\.zoo\]/a QueryInterval = "1s"' "$ds/dsconfig.toml"
     done
-    ./scion.sh run
+    ./scion.sh run nobuild
 }
 
 test_run() {
@@ -60,7 +60,7 @@ check_dynamic() {
     kill_and_check "[p]s1-ff00_0_111-2" $addr 1 1 1
     # Restart instances
     printf "[dynamic] Restarting killed services\n"
-    ./scion.sh run
+    ./scion.sh run nobuild
     # Make sure that the instances have registered with service discovery.
     sleep 5
     # Check dynamic is served with all instances.
@@ -165,8 +165,7 @@ query_topo() {
 }
 
 test_teardown() {
-    set -e
-    ./scion.sh stop
+    ./tools/dc down
 }
 
 print_help() {
