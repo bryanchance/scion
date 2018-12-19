@@ -134,3 +134,20 @@ func (c *pgRevCache) Insert(ctx context.Context, rev *path_mgmt.SignedRevInfo) (
 	}
 	return true, nil
 }
+
+func (c *pgRevCache) DeleteExpired(ctx context.Context) (int64, error) {
+	tx, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	query := `DELETE FROM Revocations WHERE Expiration < NOW()`
+	r, err := tx.ExecContext(ctx, query)
+	if err != nil {
+		tx.Rollback()
+		return 0, err
+	}
+	if err = tx.Commit(); err != nil {
+		return 0, err
+	}
+	return r.RowsAffected()
+}
