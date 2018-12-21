@@ -277,9 +277,6 @@ func (ae *ASEntry) DelSession(sessId mgmt.SessionType) {
 	ae.Lock()
 	defer ae.Unlock()
 	ae.delSession(sessId)
-	if len(ae.Sessions) == 0 {
-		ae.healthMonitorStop <- struct{}{}
-	}
 }
 
 func (ae *ASEntry) delSession(sessId mgmt.SessionType) {
@@ -287,6 +284,9 @@ func (ae *ASEntry) delSession(sessId mgmt.SessionType) {
 		delete(ae.Sessions, sessId)
 	} else {
 		ae.Error("delSession: Session not found", "sessId", sessId)
+	}
+	if len(ae.Sessions) == 0 {
+		ae.healthMonitorStop <- struct{}{}
 	}
 }
 
@@ -414,7 +414,7 @@ func (ae *ASEntry) checkNetsEmpty() {
 
 func (ae *ASEntry) cleanSessions() {
 	for id, s := range ae.Sessions {
-		ae.DelSession(id)
+		ae.delSession(id)
 		if err := s.Cleanup(); err != nil {
 			s.Error("Error cleaning up session", "err", err)
 		}

@@ -10,6 +10,7 @@ flake8
 g++
 gcc
 git
+iproute2
 jq
 libcapnp-dev
 libcurl4-openssl-dev

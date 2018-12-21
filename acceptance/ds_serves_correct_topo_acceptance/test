@@ -13,21 +13,26 @@ DYNAMIC="dynamic"
 REDUCED="reduced.json"
 FULL="full.json"
 
-PRIVILEGED=${PRIVILEGED:-"127.0.0.2"}
-REGULAR=${REGULAR:-"127.0.0.1"}
-TEST_TOPOLOGY="./acceptance/ds_serves_correct_topo_acceptance/test.topo"
+PRIVILEGED=${PRIVILEGED:-"172.220.0.2"}
+REGULAR=${REGULAR:-"172.220.0.1"}
+TEST_TOPOLOGY="./acceptance/ds_serves_correct_topo_acceptance/Test.topo"
 MULTI_SVC_AS_DIR="gen/ISD1/ASff00_0_111"
 
 
 test_setup() {
     set -e
-    ./scion.sh topology zkclean -c $TEST_TOPOLOGY -ds -ps=py -cs=py
+    sudo -p "Setup virtual interfaces - [sudo] password for %p: " true
+    sudo ip addr add "$PRIVILEGED/32" dev lo
+    sudo ip addr add "$REGULAR/32" dev lo
+
+    ./scion.sh topology zkclean -c $TEST_TOPOLOGY -ds -ps=py -cs=py -d
     for ds in gen/ISD1/*/ds*; do
         # Add privileged to the ACL.
         printf "\n$PRIVILEGED/32" >> $ds/acl
         sed -i '/\[ds\.zoo\]/a QueryInterval = "1s"' "$ds/dsconfig.toml"
     done
     ./scion.sh run nobuild
+    sleep 5
 }
 
 test_run() {
@@ -53,16 +58,16 @@ check_dynamic() {
     addr="$( get_laddr $MULTI_SVC_AS_DIR/ds1-ff00_0_111-1 )"
     # Kill services instances and check that the dynamic is updated.
     printf "[dynamic] Killing beacon service\n"
-    kill_and_check "[b]s1-ff00_0_111-2" $addr 1 2 2
+    kill_and_check "bs1-ff00_0_111-2" $addr 1 2 2
     printf "[dynamic] Killing certificate service\n"
-    kill_and_check "[c]s1-ff00_0_111-2" $addr 1 1 2
+    kill_and_check "cs1-ff00_0_111-2" $addr 1 1 2
     printf "[dynamic] Killing path service\n"
-    kill_and_check "[p]s1-ff00_0_111-2" $addr 1 1 1
+    kill_and_check "ps1-ff00_0_111-2" $addr 1 1 1
     # Restart instances
     printf "[dynamic] Restarting killed services\n"
     ./scion.sh run nobuild
     # Make sure that the instances have registered with service discovery.
-    sleep 5
+    sleep 10
     # Check dynamic is served with all instances.
     check_all_disc $DYNAMIC
     printf "[dynamic] All tests passed\n"
@@ -94,7 +99,7 @@ check_all_disc() {
 # Arguments:
 #   Discovery service config dir
 get_laddr() {
-    grep -Po 'ListenAddr = "\K.*?(?=")' $1/dsconfig.toml
+    jq -r '.DiscoveryService[].Addrs[].Public | "\(.Addr):\(.L4Port)"' $1/topology.json
 }
 
 # Compare topology with version on disk.
@@ -136,8 +141,8 @@ query_status_code() {
 #   Expected certificate server count
 #   Expected path server count
 kill_and_check() {
-    kill -9 $( ps aux | grep $1 | awk '{print $2}' )
-    sleep 3
+    ./tools/dc dc kill "scion_$1"
+    sleep 10
     topo=$( query_topo $PRIVILEGED $2 $DYNAMIC $FULL )
     jq "[(.BeaconService | length == $3),(.CertificateService | length == $4),(.PathService | length == $5)] | all" -e <(echo $topo) > /dev/null
     # BS is not exposed to regular hosts
@@ -165,7 +170,10 @@ query_topo() {
 }
 
 test_teardown() {
-    ./scion.sh stop
+    ./tools/dc down
+    sudo -p "Teardown virtual interfaces - [sudo] password for %p: " true
+    sudo ip addr del "$PRIVILEGED/32" dev lo
+    sudo ip addr del "$REGULAR/32" dev lo
 }
 
 print_help() {

@@ -9,6 +9,8 @@ STEPS="$BASE/steps"
 if [ -z "$RUN_ALL_TESTS" ]; then
     [ "$BUILDKITE_PULL_REQUEST" = "false" ] && export RUN_ALL_TESTS=y
 fi
+# if this is an anamerge, run the full pipeline
+[[ "$BUILDKITE_BRANCH" = *"anamerge" ]] && export RUN_ALL_TESTS=y
 
 # begin the pipeline.yml file
 "$BASE/common.sh"

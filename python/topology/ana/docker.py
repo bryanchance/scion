@@ -5,6 +5,7 @@ import copy
 import os
 
 # SCION
+from topology.ana.sig import SIGGenerator
 from topology.common import DOCKER_USR_VOL
 from topology.docker import DockerGenerator as VanillaGenerator
 
@@ -35,3 +36,7 @@ class DockerGenerator(VanillaGenerator):
             entry['networks'][self.bridges[net['net']]] = {'ipv4_address': str(net['ipv4'])}
             entry['volumes'].append('%s:/share/conf:ro' % os.path.join(base, k))
             self.dc_conf['services']['scion_%s' % k] = entry
+
+    def _gen_sig(self):
+        sig_gen = SIGGenerator(self._sig_args())
+        self.dc_conf = sig_gen.generate()
