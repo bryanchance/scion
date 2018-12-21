@@ -20,6 +20,7 @@ package truststorage
 import (
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb"
+	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb/trustdbpg"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb/trustdbsqlite"
 	"github.com/scionproto/scion/go/lib/log"
 )
@@ -29,6 +30,8 @@ type Backend string
 const (
 	BackendNone   Backend = ""
 	BackendSqlite Backend = "sqlite"
+
+	BackendPostgres Backend = "postgres"
 )
 
 // TrustDBConf is the configuration for the connection to the trust database.
@@ -46,6 +49,8 @@ func (c TrustDBConf) New() (trustdb.TrustDB, error) {
 		return trustdbsqlite.New(c.Connection)
 	case BackendNone:
 		return defaultBackend(c.Connection)
+	case BackendPostgres:
+		return trustdbpg.New(c.Connection)
 	default:
 		return nil, common.NewBasicError("Unsupported backend", nil, "backend", c.Backend)
 	}

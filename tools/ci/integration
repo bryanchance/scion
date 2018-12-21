@@ -3,6 +3,9 @@
 . tools/ci/common.sh
 
 ./docker.sh exec "set -x; ./scion.sh topology ${DOCKER_BE:+ -d -n 172.21.0.0/16 -c topology/Tiny.topo}"
+# Postgres needs some time to be ready. 
+# TODO(lukedirtwalker): Use better mechanism to determine readiness (see: https://github.com/docker-library/postgres/issues/146)
+sleep 15
 ./docker.sh exec "set -eo pipefail; ./scion.sh run nobuild | grep -v "started" |& tee logs/integration.run"
 ./docker.sh exec "set -eo pipefail; ./scion.sh status |& tee logs/integration.run"
 
