@@ -32,9 +32,9 @@ class PostgresGenerator(object):
     def generate(self):
         if self.args.cs_db != 'postgres' and self.args.ps_db != 'postgres':
             return
-        if self.args.ps_db == 'postgres':
+        if self.args.ps_db == 'postgres' and self.args.path_server == 'go':
             self._gen_dc('postgres_ps', PSDB_NAME, PSDB_PORT)
-        if self.args.cs_db == 'postgres':
+        if self.args.cs_db == 'postgres' and self.args.cert_server == 'go':
             self._gen_dc('postgres_cs', CSDB_NAME, CSDB_PORT)
         write_file(os.path.join(self.args.output_dir, PG_CONF),
                    yaml.dump(self.pg_conf, default_flow_style=False))
