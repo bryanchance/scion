@@ -133,10 +133,9 @@ func (db *executor) GetChainVersion(ctx context.Context, ia addr.IA,
 	query := `
 	SELECT Data, 0 AS idx FROM LeafCerts WHERE IsdID=$1 AND AsID=$2 AND Version=$3
 	UNION ALL
-	SELECT ic.Data, ch.OrderKey AS idx FROM IssuerCerts ic, Chains ch
-	WHERE ic.RowID IN (
-		SELECT IssCertsRowID FROM Chains WHERE IsdID=$1 AND AsID=$2 AND Version=$3
-	)
+	SELECT ic.Data, ch.OrderKey AS idx FROM Chains ch
+	JOIN IssuerCerts ic ON ch.IssCertsRowID = ic.RowID
+	WHERE ch.IsdID=$1 AND ch.AsID=$2 AND ch.Version=$3
 	ORDER BY idx`
 	rows, err := db.db.QueryContext(ctx, query, ia.I, ia.A, version)
 	return parseChain(rows, err)
