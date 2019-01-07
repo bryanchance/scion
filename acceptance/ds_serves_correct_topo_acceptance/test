@@ -85,7 +85,7 @@ check_all_disc() {
         compare_topo_reduced $ds "$( query_topo $REGULAR $addr $1 $REDUCED )"
         # Check full topo
         topo=$( query_topo $PRIVILEGED $addr $1 $FULL )
-        diff <(jq 'del(.Timestamp, .TimestampHuman)' -S <(echo "$topo")) <(jq '.' -S <(cat "$ds/topology.json"))
+        diff <(jq 'del(.Timestamp, .TimestampHuman, .TTL)' -S <(echo "$topo")) <(jq '.' -S <(cat "$ds/topology.json"))
         sc=$( query_status_code $REGULAR $addr $1 $FULL )
         if [[ $sc != "403" ]]; then
             printf "Error: $( full=$FULL mode=$1 host=$REGULAR )\nerr=Unexpected status code: $sc\n"
@@ -109,7 +109,7 @@ get_laddr() {
 #   Raw topology recieved from discovery service
 compare_topo_reduced() {
     filter="del(.ZookeeperService, .BeaconService) | del( .BorderRouters[].Interfaces[] | (.Overlay, .BindOverlay, .PublicOverlay, .RemoteOverlay))"
-    diff <(jq 'del(.Timestamp, .TimestampHuman)' -S <(echo $2)) <(jq "$filter" -S <(cat "$1/topology.json"))
+    diff <(jq 'del(.Timestamp, .TimestampHuman, .TTL)' -S <(echo $2)) <(jq "$filter" -S <(cat "$1/topology.json"))
 }
 
 # Get status code when querying topology from discovery service.
