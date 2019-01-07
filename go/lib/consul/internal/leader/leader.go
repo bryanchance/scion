@@ -70,11 +70,21 @@ func (l *leaderMon) run() {
 			continue
 		}
 		l.logger.Debug("[LeaderElector] Session changed", "newSessId", sessId)
-		// TODO print new session info.
 		if leader {
 			l.ln.setLeader(false)
 		}
 	}
+}
+
+func (l *leaderMon) sessionName(sessId string) string {
+	qo := &consulapi.QueryOptions{}
+	qo = qo.WithContext(l.ctx)
+	session, _, err := l.c.Session().Info(sessId, qo)
+	if err != nil {
+		l.logger.Warn("Failed to list session", "err", err)
+		return "Could not determine"
+	}
+	return session.Name
 }
 
 func (l *leaderMon) acquire() (bool, error) {
@@ -104,11 +114,6 @@ func (l *leaderMon) tryAcquire() (bool, error) {
 	if err != nil {
 		return false, common.NewBasicError("Error while acquiring leader lock", err)
 	}
-	if acquired {
-		l.logger.Info("[LeaderElector] Became leader")
-	} else {
-		l.logger.Trace("[LeaderElector] Not leader")
-	}
 	return acquired, nil
 }
 
@@ -116,6 +121,10 @@ func (l *leaderMon) waitForChanges() (string, error) {
 	sessId, modIdx, err := l.lockSessIdBlock(0)
 	if err != nil {
 		return "", common.NewBasicError("Error while waiting on changes", err)
+	}
+	if sessId != l.sessId {
+		l.logger.Info("[LeaderElector] Current leader",
+			"leaderSession", sessId, "leaderName", l.sessionName(sessId))
 	}
 	for {
 		var newSessId string

@@ -39,6 +39,7 @@ func realMain() int {
 		return 1
 	}
 	le, err := consul.StartLeaderElector(c, *key, consulconfig.LeaderElectorConf{
+		Name:    fmt.Sprintf("leader_acceptance_%s", *id),
 		Timeout: 5 * time.Second,
 		// Use a low lock delay for tests to have a faster handover.
 		LockDelay:  1 * time.Second,
