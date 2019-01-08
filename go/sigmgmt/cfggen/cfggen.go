@@ -7,11 +7,9 @@
 package cfggen
 
 import (
-	"strconv"
-	"strings"
-
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/pathpol"
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sig/mgmt"
@@ -22,24 +20,19 @@ import (
 type Command struct {
 	Name      string
 	Condition pktcls.Cond
-	Selectors []string
+	Policies  []string
 }
 
 // Compile inserts the rules specified by policies into cfg. Any overwrites happen silently.
-func Compile(cfg *config.Cfg, policies map[addr.IA][]db.Policy,
-	trafficClasses map[uint]db.TrafficClass, selectors []db.PathSelector) error {
-	if cfg.Classes == nil {
-		cfg.Classes = make(pktcls.ClassMap)
+func Compile(cfg *config.Cfg, policies map[addr.IA][]db.TrafficPolicy,
+	trafficClasses map[uint]db.TrafficClass, pathPolicies []*pathpol.ExtPolicy) error {
+	if cfg.PktClasses == nil {
+		cfg.PktClasses = make(pktcls.ClassMap)
 	}
-	actions, err := db.ActionMapFromSelectors(selectors)
-	if err != nil {
-		return err
-	}
-	cfg.Actions = actions
-	// Create ID to name map
-	selectorIDMap := map[string]string{}
-	for _, selector := range selectors {
-		selectorIDMap[strconv.Itoa(int(selector.ID))] = selector.Name
+	cfg.PathPolicies = make(pathpol.PolicyMap)
+	polMap := make(pathpol.PolicyMap)
+	for _, extPol := range pathPolicies {
+		polMap[extPol.Policy.Name] = extPol
 	}
 
 	for ia, asEntry := range cfg.ASes {
@@ -53,12 +46,8 @@ func Compile(cfg *config.Cfg, policies map[addr.IA][]db.Policy,
 			if err != nil {
 				return err
 			}
-			selectorIDs := []string{}
-			for _, selectorID := range strings.Split(policy.Selectors, ",") {
-				selectorIDs = append(selectorIDs, selectorIDMap[selectorID])
-			}
 			commands = append(commands, &Command{Name: trafficClasses[policy.TrafficClass].Name,
-				Condition: cond, Selectors: selectorIDs})
+				Condition: cond, Policies: policy.PathPolicies})
 		}
 
 		// Make sure there is a default policy
@@ -70,21 +59,21 @@ func Compile(cfg *config.Cfg, policies map[addr.IA][]db.Policy,
 			commands = []*Command{cmd}
 		}
 
-		// Determine which path selectors are used by the current remote AS
-		sessionMap := newSessionMapper(cfg.Actions)
+		// Determine which path policies are used by the current remote AS
+		sessionMap := newSessionMapper(polMap)
 		for _, command := range commands {
-			if err := sessionMap.Add(command.Selectors); err != nil {
+			if err := sessionMap.Add(command.Policies); err != nil {
 				return err
 			}
 		}
 
 		for _, command := range commands {
 			name := command.Name
-			cfg.Classes[name] = pktcls.NewClass(name, command.Condition)
-			// Add sessionIDs based on path selectors
+			cfg.PktClasses[name] = pktcls.NewClass(name, command.Condition)
+			// Add sessionIDs based on path policies
 			var sessIds []mgmt.SessionType
-			for _, selector := range command.Selectors {
-				sessIds = append(sessIds, sessionMap.sessions[selector])
+			for _, policy := range command.Policies {
+				sessIds = append(sessIds, sessionMap.sessions[policy])
 			}
 			asEntry.PktPolicies = append(
 				asEntry.PktPolicies,
@@ -94,8 +83,12 @@ func Compile(cfg *config.Cfg, policies map[addr.IA][]db.Policy,
 				})
 			// Add the necessary sessions themselves
 			sessions := make(config.SessionMap)
-			for selector, id := range sessionMap.sessions {
-				sessions[id] = selector
+			for policy, id := range sessionMap.sessions {
+				sessions[id] = policy
+			}
+			// Add the necessary policies
+			for _, name := range command.Policies {
+				cfg.PathPolicies[name] = polMap[name]
 			}
 			asEntry.Sessions = sessions
 		}
@@ -108,29 +101,29 @@ func defaultPolicyCommand() (*Command, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Command{Name: "all", Condition: cond, Selectors: []string{"any"}}, nil
+	return &Command{Name: "default-generated", Condition: cond}, nil
 }
 
 type sessionMapper struct {
-	nextSessionID  mgmt.SessionType
-	sessions       map[string]mgmt.SessionType
-	knownSelectors pktcls.ActionMap
+	nextSessionID mgmt.SessionType
+	sessions      map[string]mgmt.SessionType
+	knownPolicies pathpol.PolicyMap
 }
 
-func newSessionMapper(knownSelectors pktcls.ActionMap) *sessionMapper {
+func newSessionMapper(knownPolicies pathpol.PolicyMap) *sessionMapper {
 	return &sessionMapper{
-		sessions:       make(map[string]mgmt.SessionType),
-		knownSelectors: knownSelectors,
+		sessions:      make(map[string]mgmt.SessionType),
+		knownPolicies: knownPolicies,
 	}
 }
 
 func (s *sessionMapper) Add(references []string) error {
-	for _, selector := range references {
-		if _, ok := s.knownSelectors[selector]; !ok {
-			return common.NewBasicError("Path selector does not exist:", nil, "selector", selector)
+	for _, policy := range references {
+		if _, ok := s.knownPolicies[policy]; !ok {
+			return common.NewBasicError("Path policy does not exist:", nil, "policy", policy)
 		}
-		if _, ok := s.sessions[selector]; !ok {
-			s.sessions[selector] = s.nextSessionID
+		if _, ok := s.sessions[policy]; !ok {
+			s.sessions[policy] = s.nextSessionID
 			s.nextSessionID++
 			if s.nextSessionID == 0 {
 				// mgmt.SessionType overflowed

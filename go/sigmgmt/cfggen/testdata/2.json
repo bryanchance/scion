@@ -2,12 +2,11 @@
     "ASes": {
         "1-1": {
             "Sessions": {
-                "0": "foo",
-                "1": "bar"
+                "0": "any",
+                "1": "foo"
             },
             "PktPolicies": [
                 {
-                    "Name": "",
                     "ClassName": "class-1",
                     "SessIds": [
                         0,
@@ -18,11 +17,10 @@
         },
         "2-2": {
             "Sessions": {
-                "0": "bar"
+                "0": "foo"
             },
             "PktPolicies": [
                 {
-                    "Name": "",
                     "ClassName": "class-2",
                     "SessIds": [
                         0
@@ -31,7 +29,7 @@
             ]
         }
     },
-    "Classes": {
+    "PktClasses": {
         "class-1": {
             "CondIPv4": {
                 "MatchSource": {
@@ -47,27 +45,12 @@
             }
         }
     },
-    "Actions": {
-        "any": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "0-0#0"
-                }
-            }
-        },
-        "bar": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "0-0#0"
-                }
-            }
-        },
+    "PathPolicies": {
+        "any": {},
         "foo": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "0-0#0"
-                }
-            }
+            "Sequence": [
+                "1-ff00:0:133#1010"
+            ]
         }
     },
     "ConfigVersion": 0

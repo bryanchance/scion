@@ -3,11 +3,11 @@
 package db
 
 import (
+	"encoding/json"
 	"net"
 
-	"github.com/scionproto/scion/go/lib/pktcls"
+	"github.com/scionproto/scion/go/lib/pathpol"
 	"github.com/scionproto/scion/go/sig/anaconfig"
-	"github.com/scionproto/scion/go/sigmgmt/parser"
 )
 
 // IPNetsFromNetworks converts a slice of networks to a slice of IPNet
@@ -23,15 +23,20 @@ func IPNetsFromNetworks(networks []Network) ([]*config.IPNet, error) {
 	return ipNets, nil
 }
 
-// ActionMapFromSelectors converts a slice of path selectors to an ActionMap
-func ActionMapFromSelectors(selectors []PathSelector) (pktcls.ActionMap, error) {
-	actionMap := make(pktcls.ActionMap)
-	for _, selector := range selectors {
-		condTree, err := parser.BuildPredicateTree(selector.Filter)
+func (pp *PathPolicyFile) GetExtPolicies() (map[string]*pathpol.ExtPolicy, error) {
+	var policies []string
+	err := json.Unmarshal([]byte(pp.CodeStr), &policies)
+	if err != nil {
+		return nil, err
+	}
+	extPolicies := make(map[string]*pathpol.ExtPolicy, len(policies))
+	for _, policy := range policies {
+		var extPolicy pathpol.ExtPolicy
+		err := json.Unmarshal([]byte(policy), &extPolicy)
 		if err != nil {
 			return nil, err
 		}
-		actionMap[selector.Name] = pktcls.NewActionFilterPaths(selector.Name, condTree)
+		extPolicies[extPolicy.Name] = &extPolicy
 	}
-	return actionMap, nil
+	return extPolicies, nil
 }

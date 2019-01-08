@@ -11,6 +11,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/scionproto/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/pathpol"
 	"github.com/scionproto/scion/go/lib/xtest"
 	"github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sigmgmt/db"
@@ -22,36 +23,39 @@ var (
 
 func TestCompile(t *testing.T) {
 	testCases := []struct {
-		Name      string
-		File      string
-		Config    *config.Cfg // This mutates during the test
-		Policies  map[addr.IA][]db.Policy
-		Classes   map[uint]db.TrafficClass
-		Selectors []db.PathSelector
+		Name         string
+		File         string
+		Config       *config.Cfg // This mutates during the test
+		Policies     map[addr.IA][]db.TrafficPolicy
+		Classes      map[uint]db.TrafficClass
+		PathPolicies []*pathpol.ExtPolicy
 	}{
 		{
-			Name: "one selector, one AS",
+			Name: "one path policy, one AS",
 			File: "1",
 			Config: &config.Cfg{
 				ASes: map[addr.IA]*config.ASEntry{
 					{I: 1, A: 1}: {},
 				},
 			},
-			Policies: map[addr.IA][]db.Policy{
+			Policies: map[addr.IA][]db.TrafficPolicy{
 				{I: 1, A: 1}: {
-					{Name: "audio", Selectors: "1", TrafficClass: 0},
+					{Name: "audio", PathPolicies: []string{"foo"}, TrafficClass: 0},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
 				0: {ID: 0, Name: "class-1", CondStr: "src=1.1.1.0/24"},
 			},
-			Selectors: []db.PathSelector{
-				{ID: 0, Name: "any", Filter: "0-0#0"},
-				{ID: 1, Name: "foo", Filter: "0-0#0"},
+			PathPolicies: []*pathpol.ExtPolicy{
+				{
+					Policy: &pathpol.Policy{
+						Name: "foo",
+						Sequence: newSequence(t,
+							[]string{"1-ff00:0:133#1010", "1-ff00:0:132#1910"})}},
 			},
 		},
 		{
-			Name: "two selectors, AS 1 uses both, AS 2 uses one",
+			Name: "two path policies, AS 1 uses both, AS 2 uses one",
 			File: "2",
 			Config: &config.Cfg{
 				ASes: map[addr.IA]*config.ASEntry{
@@ -59,22 +63,27 @@ func TestCompile(t *testing.T) {
 					{I: 2, A: 2}: {},
 				},
 			},
-			Policies: map[addr.IA][]db.Policy{
+			Policies: map[addr.IA][]db.TrafficPolicy{
 				{I: 1, A: 1}: {
-					{Name: "audio", Selectors: "1,2", TrafficClass: 0},
+					{Name: "audio", PathPolicies: []string{"any", "foo"}, TrafficClass: 0},
 				},
 				{I: 2, A: 2}: {
-					{Name: "video", Selectors: "2", TrafficClass: 1},
+					{Name: "video", PathPolicies: []string{"foo"}, TrafficClass: 1},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
 				0: {ID: 0, Name: "class-1", CondStr: "src=1.1.1.0/24"},
 				1: {ID: 1, Name: "class-2", CondStr: "dst=2.2.2.0/24"},
 			},
-			Selectors: []db.PathSelector{
-				{ID: 0, Name: "any", Filter: "0-0#0"},
-				{ID: 1, Name: "foo", Filter: "0-0#0"},
-				{ID: 2, Name: "bar", Filter: "0-0#0"},
+			PathPolicies: []*pathpol.ExtPolicy{
+				{
+					Policy: &pathpol.Policy{Name: "any"}},
+				{
+					Policy: &pathpol.Policy{Name: "foo",
+						Sequence: newSequence(t, []string{"1-ff00:0:133#1010"})}},
+				{
+					Policy: &pathpol.Policy{Name: "bar",
+						Sequence: newSequence(t, []string{"1-ff00:0:132#1910"})}},
 			},
 		},
 		{
@@ -86,22 +95,28 @@ func TestCompile(t *testing.T) {
 					{I: 2, A: 2}: {},
 				},
 			},
-			Policies: map[addr.IA][]db.Policy{
+			Policies: map[addr.IA][]db.TrafficPolicy{
 				{I: 1, A: 1}: {
-					{Name: "audio", Selectors: "1,2", TrafficClass: 0},
-					{Name: "video", Selectors: "2,3", TrafficClass: 1},
+					{Name: "audio", PathPolicies: []string{"any", "foo"}, TrafficClass: 0},
+					{Name: "video", PathPolicies: []string{"foo", "bar"}, TrafficClass: 1},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
 				0: {Name: "class-1", CondStr: "dscp=0x12"},
 				1: {Name: "class-2", CondStr: "tos=0x34"},
 			},
-			Selectors: []db.PathSelector{
-				{ID: 0, Name: "any", Filter: "0-0#0"},
-				{ID: 1, Name: "foo", Filter: "1-1#1"},
-				{ID: 2, Name: "bar", Filter: "2-2#2"},
-				{ID: 3, Name: "baz", Filter: "3-3#3"},
-				{ID: 4, Name: "bad", Filter: "4-4#4"},
+			PathPolicies: []*pathpol.ExtPolicy{
+				{
+					Policy: &pathpol.Policy{Name: "any"}},
+				{
+					Policy: &pathpol.Policy{Name: "foo",
+						Sequence: newSequence(t, []string{"1-ff00:0:133#1010"})}},
+				{
+					Policy: &pathpol.Policy{Name: "bar",
+						Sequence: newSequence(t, []string{"1-ff00:0:132#1910"})}},
+				{
+					Policy: &pathpol.Policy{Name: "baz",
+						Sequence: newSequence(t, []string{"1-ff00:0:132"})}},
 			},
 		},
 		{
@@ -113,16 +128,16 @@ func TestCompile(t *testing.T) {
 					{I: 2, A: 2}: {},
 				},
 			},
-			Policies: map[addr.IA][]db.Policy{
+			Policies: map[addr.IA][]db.TrafficPolicy{
 				{I: 1, A: 1}: {
-					{Name: "audio", Selectors: "1,2", TrafficClass: 0},
-					{Name: "video", Selectors: "2,3", TrafficClass: 1},
-					{Name: "http", Selectors: "4,2", TrafficClass: 2},
+					{Name: "audio", PathPolicies: []string{"any", "foo"}, TrafficClass: 0},
+					{Name: "video", PathPolicies: []string{"foo", "bar"}, TrafficClass: 1},
+					{Name: "http", PathPolicies: []string{"baz", "foo"}, TrafficClass: 2},
 				},
 				{I: 2, A: 2}: {
-					{Name: "audio", Selectors: "5,3", TrafficClass: 2},
-					{Name: "video", Selectors: "2,1", TrafficClass: 4},
-					{Name: "http", Selectors: "1,3", TrafficClass: 3},
+					{Name: "audio", PathPolicies: []string{"bax", "bar"}, TrafficClass: 2},
+					{Name: "video", PathPolicies: []string{"foo", "any"}, TrafficClass: 4},
+					{Name: "http", PathPolicies: []string{"any", "bar"}, TrafficClass: 3},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
@@ -133,13 +148,21 @@ func TestCompile(t *testing.T) {
 				4: {Name: "class-5",
 					CondStr: "ALL(NOT(src=12.12.127.0/24),ANY(tos=0x34, src=1.1.1.0/28))"},
 			},
-			Selectors: []db.PathSelector{
-				{ID: 0, Name: "any", Filter: "0-0#0"},
-				{ID: 1, Name: "foo", Filter: "1-1#1"},
-				{ID: 2, Name: "bar", Filter: "2-2#2"},
-				{ID: 3, Name: "baz", Filter: "3-3#3"},
-				{ID: 4, Name: "bad", Filter: "4-4#4"},
-				{ID: 5, Name: "bax", Filter: "5-4#4"},
+			PathPolicies: []*pathpol.ExtPolicy{
+				{
+					Policy: &pathpol.Policy{Name: "any"}},
+				{
+					Policy: &pathpol.Policy{Name: "foo",
+						Sequence: newSequence(t, []string{"1-ff00:0:133#1010"})}},
+				{
+					Policy: &pathpol.Policy{Name: "bar",
+						Sequence: newSequence(t, []string{"1-ff00:0:132#1910"})}},
+				{
+					Policy: &pathpol.Policy{Name: "baz",
+						Sequence: newSequence(t, []string{"1-ff00:0:132"})}},
+				{
+					Policy: &pathpol.Policy{Name: "bax",
+						Sequence: newSequence(t, []string{"1-0"})}},
 			},
 		},
 		{
@@ -150,16 +173,13 @@ func TestCompile(t *testing.T) {
 					{I: 1, A: 1}: {},
 				},
 			},
-			Selectors: []db.PathSelector{
-				{ID: 0, Name: "any", Filter: "0-0#0"},
-			},
 		},
 	}
 
 	Convey("TestCompile", t, func() {
 		for _, tc := range testCases {
 			Convey(tc.Name, func() {
-				err := Compile(tc.Config, tc.Policies, tc.Classes, tc.Selectors)
+				err := Compile(tc.Config, tc.Policies, tc.Classes, tc.PathPolicies)
 				SoMsg("err", err, ShouldBeNil)
 
 				if *update {
@@ -176,4 +196,74 @@ func TestCompile(t *testing.T) {
 			})
 		}
 	})
+
+	testCases = []struct {
+		Name         string
+		File         string
+		Config       *config.Cfg // This mutates during the test
+		Policies     map[addr.IA][]db.TrafficPolicy
+		Classes      map[uint]db.TrafficClass
+		PathPolicies []*pathpol.ExtPolicy
+	}{
+		{
+			Name: "missing traffic class",
+			Config: &config.Cfg{
+				ASes: map[addr.IA]*config.ASEntry{
+					{I: 1, A: 1}: {},
+				},
+			},
+			Policies: map[addr.IA][]db.TrafficPolicy{
+				{I: 1, A: 1}: {
+					{Name: "audio", PathPolicies: []string{"foo"}, TrafficClass: 0},
+				},
+			},
+		},
+		{
+			Name: "bad traffic class",
+			Config: &config.Cfg{
+				ASes: map[addr.IA]*config.ASEntry{
+					{I: 1, A: 1}: {},
+				},
+			},
+			Classes: map[uint]db.TrafficClass{
+				0: {ID: 0, Name: "class-1", CondStr: "cls=1"},
+			},
+			Policies: map[addr.IA][]db.TrafficPolicy{
+				{I: 1, A: 1}: {
+					{Name: "audio", PathPolicies: []string{"foo"}, TrafficClass: 0},
+				},
+			},
+		},
+		{
+			Name: "missing path policy",
+			Config: &config.Cfg{
+				ASes: map[addr.IA]*config.ASEntry{
+					{I: 1, A: 1}: {},
+				},
+			},
+			Classes: map[uint]db.TrafficClass{
+				0: {ID: 0, Name: "class-1", CondStr: "src=1.1.1.0/24"},
+			},
+			Policies: map[addr.IA][]db.TrafficPolicy{
+				{I: 1, A: 1}: {
+					{Name: "audio", PathPolicies: []string{"foo"}},
+				},
+			},
+		},
+	}
+
+	Convey("TestCompile fail", t, func() {
+		for _, tc := range testCases {
+			Convey(tc.Name, func() {
+				err := Compile(tc.Config, tc.Policies, tc.Classes, tc.PathPolicies)
+				SoMsg("err", err, ShouldNotBeNil)
+			})
+		}
+	})
+}
+
+func newSequence(t *testing.T, str []string) pathpol.Sequence {
+	seq, err := pathpol.NewSequence(str)
+	xtest.FailOnErr(t, err)
+	return seq
 }

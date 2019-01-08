@@ -1,32 +1,17 @@
 {
     "ASes": {
         "1-1": {
-            "Sessions": {
-                "0": "any"
-            },
             "PktPolicies": [
                 {
-                    "Name": "",
-                    "ClassName": "all",
-                    "SessIds": [
-                        0
-                    ]
+                    "ClassName": "default-generated",
+                    "SessIds": null
                 }
             ]
         }
     },
-    "Classes": {
-        "all": {
+    "PktClasses": {
+        "default-generated": {
             "CondBool": true
-        }
-    },
-    "Actions": {
-        "any": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "0-0#0"
-                }
-            }
         }
     },
     "ConfigVersion": 0

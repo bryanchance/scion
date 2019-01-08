@@ -2,14 +2,13 @@
     "ASes": {
         "1-1": {
             "Sessions": {
-                "0": "foo",
-                "1": "bar",
-                "2": "baz",
-                "3": "bad"
+                "0": "any",
+                "1": "foo",
+                "2": "bar",
+                "3": "baz"
             },
             "PktPolicies": [
                 {
-                    "Name": "",
                     "ClassName": "class-1",
                     "SessIds": [
                         0,
@@ -17,7 +16,6 @@
                     ]
                 },
                 {
-                    "Name": "",
                     "ClassName": "class-2",
                     "SessIds": [
                         1,
@@ -25,7 +23,6 @@
                     ]
                 },
                 {
-                    "Name": "",
                     "ClassName": "class-3",
                     "SessIds": [
                         3,
@@ -37,13 +34,12 @@
         "2-2": {
             "Sessions": {
                 "0": "bax",
-                "1": "baz",
-                "2": "bar",
-                "3": "foo"
+                "1": "bar",
+                "2": "foo",
+                "3": "any"
             },
             "PktPolicies": [
                 {
-                    "Name": "",
                     "ClassName": "class-3",
                     "SessIds": [
                         0,
@@ -51,7 +47,6 @@
                     ]
                 },
                 {
-                    "Name": "",
                     "ClassName": "class-5",
                     "SessIds": [
                         2,
@@ -59,7 +54,6 @@
                     ]
                 },
                 {
-                    "Name": "",
                     "ClassName": "class-4",
                     "SessIds": [
                         3,
@@ -69,7 +63,7 @@
             ]
         }
     },
-    "Classes": {
+    "PktClasses": {
         "class-1": {
             "CondIPv4": {
                 "MatchSource": {
@@ -156,48 +150,27 @@
             ]
         }
     },
-    "Actions": {
-        "any": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "0-0#0"
-                }
-            }
-        },
-        "bad": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "4-4#4"
-                }
-            }
-        },
+    "PathPolicies": {
+        "any": {},
         "bar": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "2-2#2"
-                }
-            }
+            "Sequence": [
+                "1-ff00:0:132#1910"
+            ]
         },
         "bax": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "5-4#4"
-                }
-            }
+            "Sequence": [
+                "1-0#0"
+            ]
         },
         "baz": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "3-3#3"
-                }
-            }
+            "Sequence": [
+                "1-ff00:0:132#0"
+            ]
         },
         "foo": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "1-1#1"
-                }
-            }
+            "Sequence": [
+                "1-ff00:0:133#1010"
+            ]
         }
     },
     "ConfigVersion": 0

@@ -11,8 +11,8 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/scionproto/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/pathpol"
 	"github.com/scionproto/scion/go/lib/pktcls"
-	"github.com/scionproto/scion/go/lib/spath/spathmeta"
 	"github.com/scionproto/scion/go/lib/xtest"
 	"github.com/scionproto/scion/go/sig/mgmt"
 )
@@ -42,6 +42,7 @@ func TestCompatible(t *testing.T) {
 			Config: Cfg{
 				ASes: map[addr.IA]*ASEntry{
 					xtest.MustParseIA("1-ff00:0:1"): {
+						Name: "AS 1",
 						Nets: []*IPNet{
 							{
 								IP:   net.IP{192, 0, 2, 0},
@@ -65,6 +66,7 @@ func TestCompatible(t *testing.T) {
 						Nets: []*IPNet{},
 					},
 					xtest.MustParseIA("1-ff00:0:4"): {
+						Name: "AS 4",
 						Nets: []*IPNet{},
 					},
 				},
@@ -141,8 +143,8 @@ func TestLoadFromFile(t *testing.T) {
 							},
 						},
 						Sessions: SessionMap{
-							0x03: "filter-A",
-							0x04: "filter-B",
+							0x03: "policy-A",
+							0x04: "policy-B",
 						},
 						PktPolicies: []*PktPolicy{
 							{
@@ -180,7 +182,7 @@ func TestLoadFromFile(t *testing.T) {
 						},
 					},
 				},
-				Classes: pktcls.ClassMap{
+				PktClasses: pktcls.ClassMap{
 					"transit-isd-1": pktcls.NewClass(
 						"transit-isd-1",
 						pktcls.NewCondAllOf(
@@ -210,27 +212,45 @@ func TestLoadFromFile(t *testing.T) {
 						pktcls.NewCondAllOf(),
 					),
 				},
-				Actions: pktcls.ActionMap{
-					"filter-A": &pktcls.ActionFilterPaths{
-						Name: "filter-A",
-						Cond: pktcls.CondAnyOf{
-							pktcls.CondAllOf{
-								mustCondPathPredicate(t, "0-123#0"),
-								mustCondPathPredicate(t, "0-234#0"),
+				PathPolicies: pathpol.PolicyMap{
+					"policy-A": &pathpol.ExtPolicy{Policy: pathpol.NewPolicy("", nil,
+						mustSequence(t, []string{"0-123#0", "0-234#0"}),
+						nil,
+					)},
+					"policy-B": &pathpol.ExtPolicy{Policy: pathpol.NewPolicy("", nil,
+						mustSequence(t, []string{"0-123#0", "0-134#0"}), nil,
+					)},
+					"policy-C": &pathpol.ExtPolicy{Policy: pathpol.NewPolicy("",
+						mustACL(t,
+							&pathpol.ACLEntry{
+								Action: pathpol.Allow,
+								Rule:   mustHopPredicate(t, "0-123"),
 							},
-							pktcls.CondAllOf{
-								mustCondPathPredicate(t, "0-345#0"),
-								mustCondPathPredicate(t, "0-456#0"),
+							&pathpol.ACLEntry{
+								Action: pathpol.Allow,
+								Rule:   mustHopPredicate(t, "0-124"),
+							},
+							&pathpol.ACLEntry{
+								Action: pathpol.Deny,
+								Rule:   mustHopPredicate(t, "0"),
+							},
+						),
+						mustSequence(t, []string{"0-123#0", "0-134#0"}),
+						[]pathpol.Option{
+							{
+								Weight: 1,
+								Policy: pathpol.NewPolicy("", nil,
+									mustSequence(t, []string{"0-123#0", "0-134#0"}), nil,
+								),
+							},
+							{
+								Weight: 2,
+								Policy: pathpol.NewPolicy("", nil,
+									mustSequence(t, []string{"0-134#0", "0-145#0"}), nil,
+								),
 							},
 						},
-					},
-					"filter-B": &pktcls.ActionFilterPaths{
-						Name: "filter-B",
-						Cond: pktcls.CondAnyOf{
-							mustCondPathPredicate(t, "0-123#0"),
-							mustCondPathPredicate(t, "0-134#0"),
-						},
-					},
+					)},
 				},
 				ConfigVersion: 0,
 			},
@@ -239,20 +259,95 @@ func TestLoadFromFile(t *testing.T) {
 
 	Convey("Test SIG config marshal/unmarshal", t, func() {
 		for _, tc := range testCases {
-			if *update {
-				xtest.MustMarshalJSONToFile(t, tc.Config, tc.FileName)
-			}
-			cfg, err := LoadFromFile(filepath.Join("testdata", tc.FileName))
-			SoMsg("err", err, ShouldBeNil)
-			SoMsg("cfg", *cfg, ShouldResemble, tc.Config)
+			Convey(tc.Name, func() {
+				if *update {
+					xtest.MustMarshalJSONToFile(t, tc.Config, tc.FileName)
+				}
+				cfg, err := LoadFromFile(filepath.Join("testdata", tc.FileName))
+				SoMsg("err", err, ShouldBeNil)
+				SoMsg("cfg", *cfg, ShouldResemble, tc.Config)
+			})
 		}
 	})
 }
 
-func mustCondPathPredicate(t *testing.T, str string) *pktcls.CondPathPredicate {
+func TestBuildSessions(t *testing.T) {
+	Convey("Build sessions", t, func() {
+		pol1 := &pathpol.Policy{Sequence: mustSequence(t, []string{"0"})}
+		pol2 := &pathpol.Policy{}
+		sessionMap := SessionMap{1: "policy-1", 2: "policy-2"}
+		policies := pathpol.PolicyMap{"policy-1": {Policy: pol1}, "policy-2": {Policy: pol2}}
+		sessionSet, err := BuildSessions(sessionMap, policies)
+		SoMsg("err", err, ShouldBeNil)
+		resSet := SessionSet{
+			1: &Session{ID: 1, PolName: "policy-1", Policy: pol1},
+			2: &Session{ID: 2, PolName: "policy-2", Policy: pol2},
+		}
+		SoMsg("sessionSet", sessionSet, ShouldResemble, resSet)
+	})
+	Convey("Build sessions fail", t, func() {
+		pol1 := &pathpol.Policy{Sequence: mustSequence(t, []string{"0"})}
+		pol2 := &pathpol.Policy{}
+		sessionMap := SessionMap{1: "policy-10", 2: "policy-2"}
+		policies := pathpol.PolicyMap{"policy-1": {Policy: pol1}, "policy-2": {Policy: pol2}}
+		_, err := BuildSessions(sessionMap, policies)
+		SoMsg("err", err, ShouldNotBeNil)
+	})
+	Convey("Build sessions, only 0 session", t, func() {
+		sessionMap := SessionMap{0: ""}
+		policies := pathpol.PolicyMap{}
+		sessionSet, err := BuildSessions(sessionMap, policies)
+		SoMsg("err", err, ShouldBeNil)
+		resSet := SessionSet{
+			0: &Session{ID: 0, PolName: "", Policy: nil},
+		}
+		SoMsg("sessionSet", sessionSet, ShouldResemble, resSet)
+	})
+	Convey("Build session from extended policy", t, func() {
+		pol1 := &pathpol.Policy{Name: "policy-1"}
+		pol2 := &pathpol.Policy{
+			Name:     "policy-2",
+			Sequence: mustSequence(t, []string{"0", "1", "2"})}
+		exPol1 := &pathpol.ExtPolicy{Policy: pol1, Extends: []string{"policy-2"}}
+		exPol2 := &pathpol.ExtPolicy{Policy: pol2}
+		sessionMap := SessionMap{1: "policy-1"}
+		policies := pathpol.PolicyMap{exPol1.Policy.Name: exPol1, exPol2.Policy.Name: exPol2}
+		sessionSet, err := BuildSessions(sessionMap, policies)
+		SoMsg("err", err, ShouldBeNil)
+		resSet := SessionSet{
+			1: &Session{ID: 1, PolName: exPol1.Policy.Name,
+				Policy: &pathpol.Policy{
+					Name:     exPol1.Policy.Name,
+					Sequence: mustSequence(t, []string{"0", "1", "2"})}},
+		}
+		SoMsg("sessionSet", sessionSet, ShouldResemble, resSet)
+	})
+	Convey("Build sessions from ext Policy fails", t, func() {
+		pol1 := &pathpol.Policy{Name: "policy-1"}
+		exPol1 := &pathpol.ExtPolicy{Policy: pol1, Extends: []string{"policy-2"}}
+		sessionMap := SessionMap{1: "policy-1"}
+		policies := pathpol.PolicyMap{exPol1.Policy.Name: exPol1}
+		_, err := BuildSessions(sessionMap, policies)
+		SoMsg("err", err, ShouldNotBeNil)
+	})
+}
+
+func mustACL(t *testing.T, entries ...*pathpol.ACLEntry) *pathpol.ACL {
+	acl, err := pathpol.NewACL(entries...)
+	xtest.FailOnErr(t, err)
+	return acl
+}
+
+func mustSequence(t *testing.T, str []string) pathpol.Sequence {
 	t.Helper()
 
-	pp, err := spathmeta.NewPathPredicate(str)
+	seq, err := pathpol.NewSequence(str)
 	xtest.FailOnErr(t, err)
-	return pktcls.NewCondPathPredicate(pp)
+	return seq
+}
+
+func mustHopPredicate(t *testing.T, str string) *pathpol.HopPredicate {
+	hp, err := pathpol.HopPredicateFromString(str)
+	xtest.FailOnErr(t, err)
+	return hp
 }

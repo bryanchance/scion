@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# This test checks whether SIG path policies work as expected.
+
+. acceptance/common.sh
+. acceptance/sigutil/common.sh
+
+PROGRAM=`basename "$0"`
+COMMAND="$1"
+TEST_NAME="sig_policies"
+
+SRC_IA_FILE="$(ia_file $SRC_IA)"
+SRC_AS_FILE="$(as_file $SRC_IA)"
+SIG_JSON="gen/ISD1/AS$SRC_AS_FILE/sig$SRC_IA_FILE/cfg.json"
+
+test_run() {
+    set -e
+
+    # First, check that pings are going through with vanilla config.
+    ./bin/sig_ping_acceptance -d -log.console info -src $SRC_IA -dst $DST_IA
+
+    # Blacklist the intermediate AS and make sure that packets can't pass through.
+    # There's only one kind of policy tested here. Testing different complex policies
+    # is more appropriately done in unit tests.
+    cp $SIG_JSON $SIG_JSON.backup
+    jq '.ASes."1-ff00:0:112".Sessions."0" = "foo"' $SIG_JSON | sponge $SIG_JSON
+    jq '.PathPolicies = {"foo": {"ACL": [{"Action": false, "Rule": "1-ff00:0:110"}, {"Action": true, "Rule": "0-0#0"}]}}' $SIG_JSON | sponge $SIG_JSON
+    reload_sig "$SRC_IA_FILE"
+    ./bin/sig_ping_acceptance -d --log.console info -fail -src $SRC_IA -dst $DST_IA
+
+    # Revert the change and make sure that packets pass through again.
+    mv -f $SIG_JSON.backup $SIG_JSON
+    reload_sig "$SRC_IA_FILE"
+    ./bin/sig_ping_acceptance -d -log.console info -src $SRC_IA -dst $DST_IA
+}
+
+reload_sig() {
+    id="$(./tools/dc dc exec -T scion_sig_$1 pgrep -x sig)"
+    ./tools/dc dc exec -T scion_sig_"$1" kill -SIGHUP "$id"
+}
+
+shift
+do_command $PROGRAM $COMMAND $TEST_NAME "$@"

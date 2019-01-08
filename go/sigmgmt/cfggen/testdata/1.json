@@ -6,7 +6,6 @@
             },
             "PktPolicies": [
                 {
-                    "Name": "",
                     "ClassName": "class-1",
                     "SessIds": [
                         0
@@ -15,7 +14,7 @@
             ]
         }
     },
-    "Classes": {
+    "PktClasses": {
         "class-1": {
             "CondIPv4": {
                 "MatchSource": {
@@ -24,20 +23,12 @@
             }
         }
     },
-    "Actions": {
-        "any": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "0-0#0"
-                }
-            }
-        },
+    "PathPolicies": {
         "foo": {
-            "ActionFilterPaths": {
-                "CondPathPredicate": {
-                    "PP": "0-0#0"
-                }
-            }
+            "Sequence": [
+                "1-ff00:0:133#1010",
+                "1-ff00:0:132#1910"
+            ]
         }
     },
     "ConfigVersion": 0

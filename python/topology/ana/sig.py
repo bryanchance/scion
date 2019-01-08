@@ -12,7 +12,7 @@ from topology.sig import SIGGenerator as VanillaGenerator
 class SIGGenerator(VanillaGenerator):
 
     def _sig_json(self, topo_id):
-        sig_cfg = {"ConfigVersion": 1, "ASes": {}, "Classes": {"default": {"CondBool": True}}}
+        sig_cfg = {"ConfigVersion": 1, "ASes": {}, "PktClasses": {"default": {"CondBool": True}}}
         for t_id, topo in self.args.topo_dicts.items():
             if topo_id == t_id:
                 continue

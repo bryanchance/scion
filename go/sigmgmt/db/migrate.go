@@ -13,6 +13,7 @@ func MigrateDB(dbase *gorm.DB) {
 	dbase.AutoMigrate(&ASEntry{})
 	dbase.AutoMigrate(&SIG{})
 	dbase.AutoMigrate(&Network{})
-	dbase.AutoMigrate(&Policy{})
+	dbase.AutoMigrate(&TrafficPolicy{})
 	dbase.AutoMigrate(&TrafficClass{})
+	dbase.AutoMigrate(&PathPolicyFile{})
 }

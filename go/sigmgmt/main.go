@@ -83,14 +83,6 @@ func configureRouter(cfg *config.Global, dbase *gorm.DB) http.Handler {
 		"/api/sites/{site}/reload-config": {
 			"GET": c.ReloadConfig,
 		},
-		"/api/sites/{site}/paths": {
-			"GET":  c.GetPathSelectors,
-			"POST": c.PostPathSelector,
-		},
-		"/api/paths/{selector}": {
-			"PUT":    c.PutPathSelector,
-			"DELETE": c.DeletePathSelector,
-		},
 		"/api/sites/{site}/classes": {
 			"GET":  c.GetTrafficClasses,
 			"POST": c.PostTrafficClass,

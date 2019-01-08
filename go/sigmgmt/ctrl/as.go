@@ -86,7 +86,7 @@ func (c *Controller) UpdateAS(w http.ResponseWriter, r *http.Request, _ http.Han
 }
 
 func (c *Controller) GetPolicies(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var policies []*db.Policy
+	var policies []*db.TrafficPolicy
 	if err := c.db.Where("as_entry_id = ?", mux.Vars(r)["as"]).Find(&policies).Error; err != nil {
 		respondError(w, err, DBFindError, http.StatusBadRequest)
 		return
@@ -103,7 +103,7 @@ func (c *Controller) GetPolicies(w http.ResponseWriter, r *http.Request, _ http.
 }
 
 func (c *Controller) PostPolicy(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var policy db.Policy
+	var policy db.TrafficPolicy
 	if err := json.NewDecoder(r.Body).Decode(&policy); err != nil {
 		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
 		return
@@ -137,7 +137,7 @@ func (c *Controller) PostPolicy(w http.ResponseWriter, r *http.Request, _ http.H
 }
 
 func (c *Controller) UpdatePolicy(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	var policy db.Policy
+	var policy db.TrafficPolicy
 	if err := json.NewDecoder(r.Body).Decode(&policy); err != nil {
 		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
 		return
@@ -178,7 +178,7 @@ func (c *Controller) UpdatePolicy(w http.ResponseWriter, r *http.Request, _ http
 }
 
 func (c *Controller) DeletePolicy(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
-	if err := c.db.Delete(&db.Policy{}, mux.Vars(r)["policy"]).Error; err != nil {
+	if err := c.db.Delete(&db.TrafficPolicy{}, mux.Vars(r)["policy"]).Error; err != nil {
 		respondError(w, err, DBDeleteError, http.StatusBadRequest)
 		return
 	}

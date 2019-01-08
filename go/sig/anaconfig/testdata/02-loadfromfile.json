@@ -6,8 +6,8 @@
                 "2001:db8::/48"
             ],
             "Sessions": {
-                "3": "filter-A",
-                "4": "filter-B"
+                "3": "policy-A",
+                "4": "policy-B"
             },
             "PktPolicies": [
                 {
@@ -18,7 +18,6 @@
                     ]
                 },
                 {
-                    "Name": "",
                     "ClassName": "transit-isd-2",
                     "SessIds": [
                         3,
@@ -30,17 +29,10 @@
         "1-ff00:0:2": {
             "Nets": [
                 "2.0.0.0/16"
-            ],
-            "Sessions": null,
-            "PktPolicies": null
+            ]
         },
-        "1-ff00:0:3": {
-            "Nets": [],
-            "Sessions": null,
-            "PktPolicies": null
-        },
+        "1-ff00:0:3": {},
         "1-ff00:0:4": {
-            "Nets": [],
             "Sessions": {
                 "0": ""
             },
@@ -54,7 +46,7 @@
             ]
         }
     },
-    "Classes": {
+    "PktClasses": {
         "classC": {
             "CondAllOf": null
         },
@@ -95,56 +87,58 @@
             ]
         }
     },
-    "Actions": {
-        "filter-A": {
-            "ActionFilterPaths": {
-                "CondAnyOf": [
-                    {
-                        "CondAllOf": [
-                            {
-                                "CondPathPredicate": {
-                                    "PP": "0-123#0"
-                                }
-                            },
-                            {
-                                "CondPathPredicate": {
-                                    "PP": "0-234#0"
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        "CondAllOf": [
-                            {
-                                "CondPathPredicate": {
-                                    "PP": "0-345#0"
-                                }
-                            },
-                            {
-                                "CondPathPredicate": {
-                                    "PP": "0-456#0"
-                                }
-                            }
-                        ]
-                    }
-                ]
-            }
+    "PathPolicies": {
+        "policy-A": {
+            "Sequence": [
+                "0-123#0",
+                "0-234#0"
+            ]
         },
-        "filter-B": {
-            "ActionFilterPaths": {
-                "CondAnyOf": [
-                    {
-                        "CondPathPredicate": {
-                            "PP": "0-123#0"
-                        }
-                    },
-                    {
-                        "CondPathPredicate": {
-                            "PP": "0-134#0"
-                        }
+        "policy-B": {
+            "Sequence": [
+                "0-123#0",
+                "0-134#0"
+            ]
+        },
+        "policy-C": {
+            "ACL": [
+                {
+                    "Action": true,
+                    "Rule": "0-123#0"
+                },
+                {
+                    "Action": true,
+                    "Rule": "0-124#0"
+                },
+                {
+                    "Action": false,
+                    "Rule": "0-0#0"
+                }
+            ],
+            "Sequence": [
+                "0-123#0",
+                "0-134#0"
+            ],
+            "Options": [
+                {
+                    "Weight": 2,
+                    "Policy": {
+                        "Sequence": [
+                            "0-134#0",
+                            "0-145#0"
+                        ]
                     }
-                ]
-            }
+                },
+                {
+                    "Weight": 1,
+                    "Policy": {
+                        "Sequence": [
+                            "0-123#0",
+                            "0-134#0"
+                        ]
+                    }
+                }
+            ]
         }
     },
     "ConfigVersion": 0

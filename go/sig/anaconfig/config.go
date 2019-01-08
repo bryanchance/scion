@@ -10,6 +10,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/pathpol"
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/sig/config"
 	"github.com/scionproto/scion/go/sig/mgmt"
@@ -23,8 +24,8 @@ type IPNet = config.IPNet
 // Cfg is a direct Go representation of the JSON file format.
 type Cfg struct {
 	ASes          map[addr.IA]*ASEntry
-	Classes       pktcls.ClassMap
-	Actions       pktcls.ActionMap
+	PktClasses    pktcls.ClassMap   `json:",omitempty"`
+	PathPolicies  pathpol.PolicyMap `json:",omitempty"`
 	ConfigVersion uint64
 }
 
@@ -44,23 +45,23 @@ func LoadFromFile(path string) (*Cfg, error) {
 	return cfg, nil
 }
 
-// postprocess fills in sig IDs in cfg, and checks that action and class names
+// postprocess fills in sig IDs in cfg, and checks that policy and class names
 // reference valid objects.
 func (cfg *Cfg) postprocess() error {
 	for ia, ae := range cfg.ASes {
-		// Check that each session references an action that exists
-		for sessId, actName := range ae.Sessions {
-			if actName == "" {
+		// Check that each session references an policy that exists
+		for sessId, polName := range ae.Sessions {
+			if polName == "" {
 				continue
 			}
-			if _, ok := cfg.Actions[actName]; !ok {
-				return common.NewBasicError("Unknown action name", nil,
-					"ia", ia, "sessId", sessId, "action", actName)
+			if _, ok := cfg.PathPolicies[polName]; !ok {
+				return common.NewBasicError("Unknown policy name", nil,
+					"ia", ia, "sessId", sessId, "policy", polName)
 			}
 		}
 		// check that each policy references a class that exists
 		for i, pol := range ae.PktPolicies {
-			if _, ok := cfg.Classes[pol.ClassName]; !ok {
+			if _, ok := cfg.PktClasses[pol.ClassName]; !ok {
 				return common.NewBasicError("Unknown class name", nil,
 					"ia", ia, "polIdx", i, "class", pol.ClassName)
 			}
@@ -72,14 +73,16 @@ func (cfg *Cfg) postprocess() error {
 				}
 			}
 		}
+		if ae.Nets == nil {
+			ae.Nets = []*config.IPNet{}
+		}
 	}
-
 	return nil
 }
 
 type ASEntry struct {
 	// Common with open source ASEntry
-
+	Name string          `json:",omitempty"`
 	Nets []*config.IPNet `json:",omitempty"`
 
 	// Anapaya specific
@@ -88,10 +91,11 @@ type ASEntry struct {
 	PktPolicies []*PktPolicy `json:",omitempty"`
 }
 
+// SessionMap provides a mapping from session id to path policy name
 type SessionMap map[mgmt.SessionType]string
 
 type PktPolicy struct {
-	Name      string
+	Name      string `json:",omitempty"`
 	ClassName string
 	SessIds   []mgmt.SessionType
 }
@@ -99,25 +103,38 @@ type PktPolicy struct {
 type Session struct {
 	ID      mgmt.SessionType
 	PolName string
-	Pred    *pktcls.ActionFilterPaths
+	Policy  *pathpol.Policy
 }
 
+// SessionSet is a mapping from session id to Session
 type SessionSet map[mgmt.SessionType]*Session
 
-func BuildSessions(cfgSessMap SessionMap, actions pktcls.ActionMap) (SessionSet, error) {
+// BuildSessions creates a SessionSet from a SessionMap and the referenced Policies
+func BuildSessions(cfgSessMap SessionMap, polMap pathpol.PolicyMap) (SessionSet, error) {
 	set := make(SessionSet)
-	for sessId, actName := range cfgSessMap {
-		act := actions[actName]
-		afp, ok := act.(*pktcls.ActionFilterPaths)
-		if actName != "" && !ok {
-			// Unable to find the Action the session is referencing
-			return nil, common.NewBasicError("Unable to find referenced Action", nil,
-				"sessionID", sessId, "action", actName)
+	for sessId, polName := range cfgSessMap {
+		ep, ok := polMap[polName]
+		if polName != "" && !ok {
+			// Unable to find the Policy the session is referencing
+			return nil, common.NewBasicError("Unable to find referenced Policy", nil,
+				"sessionId", sessId, "policy", polName)
+		}
+		var pp *pathpol.Policy
+		// Session has no policy specified, generate allow-all fallback
+		if polName != "" {
+			policies := make([]*pathpol.ExtPolicy, 0, len(polMap))
+			for _, policy := range polMap {
+				policies = append(policies, policy)
+			}
+			var err error
+			if pp, err = pathpol.PolicyFromExtPolicy(ep, policies); err != nil {
+				return nil, common.NewBasicError("Unable to create Policy from ExtPolicy", err)
+			}
 		}
 		set[sessId] = &Session{
 			ID:      sessId,
-			PolName: actName,
-			Pred:    afp,
+			PolName: polName,
+			Policy:  pp,
 		}
 	}
 	return set, nil

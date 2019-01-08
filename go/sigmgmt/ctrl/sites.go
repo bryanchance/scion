@@ -7,7 +7,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
@@ -138,78 +137,6 @@ func (c *Controller) ReloadConfig(w http.ResponseWriter, r *http.Request,
 	}
 	if errs != nil {
 		respondError(w, errs, msg, http.StatusInternalServerError)
-		return
-	}
-	respondEmpty(w)
-}
-
-func (c *Controller) GetPathSelectors(w http.ResponseWriter, r *http.Request,
-	_ http.HandlerFunc) {
-	var selectors []db.PathSelector
-	if err := c.db.Order("id asc").Where("site_id = ?", mux.Vars(r)["site"]).
-		Find(&selectors).Error; err != nil {
-		respondError(w, err, DBFindError, http.StatusBadRequest)
-		return
-	}
-	respondJSON(w, selectors)
-}
-
-func (c *Controller) PostPathSelector(w http.ResponseWriter, r *http.Request,
-	_ http.HandlerFunc) {
-	selector := db.PathSelector{}
-	if err := json.NewDecoder(r.Body).Decode(&selector); err != nil {
-		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
-		return
-	}
-	selector.Filter = strings.TrimSpace(selector.Filter)
-	if err := parser.ValidatePredicate(selector.Filter); err != nil {
-		respondError(w, err, PathPredicateError, http.StatusBadRequest)
-		return
-	}
-	var site db.Site
-	if !c.findOne(w, mux.Vars(r)["site"], &site) {
-		return
-	}
-	selector.SiteID = site.ID
-	if !c.createOne(w, &selector) {
-		return
-	}
-	respondJSON(w, &selector)
-}
-
-func (c *Controller) PutPathSelector(w http.ResponseWriter, r *http.Request,
-	_ http.HandlerFunc) {
-	selector := db.PathSelector{}
-	if err := json.NewDecoder(r.Body).Decode(&selector); err != nil {
-		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
-		return
-	}
-	selector.Filter = strings.TrimSpace(selector.Filter)
-	if err := parser.ValidatePredicate(selector.Filter); err != nil {
-		respondError(w, err, PathPredicateError, http.StatusBadRequest)
-		return
-	}
-	id, err := strconv.Atoi(mux.Vars(r)["selector"])
-	if err != nil || int(selector.ID) != id {
-		respondError(w, nil, IDChangeError, http.StatusBadRequest)
-		return
-	}
-	err = c.db.Model(&selector).Updates(
-		map[string]interface{}{
-			"Name":   selector.Name,
-			"Filter": selector.Filter,
-		}).Error
-	if err != nil {
-		respondError(w, err, DBUpdateError, http.StatusBadRequest)
-		return
-	}
-	respondEmpty(w)
-}
-
-func (c *Controller) DeletePathSelector(w http.ResponseWriter, r *http.Request,
-	_ http.HandlerFunc) {
-	if err := c.db.Delete(&db.PathSelector{}, mux.Vars(r)["selector"]).Error; err != nil {
-		respondError(w, err, DBDeleteError, http.StatusBadRequest)
 		return
 	}
 	respondEmpty(w)

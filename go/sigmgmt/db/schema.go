@@ -12,10 +12,11 @@ type Site struct {
 	Name           string `gorm:"unique;not null"`
 	VHost          string
 	MetricsPort    uint16
-	Hosts          []Host         `gorm:"association_autoupdate:false;association_autocreate:false"`
-	ASEntries      []ASEntry      `json:",omitempty"`
-	PathSelectors  []PathSelector `json:",omitempty"`
-	TrafficClasses []TrafficClass `json:",omitempty"`
+	Hosts          []Host           `gorm:"association_autoupdate:false;association_autocreate:false"`
+	ASEntries      []ASEntry        `json:",omitempty"`
+	PathSelectors  []PathSelector   `json:",omitempty"`
+	TrafficClasses []TrafficClass   `json:",omitempty"`
+	PathPolicies   []PathPolicyFile `json:",omitempty"`
 }
 
 type Host struct {
@@ -36,14 +37,14 @@ type PathSelector struct {
 type ASEntry struct {
 	ID                   uint
 	Name                 string
-	ISD                  string    `gorm:"column:isd_id"`
-	AS                   string    `gorm:"column:as_id"`
-	Policies             string    `gorm:"column:policies"`
-	SiteID               uint      `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name, isd_id, as_id)" json:"-"`
-	SIGs                 []SIG     `json:",omitempty"`
-	Networks             []Network `json:",omitempty"`
-	Policy               []Policy  `json:",omitempty"`
-	IPAllocationProvider string    `json:",omitempty"`
+	ISD                  string          `gorm:"column:isd_id"`
+	AS                   string          `gorm:"column:as_id"`
+	Policies             string          `gorm:"column:policies"`
+	SiteID               uint            `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name, isd_id, as_id)" json:"-"`
+	SIGs                 []SIG           `json:",omitempty"`
+	Networks             []Network       `json:",omitempty"`
+	Policy               []TrafficPolicy `json:",omitempty"`
+	IPAllocationProvider string          `json:",omitempty"`
 }
 
 func (ASEntry) TableName() string {
@@ -69,16 +70,41 @@ type Network struct {
 	ASEntryID uint   `sql:"type:integer REFERENCES asentries ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (cidr, as_entry_id)" json:"-"`
 }
 
-type Policy struct {
+type PathPolicyFile struct {
+	ID      uint
+	Name    string
+	CodeStr string   `json:"-"`
+	Code    []string `gorm:"-"`
+	Type    ppFileType
+	SiteID  *uint `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id)"`
+}
+
+func (PathPolicyFile) TableName() string {
+	return "path_policies"
+}
+
+type ppFileType string
+
+const (
+	// GlobalPolicy is a Path Policy File for all sites
+	GlobalPolicy ppFileType = "global"
+	// SitePolicy is a Path Policy File for the referenced site
+	SitePolicy ppFileType = "site"
+	// TemplatePolicy is a Path Policy Template for new sites
+	TemplatePolicy ppFileType = "template"
+)
+
+type TrafficPolicy struct {
 	ID           uint
 	Name         string
 	TrafficClass uint   `sql:"type:integer REFERENCES traffic_classes ON DELETE CASCADE ON UPDATE CASCADE"`
 	Selectors    string `json:"-"`
 	SelectorIDs  []int  `gorm:"-" json:"Selectors"`
 	ASEntryID    uint   `sql:"type:integer REFERENCES asentries ON DELETE CASCADE ON UPDATE CASCADE" json:"-"`
+	PathPolicies []string
 }
 
-func (Policy) TableName() string {
+func (TrafficPolicy) TableName() string {
 	return "policies"
 }
 

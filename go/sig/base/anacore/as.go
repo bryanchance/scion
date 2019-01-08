@@ -25,6 +25,7 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/pathpol"
 	"github.com/scionproto/scion/go/lib/pktcls"
 	"github.com/scionproto/scion/go/lib/ringbuf"
 	"github.com/scionproto/scion/go/sig/anaconfig"
@@ -72,14 +73,14 @@ func newASEntry(ia addr.IA) (*ASEntry, error) {
 }
 
 func (ae *ASEntry) ReloadConfig(cfg *config.ASEntry, classes pktcls.ClassMap,
-	actions pktcls.ActionMap) bool {
+	policies pathpol.PolicyMap) bool {
 	ae.Lock()
 	defer ae.Unlock()
 	// Method calls first to prevent skips due to logical short-circuit
 	s := ae.addNewNets(cfg.Nets)
 	s = ae.delOldNets(cfg.Nets) && s
 
-	sessionCfgs, err := config.BuildSessions(cfg.Sessions, actions)
+	sessionCfgs, err := config.BuildSessions(cfg.Sessions, policies)
 	if err != nil {
 		ae.Error("Unable to update sessions", "err", err)
 		s = false
@@ -204,7 +205,7 @@ func (ae *ASEntry) delNet(ipnet *net.IPNet) error {
 func (ae *ASEntry) addNewSessions(cfgs config.SessionSet) bool {
 	s := true
 	for _, cfg := range cfgs {
-		if err := ae.addSession(cfg.ID, cfg.PolName, cfg.Pred); err != nil {
+		if err := ae.addSession(cfg.ID, cfg.PolName, cfg.Policy); err != nil {
 			ae.Error("Unable to add session", "id", cfg.ID, "err", err)
 			s = false
 			// Continue without rollback
@@ -235,16 +236,16 @@ func (ae *ASEntry) delOldSessions(cfgs config.SessionSet) egress.SessionSet {
 
 // AddSession idempotently adds a Session for the remote IA.
 func (ae *ASEntry) AddSession(sessId mgmt.SessionType, polName string,
-	afp *pktcls.ActionFilterPaths) error {
+	pp *pathpol.Policy) error {
 	ae.Lock()
 	defer ae.Unlock()
-	return ae.addSession(sessId, polName, afp)
+	return ae.addSession(sessId, polName, pp)
 }
 
 func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
-	afp *pktcls.ActionFilterPaths) error {
+	pp *pathpol.Policy) error {
 	if s, ok := ae.Sessions[sessId]; !ok {
-		pool, err := policypathpool.NewPool(ae.IA, polName, afp)
+		pool, err := policypathpool.NewPool(ae.IA, polName, pp)
 		if err != nil {
 			return err
 		}
@@ -258,7 +259,7 @@ func (ae *ASEntry) addSession(sessId mgmt.SessionType, polName string,
 	} else {
 		// Session exists, update its path pool
 		pool := s.PathPool().(*policypathpool.Pool)
-		if err := pool.Update(polName, afp); err != nil {
+		if err := pool.Update(polName, pp); err != nil {
 			return err
 		}
 	}

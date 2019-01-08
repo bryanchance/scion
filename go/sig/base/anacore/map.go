@@ -76,7 +76,7 @@ func (am *ASMap) addNewIAs(cfg *config.Cfg) bool {
 			s = false
 			continue
 		}
-		s = ae.ReloadConfig(cfgEntry, cfg.Classes, cfg.Actions) && s
+		s = ae.ReloadConfig(cfgEntry, cfg.PktClasses, cfg.PathPolicies) && s
 		log.Info("ReloadConfig: Added AS", "ia", ia)
 	}
 	return s

@@ -11,7 +11,7 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/pathmgr"
-	"github.com/scionproto/scion/go/lib/pktcls"
+	"github.com/scionproto/scion/go/lib/pathpol"
 	"github.com/scionproto/scion/go/lib/spath/spathmeta"
 	"github.com/scionproto/scion/go/sig/sigcmn"
 )
@@ -25,9 +25,9 @@ type Pool struct {
 }
 
 func NewPool(dst addr.IA, name string,
-	afp *pktcls.ActionFilterPaths) (*Pool, error) {
+	pp *pathpol.Policy) (*Pool, error) {
 
-	pool, err := sigcmn.PathMgr.WatchFilter(context.TODO(), sigcmn.IA, dst, afp)
+	pool, err := sigcmn.PathMgr.WatchFilter(context.TODO(), sigcmn.IA, dst, pp)
 	if err != nil {
 		return nil, common.NewBasicError("Unable to register watch", err)
 	}
@@ -51,11 +51,11 @@ func (ppp *Pool) Destroy() error {
 	return nil
 }
 
-func (ppp *Pool) Update(name string, afp *pktcls.ActionFilterPaths) error {
+func (ppp *Pool) Update(name string, pp *pathpol.Policy) error {
 	ppp.policyLock.Lock()
 	defer ppp.policyLock.Unlock()
 
-	pool, err := sigcmn.PathMgr.WatchFilter(context.TODO(), sigcmn.IA, ppp.ia, afp)
+	pool, err := sigcmn.PathMgr.WatchFilter(context.TODO(), sigcmn.IA, ppp.ia, pp)
 	if err != nil {
 		return common.NewBasicError("Unable to register watch", err)
 	}

@@ -18,6 +18,7 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/log"
+	"github.com/scionproto/scion/go/lib/pathpol"
 	"github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sigmgmt/cfggen"
 	"github.com/scionproto/scion/go/sigmgmt/db"
@@ -41,22 +42,19 @@ func (c *Controller) getAndValidateSiteCfg(siteID uint) (*config.Cfg, string, er
 	if len(site.ASEntries) == 0 {
 		return nil, "No remote AS configured", common.NewBasicError("Empty ASEntries", nil)
 	}
-	policies := make(map[addr.IA][]db.Policy)
-	for _, as := range site.ASEntries {
-		ia, err := as.ToAddrIA()
-		if err != nil {
-			return nil, "Could not convert AS to addr.IA", err
-		}
-		policies[ia] = as.Policy
+	var trafficPolicies map[addr.IA][]db.TrafficPolicy
+	var trafficClasses map[uint]db.TrafficClass
+	var pathPolicies []*pathpol.ExtPolicy
+	if trafficPolicies, msg, err = c.getTrafficPolicies(site); err != nil {
+		return nil, msg, err
 	}
-	trafficClasses := make(map[uint]db.TrafficClass)
-	for _, tc := range site.TrafficClasses {
-		if substituteTrafficClasses(&tc, c.db); err != nil {
-			return nil, "Could not substitute traffic classes", err
-		}
-		trafficClasses[tc.ID] = tc
+	if trafficClasses, msg, err = c.getTrafficClasses(site); err != nil {
+		return nil, msg, err
 	}
-	if err = cfggen.Compile(siteCfg, policies, trafficClasses, site.PathSelectors); err != nil {
+	if pathPolicies, msg, err = c.getPathPolicies(siteID); err != nil {
+		return nil, msg, err
+	}
+	if err = cfggen.Compile(siteCfg, trafficPolicies, trafficClasses, pathPolicies); err != nil {
 		return nil, "Config compiler error", err
 	}
 	siteCfg.ConfigVersion = uint64(time.Now().Unix())
@@ -109,7 +107,7 @@ func (c *Controller) writeConfig(siteID uint, siteCfg *config.Cfg) (string, erro
 func (c *Controller) getSiteConfig(siteID uint) (*config.Cfg, *db.Site, string, error) {
 	cfg := &config.Cfg{}
 	var site db.Site
-	err := c.db.Preload("ASEntries").Preload("PathSelectors").Preload("TrafficClasses").
+	err := c.db.Preload("ASEntries").Preload("TrafficClasses").
 		Preload("ASEntries.Networks").Preload("ASEntries.Policy").Preload("ASEntries.SIGs").
 		Where("id = ?", siteID).Find(&site).Error
 	if err != nil {
@@ -191,6 +189,52 @@ func (c *Controller) updateHosts(newHosts []db.Host, siteID uint) error {
 		}
 	}
 	return nil
+}
+
+func (c *Controller) getTrafficPolicies(site *db.Site) (map[addr.IA][]db.TrafficPolicy, string,
+	error) {
+
+	policies := make(map[addr.IA][]db.TrafficPolicy)
+	for _, as := range site.ASEntries {
+		ia, err := as.ToAddrIA()
+		if err != nil {
+			return nil, "Could not convert AS to addr.IA", err
+		}
+		policies[ia] = as.Policy
+	}
+	return policies, "", nil
+}
+
+func (c *Controller) getTrafficClasses(site *db.Site) (map[uint]db.TrafficClass, string, error) {
+	trafficClasses := make(map[uint]db.TrafficClass)
+	for _, tc := range site.TrafficClasses {
+		if err := substituteTrafficClasses(&tc, c.db); err != nil {
+			return nil, "Could not substitute traffic classes", err
+		}
+		trafficClasses[tc.ID] = tc
+	}
+	return trafficClasses, "", nil
+}
+
+func (c *Controller) getPathPolicies(siteID uint) ([]*pathpol.ExtPolicy, string, error) {
+	var pathPolicyFiles []db.PathPolicyFile
+	if err := c.db.Where("type = ? OR site_id = ?", db.GlobalPolicy, siteID).Find(
+		&pathPolicyFiles).Error; err != nil {
+		return nil, "No path policies found", err
+	}
+	pathPolicies := make([]*pathpol.ExtPolicy, 0)
+	for _, ppF := range pathPolicyFiles {
+		policies, err := ppF.GetExtPolicies()
+		if err != nil {
+			return nil, "Error getting extPolicies", err
+		}
+		for _, policy := range policies {
+			// TODO that implies that policy names must be globally unique
+			// maybe this should be changed to unique per file
+			pathPolicies = append(pathPolicies, policy)
+		}
+	}
+	return pathPolicies, "", nil
 }
 
 // substituteTrafficClasses replaces `cls=xx` by the corresponding class
