@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# Test that the SIG switches to a new path when the session is renamed
+
+. acceptance/common.sh
+. acceptance/sigutil/common.sh
+
+PROGRAM=`basename "$0"`
+COMMAND="$1"
+TEST_NAME="sig_rename_session"
+
+SRC_IA=1-ff00:0:113
+SRC_IA_FILE="$(ia_file $SRC_IA)"
+SRC_AS_FILE="$(as_file $SRC_IA)"
+DST_IA=1-ff00:0:110
+SIG_JSON="gen/ISD1/AS$SRC_AS_FILE/sig$SRC_IA_FILE/cfg.json"
+
+TEST_TOPOLOGY="acceptance/sigutil/SIG.topo"
+
+test_run() {
+    set -e
+    # Insert path policies
+    local act1='"through-111": {"Sequence": ["0", "1-ff00:0:111", "0"]}'
+    local act2='"through-112": {"Sequence": ["0", "1-ff00:0:112", "0"]}'
+    jq ".PathPolicies = {$act1, $act2}" $SIG_JSON | sponge $SIG_JSON
+    # Insert PktPolicies and Session
+    jq ".ASes.\"$DST_IA\".PktPolicies = [{\"ClassName\": \"default\", \"SessIds\": [1]}]" $SIG_JSON | sponge $SIG_JSON
+    jq ".ASes.\"$DST_IA\".Sessions = {\"1\": \"through-111\"}" $SIG_JSON | sponge $SIG_JSON
+
+    # Run ping on action "through-111"
+    reload_sig "$SRC_IA_FILE"
+    ./bin/sig_ping_acceptance -d -log.console info -src $SRC_IA -dst $DST_IA
+    sleep 1
+    grep -q ".*sessMonitor: updating remote Info.*Hops: \[1-ff00:0:113 1>2 1-ff00:0:111 1>1 1-ff00:0:110\].*" "logs/sig$SRC_IA_FILE.log" || \
+        { echo "Could not find remote with path through 1-ff00:0:111!"; return 1; }
+
+    # Change to action "through-112"
+    jq ".ASes.\"$DST_IA\".Sessions = {\"1\": \"through-112\"}" $SIG_JSON | sponge $SIG_JSON
+    reload_sig "$SRC_IA_FILE"
+    ./bin/sig_ping_acceptance -d -log.console info -src $SRC_IA -dst $DST_IA
+    sleep 1
+    grep -q ".*sessMonitor: Current path was invalidated.*Hops: \[1-ff00:0:113 1>2 1-ff00:0:111 1>1 1-ff00:0:110\].*" "logs/sig$SRC_IA_FILE.log" || \
+        { echo "Could not find path invalidation!"; return 1; }
+    grep -q ".*sessMonitor: New remote.*Hops: \[1-ff00:0:113 2>2 1-ff00:0:112 1>2 1-ff00:0:110\].*" "logs/sig$SRC_IA_FILE.log" || \
+        { echo "Could not find remote with path through 1-ff00:0:112!"; return 1; }
+}
+
+reload_sig() {
+    id="$(./tools/dc dc exec -T scion_sig_$1 pgrep -x sig)"
+    ./tools/dc dc exec -T scion_sig_"$1" kill -SIGHUP "$id"
+}
+
+shift
+do_command $PROGRAM $COMMAND $TEST_NAME "$@"

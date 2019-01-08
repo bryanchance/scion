@@ -299,8 +299,9 @@ func (ae *ASEntry) buildNewPktPolicies(cfgPktPols []*config.PktPolicy,
 		// Packet policies are stateless, so we construct new ones
 		pp, err := sessselector.NewPktPolicy(pol.ClassName, cls, pol.SessIds, ae.Sessions)
 		if err != nil {
-			log.Error("Unable to create packet policy", "policy", pol, "err", err)
+			ae.Error("Unable to create packet policy", "policy", pol, "err", err)
 		}
+		ae.Info("PktPolicies: New policy", "class", pp.ClassName, "sessIds", pol.SessIds)
 		newPktPolicies = append(newPktPolicies, pp)
 	}
 	return newPktPolicies
