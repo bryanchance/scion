@@ -1,4 +1,4 @@
-// Copyright 2018 ETH Zurich, Anapaya Systems
+// Copyright 2018 ETH Zurich
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"testing"
@@ -152,13 +151,6 @@ func MustParseAS(s string) addr.AS {
 		panic(err)
 	}
 	return ia
-}
-
-// RunsInDocker returns whether the current binary is run in a docker container.
-func RunsInDocker() bool {
-	cmd := exec.Command("bash", "-c", "cut -d: -f 3 /proc/1/cgroup | grep -q '^/docker/'")
-	err := cmd.Run()
-	return err == nil
 }
 
 // MustParseHexString parses s and returns the corresponding byte slice.

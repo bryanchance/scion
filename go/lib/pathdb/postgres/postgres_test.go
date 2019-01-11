@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"os"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -22,19 +21,9 @@ var (
 )
 
 func init() {
-	var dbHost string
-	if xtest.RunsInDocker() {
-		var ok bool
-		dbHost, ok = os.LookupEnv("DOCKER0")
-		if !ok {
-			panic("Expected DOCKER0 env variable")
-		}
-	} else {
-		dbHost = "localhost"
-	}
 	// sslmode=disable is because dockerized postgres doesn't have SSL enabled.
 	connection = fmt.Sprintf("host=%s port=5432 user=psdb password=password sslmode=disable",
-		dbHost)
+		xtest.PostgresHost())
 }
 
 func (b *Backend) dropSchema(ctx context.Context) error {
