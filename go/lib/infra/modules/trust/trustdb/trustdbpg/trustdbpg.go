@@ -407,8 +407,14 @@ func insertIssCert(ctx context.Context, tx *sql.Tx, crt *cert.Certificate) (int6
 		NOT EXISTS(SELECT * FROM ins)`
 	var rowId int64
 	var mode string
-	err = tx.QueryRowContext(ctx, query, crt.Subject.I, crt.Subject.A, crt.Version, raw).
-		Scan(&rowId, &mode)
+	for {
+		err = tx.QueryRowContext(ctx, query, crt.Subject.I, crt.Subject.A, crt.Version, raw).
+			Scan(&rowId, &mode)
+		// In case of a concurrent insert this query returns no rows so we have to retry.
+		if err != sql.ErrNoRows {
+			break
+		}
+	}
 	if err != nil {
 		return 0, 0, common.NewBasicError("Failed to insert issuer cert", err)
 	}

@@ -9,11 +9,13 @@ import (
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb"
 	"github.com/scionproto/scion/go/lib/infra/modules/trust/trustdb/trustdbtest"
+	"github.com/scionproto/scion/go/lib/scrypto/cert"
 	"github.com/scionproto/scion/go/lib/xtest"
 )
 
@@ -59,11 +61,7 @@ func (db *trustDB) initSchema(ctx context.Context) error {
 
 func TestTrustDBSuite(t *testing.T) {
 	Convey("TrustDBSuite", t, func() {
-		db, err := New(connection)
-		xtest.FailOnErr(t, err)
-		err = db.initSchema(context.Background())
-		xtest.FailOnErr(t, err)
-
+		db := setupDB(t)
 		setup := func() trustdb.TrustDB {
 			db.initSchema(context.Background())
 			return db
@@ -75,4 +73,44 @@ func TestTrustDBSuite(t *testing.T) {
 
 		db.dropSchema(context.Background())
 	})
+}
+
+func TestConcurrentInsertion(t *testing.T) {
+	Convey("Concurrent Insert", t, func() {
+		db := setupDB(t)
+		ctx, cancelF := context.WithTimeout(context.Background(), trustdbtest.Timeout)
+		defer cancelF()
+		defer db.dropSchema(context.Background())
+		chain, err := cert.ChainFromFile("../trustdbtest/testdata/ISD1-ASff00_0_311-V1.crt", false)
+		xtest.FailOnErr(t, err)
+		var ins1 int64
+		var ins2 int64
+		chains, err := db.GetAllChains(ctx)
+		SoMsg("No chains expected", chains, ShouldBeEmpty)
+		xtest.FailOnErr(t, err)
+		tx1, err := db.BeginTransaction(ctx, nil)
+		xtest.FailOnErr(t, err)
+		ins1, err = tx1.InsertIssCert(ctx, chain.Issuer)
+		SoMsg("No err expected", err, ShouldBeNil)
+		tx2, err := db.BeginTransaction(ctx, nil)
+		xtest.FailOnErr(t, err)
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			err := tx1.Commit()
+			xtest.FailOnErr(t, err)
+		}()
+		ins2, err = tx2.InsertIssCert(ctx, chain.Issuer)
+		SoMsg("No err expected", err, ShouldBeNil)
+		err = tx2.Commit()
+		xtest.FailOnErr(t, err)
+		SoMsg("One insertion expected", ins1+ins2, ShouldEqual, int64(1))
+	})
+}
+
+func setupDB(t *testing.T) *trustDB {
+	db, err := New(connection)
+	xtest.FailOnErr(t, err)
+	err = db.initSchema(context.Background())
+	xtest.FailOnErr(t, err)
+	return db
 }
