@@ -9,7 +9,10 @@ from lib.util import write_file
 from topology.common import docker_host, get_l4_port, get_pub, get_pub_ip
 from topology.go import GoGenerator as VanillaGenerator
 from topology.ana.postgres import CSDB_NAME, CSDB_PORT, PSDB_NAME, PSDB_PORT
-
+from topology.supervisor import (
+    CS_CONFIG_NAME,
+    PS_CONFIG_NAME,
+)
 
 DB_TYPE_TRUST = 'trust'
 DB_TYPE_PATH = 'path'
@@ -94,9 +97,9 @@ class GoGenerator(VanillaGenerator):
             base = topo_id.base_dir(self.args.output_dir)
             for k, v in topo.get("PathService", {}).items():
                 # without consul only a single go PS is supported
-                if k.endswith("-1") or self.args.consul:
+                if k.endswith("-1") or (self.args.consul and self.args.ps_db == 'postgres'):
                     ps_conf = self._build_ps_conf(topo_id, topo["ISD_AS"], base, k)
-                    write_file(os.path.join(base, k, "psconfig.toml"), toml.dumps(ps_conf))
+                    write_file(os.path.join(base, k, PS_CONFIG_NAME), toml.dumps(ps_conf))
                     self._genereate_pg_user_init(topo_id, SVC_PS, DB_TYPE_PATH, k)
                     self._genereate_pg_user_init(topo_id, SVC_PS, DB_TYPE_TRUST, k)
 
@@ -126,12 +129,12 @@ class GoGenerator(VanillaGenerator):
     def generate_cs(self):
         for topo_id, topo in self.args.topo_dicts.items():
             self._generate_trust_postgres_init(topo_id, SVC_CS)
+            base = topo_id.base_dir(self.args.output_dir)
             for k, v in topo.get("CertificateService", {}).items():
                 # only a single Go-CS per AS is currently supported
-                if k.endswith("-1"):
-                    base = topo_id.base_dir(self.args.output_dir)
+                if k.endswith("-1") or (self.args.consul and self.args.cs_db == 'postgres'):
                     cs_conf = self._build_cs_conf(topo_id, topo["ISD_AS"], base, k)
-                    write_file(os.path.join(base, k, "csconfig.toml"), toml.dumps(cs_conf))
+                    write_file(os.path.join(base, k, CS_CONFIG_NAME), toml.dumps(cs_conf))
                     self._genereate_pg_user_init(topo_id, SVC_CS, DB_TYPE_TRUST, k)
 
     def _build_cs_conf(self, topo_id, ia, base, name):

@@ -69,10 +69,6 @@ var (
 	tasks *periodicTasks
 )
 
-var (
-	ttlUpdater *periodic.Runner
-)
-
 func init() {
 	flag.Usage = env.Usage
 }
@@ -289,27 +285,25 @@ func setupConsul() (io.Closer, error) {
 	if err != nil {
 		return nil, err
 	}
-	startHealthCheck(c)
+	ttlUpdater, err := startUpdateTTL(c)
+	if err != nil {
+		return nil, err
+	}
 	leaderKey := fmt.Sprintf("path_srv/leader/%s", config.General.Topology.ISD_AS.FileFmt(false))
 	le, err := consul.StartLeaderElector(c, leaderKey, consulconfig.LeaderElectorConf{
 		Name:           config.General.ID,
 		AcquiredLeader: tasks.Start,
 		LostLeader:     tasks.Kill,
 	})
+	if err != nil {
+		ttlUpdater.Kill()
+		return nil, err
+	}
 	return closerFunc(func() error {
 		le.Stop()
+		ttlUpdater.Stop()
 		return nil
 	}), nil
-}
-
-func startHealthCheck(c *consulapi.Client) {
-	go func() {
-		defer log.LogPanicAndExit()
-		var err error
-		if ttlUpdater, err = startUpdateTTL(c); err != nil {
-			fatal.Fatal(err)
-		}
-	}()
 }
 
 func startUpdateTTL(c *consulapi.Client) (*periodic.Runner, error) {

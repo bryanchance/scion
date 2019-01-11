@@ -4,7 +4,11 @@
 import os
 
 # SCION
-from topology.supervisor import SupervisorGenerator as VanillaGenerator
+from topology.supervisor import (
+    SupervisorGenerator as VanillaGenerator,
+    CS_CONFIG_NAME,
+    PS_CONFIG_NAME,
+)
 
 
 class SupervisorGenerator(VanillaGenerator):
@@ -26,6 +30,15 @@ class SupervisorGenerator(VanillaGenerator):
             return super()._ps_entries(topo, base)
         entries = []
         for k, v in topo.get("PathService", {}).items():
-            conf = os.path.join(base, k, "psconfig.toml")
+            conf = os.path.join(base, k, PS_CONFIG_NAME)
             entries.append((k, ["bin/path_srv", "-config", conf]))
+        return entries
+
+    def _cs_entries(self, topo, base):
+        if self.args.cert_server == "py" or not self.args.consul:
+            return super()._cs_entries(topo, base)
+        entries = []
+        for k, v in topo.get("CertificateService", {}).items():
+            conf = os.path.join(base, k, CS_CONFIG_NAME)
+            entries.append((k, ["bin/cert_srv", "-config", conf]))
         return entries

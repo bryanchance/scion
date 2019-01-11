@@ -18,10 +18,13 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	_ "net/http/pprof"
 	"os"
+	"sync"
 
 	"github.com/BurntSushi/toml"
+	consulapi "github.com/hashicorp/consul/api"
 
 	"github.com/scionproto/scion/go/cert_srv/internal/csconfig"
 	"github.com/scionproto/scion/go/cert_srv/internal/reiss"
@@ -55,11 +58,12 @@ var (
 	config      Config
 	environment *env.Env
 	reissRunner *periodic.Runner
+	reissMtx    sync.Mutex
 	msgr        *messenger.Messenger
 )
 
 var (
-	ttlUpdater *periodic.Runner
+	leaderElector consul.LeaderElector
 )
 
 func init() {
@@ -90,8 +94,16 @@ func realMain() int {
 		log.Crit("Setup failed", "err", err)
 		return 1
 	}
-	// Start the periodic reissuance task.
-	startReissRunner()
+	if config.Consul.Enabled {
+		c, err := setupConsul()
+		if err != nil {
+			log.Crit("Setup consul failed", "err", err)
+			return 1
+		}
+		defer c.Close()
+	} else {
+		startReissRunner()
+	}
 	// Start the messenger.
 	go func() {
 		defer log.LogPanicAndExit()
@@ -106,14 +118,6 @@ func realMain() int {
 	// Cleanup when the CS exits.
 	defer stop()
 	config.Metrics.StartPrometheus()
-	// Start periodic health status setter
-	go func() {
-		defer log.LogPanicAndExit()
-		var err error
-		if ttlUpdater, err = startUpdateTTL(); err != nil {
-			fatal.Fatal(err)
-		}
-	}()
 	select {
 	case <-environment.AppShutdownSignal:
 		// Whenever we receive a SIGINT or SIGTERM we exit without an error.
@@ -137,15 +141,25 @@ func reload() error {
 		return common.NewBasicError("Unable to initialize CS config", err)
 	}
 	config.CS = newConf.CS
-	// Restart the periodic reissue task to respect the fresh parameters.
-	stopReissRunner()
-	startReissRunner()
+	if config.Consul.Enabled {
+		stopLeaderElector()
+		if err := startLeaderElector(); err != nil {
+			err = common.NewBasicError("Failed to start leader election", err)
+			fatal.Fatal(err)
+		}
+	} else {
+		// Restart the periodic reissue task to respect the fresh parameters.
+		stopReissRunner()
+		startReissRunner()
+	}
 	return nil
 }
 
 // startReissRunner starts a periodic reissuance task. Core starts self-issuer.
 // Non-core starts a requester.
 func startReissRunner() {
+	reissMtx.Lock()
+	defer reissMtx.Unlock()
 	if !config.CS.AutomaticRenewal {
 		log.Info("Reissue disabled, not starting reiss task.")
 		return
@@ -178,21 +192,81 @@ func startReissRunner() {
 	)
 }
 
-func stopReissRunner() {
+func killReissRunner() {
+	reissMtx.Lock()
+	defer reissMtx.Unlock()
 	if reissRunner != nil {
-		reissRunner.Stop()
+		reissRunner.Kill()
+		reissRunner = nil
 	}
 }
 
-func startUpdateTTL() (*periodic.Runner, error) {
-	if !config.Consul.Enabled {
-		return nil, nil
+func stopReissRunner() {
+	reissMtx.Lock()
+	defer reissMtx.Unlock()
+	if reissRunner != nil {
+		reissRunner.Stop()
+		reissRunner = nil
 	}
+}
+
+func stop() {
+	if config.Consul.Enabled {
+		stopLeaderElector()
+	} else {
+		stopReissRunner()
+	}
+	msgr.CloseServer()
+}
+
+type closerFunc func() error
+
+func (cf closerFunc) Close() error {
+	return cf()
+}
+
+func setupConsul() (io.Closer, error) {
+	fatal.Check()
 	config.Consul.InitDefaults()
 	c, err := config.Consul.Client()
 	if err != nil {
 		return nil, err
 	}
+	ttlUpdater, err := startUpdateTTL(c)
+	if err != nil {
+		return nil, err
+	}
+	if err = startLeaderElector(); err != nil {
+		ttlUpdater.Kill()
+		return nil, err
+	}
+	return closerFunc(func() error {
+		ttlUpdater.Stop()
+		return nil
+	}), nil
+}
+
+func startLeaderElector() error {
+	config.Consul.InitDefaults()
+	c, err := config.Consul.Client()
+	if err != nil {
+		return err
+	}
+	leaderKey := fmt.Sprintf("cert_srv/leader/%s", config.General.Topology.ISD_AS.FileFmt(false))
+	leaderElector, err = consul.StartLeaderElector(c, leaderKey, consulconfig.LeaderElectorConf{
+		Name:           config.General.ID,
+		AcquiredLeader: startReissRunner,
+		LostLeader:     killReissRunner,
+	})
+	return err
+}
+
+func stopLeaderElector() {
+	leaderElector.Stop()
+	leaderElector = nil
+}
+
+func startUpdateTTL(c *consulapi.Client) (*periodic.Runner, error) {
 	svc := &consul.Service{
 		Type:        consul.CS,
 		Agent:       c.Agent(),
@@ -206,9 +280,4 @@ func startUpdateTTL() (*periodic.Runner, error) {
 		},
 	}
 	return svc.StartUpdateTTL(config.Consul.InitConnPeriod.Duration)
-}
-
-func stop() {
-	stopReissRunner()
-	msgr.CloseServer()
 }

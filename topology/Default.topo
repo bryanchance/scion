@@ -7,12 +7,14 @@ defaults:
 ASes:
   "1-ff00:0:110": # old 1-11
     core: true
+    certificate_servers: 3
     path_servers: 3
   "1-ff00:0:120": # old 1-12
     core: true
   "1-ff00:0:130": # old 1-13
     core: true
     beacon_servers: 2
+    certificate_servers: 3
   "1-ff00:0:111": # old 1-14
     cert_issuer: 1-ff00:0:110
   "1-ff00:0:112": # old 1-17
@@ -41,6 +43,7 @@ ASes:
     cert_issuer: 2-ff00:0:210
   "2-ff00:0:221": # old 2-24
     cert_issuer: 2-ff00:0:220
+    certificate_servers: 2
   "2-ff00:0:222": # old 2-26
     cert_issuer: 2-ff00:0:220
 links:
