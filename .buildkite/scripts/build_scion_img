@@ -6,7 +6,7 @@ set -e
 echo "Login to docker hub with user $DOCKERHUB_USER"
 echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USER" --password-stdin
 
-BASE_IMG=${BASE_IMG:-a3616ead26bfdfce946ed52c1f6ca762df9346045c2c354d0996d052a77064b6}
+BASE_IMG=${BASE_IMG:-d7e8edb6c23b8d5166a6fa6516125f66e9464acdee59b2e525bd470897b204ce}
 
 ./tools/ci/prepare_image "$BASE_IMG"
 ./docker.sh build

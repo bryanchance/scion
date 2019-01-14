@@ -39,7 +39,7 @@ hashes/debug_base: base/Dockerfile.debug hashes/scion
 	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $< files/
 
 # App images
-APP_TARGETS = border discovery dispatcher sig path_py path beacon_py cert_py cert sciond_py sciond
+APP_TARGETS = border discovery dispatcher dispatcher_go sig path_py path beacon_py cert_py cert sciond_py sciond
 .PHONY: $(APP_TARGETS)
 apps: $(APP_TARGETS)
 
@@ -53,6 +53,10 @@ hashes/discovery: app/Dockerfile.discovery hashes/app_base hashes/app_builder
 
 dispatcher: hashes/dispatcher
 hashes/dispatcher: app/Dockerfile.dispatcher hashes/app_base hashes/app_builder
+	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
+
+dispatcher_go: hashes/dispatcher_go
+hashes/dispatcher_go: app/Dockerfile.dispatcher_go hashes/app_base hashes/app_builder
 	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
 
 sig: hashes/sig
@@ -92,7 +96,7 @@ hashes/sciond: app/Dockerfile.sciond hashes/app_base hashes/app_builder
 	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
 
 # Debug images
-DEBUG_TARGETS = border_debug discovery_debug dispatcher_debug sig_debug path_py_debug path_debug beacon_py_debug cert_py_debug cert_debug sciond_py_debug sciond_debug
+DEBUG_TARGETS = border_debug discovery_debug dispatcher_debug dispatcher_go_debug sig_debug path_py_debug path_debug beacon_py_debug cert_py_debug cert_debug sciond_py_debug sciond_debug
 .PHONY: $(DEBUG_TARGETS)
 debug: $(DEBUG_TARGETS)
 
@@ -106,6 +110,10 @@ hashes/discovery_debug: debug/Dockerfile.discovery hashes/debug_base hashes/disc
 
 dispatcher_debug: hashes/dispatcher_debug
 hashes/dispatcher_debug: debug/Dockerfile.dispatcher hashes/debug_base hashes/dispatcher
+	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
+
+dispatcher_go_debug: hashes/dispatcher_go_debug
+hashes/dispatcher_go_debug: debug/Dockerfile.dispatcher_go hashes/debug_base hashes/dispatcher_go
 	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
 
 sig_debug: hashes/sig_debug
