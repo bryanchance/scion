@@ -24,7 +24,7 @@ test_run() {
     # is more appropriately done in unit tests.
     cp $SIG_JSON $SIG_JSON.backup
     jq '.ASes."1-ff00:0:112".Sessions."0" = "foo"' $SIG_JSON | sponge $SIG_JSON
-    jq '.PathPolicies = {"foo": {"ACL": [{"Action": false, "Rule": "1-ff00:0:110"}, {"Action": true, "Rule": "0-0#0"}]}}' $SIG_JSON | sponge $SIG_JSON
+    jq '.PathPolicies = {"foo": {"ACL": ["- 1-ff00:0:110", "+ 0-0#0"]}}' $SIG_JSON | sponge $SIG_JSON
     reload_sig "$SRC_IA_FILE"
     ./bin/sig_ping_acceptance -d --log.console info -fail -src $SRC_IA -dst $DST_IA
 

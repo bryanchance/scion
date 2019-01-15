@@ -240,8 +240,7 @@ func TestWatchFilter(t *testing.T) {
 		Convey("and adding a watch that should retrieve 1 path", func() {
 			seq, err := pathpol.NewSequence([]string{"1-ff00:0:111#105", "0", "0"})
 			xtest.FailOnErr(t, err)
-
-			filter := pathpol.NewPolicy("test-1-ff00:0:131#1619", nil, seq, nil)
+			filter := pathpol.NewPolicy("test-1-ff00:0:111#105", nil, seq, nil)
 
 			sp, err := pr.WatchFilter(context.Background(), src, dst, filter)
 			xtest.FailOnErr(t, err)

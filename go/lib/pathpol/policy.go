@@ -86,6 +86,7 @@ func PolicyFromExtPolicy(extPolicy *ExtPolicy, extended []*ExtPolicy) (*Policy, 
 // applyExtended adds attributes of extended policies to the extending policy if they are not
 // already set
 func (p *Policy) applyExtended(extends []string, exPolicies []*ExtPolicy) error {
+	// TODO(worxli): Prevent circular policies.
 	// traverse in reverse s.t. last entry of the list has precedence
 	for i := len(extends) - 1; i >= 0; i-- {
 		var policy *Policy
@@ -141,37 +142,6 @@ func (p *Policy) evalOptions(inputSet spathmeta.AppPathSet) spathmeta.AppPathSet
 type Option struct {
 	Weight int
 	Policy *Policy
-}
-
-// Sequence is a list of path interfaces that a path should match
-type Sequence []*HopPredicate
-
-// NewSequence creates a new sequence from a list of string tokens
-func NewSequence(tokens []string) (Sequence, error) {
-	s := make(Sequence, 0)
-	for _, token := range tokens {
-		hp, err := HopPredicateFromString(token)
-		if err != nil {
-			return nil, err
-		}
-		s = append(s, hp)
-	}
-	return s, nil
-}
-
-// Eval evaluates the interface sequence list and returns the set of paths that match the list
-func (s Sequence) Eval(inputSet spathmeta.AppPathSet) spathmeta.AppPathSet {
-	if len(s) == 0 {
-		return inputSet
-	}
-
-	resultSet := make(spathmeta.AppPathSet)
-	for key, path := range inputSet {
-		if pathMatches(path.Entry.Path.Interfaces, s) {
-			resultSet[key] = path
-		}
-	}
-	return resultSet
 }
 
 // The pathInterfaces slice contains an entry for each interface on the path, while the

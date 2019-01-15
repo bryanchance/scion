@@ -97,10 +97,21 @@ def prom_addr_br(br_id, br_ele, port):
     return "[%s]:%s" % (pub['PublicOverlay']['Addr'].ip, port)
 
 
-def prom_addr_infra(infra_id, infra_ele, port):
+def prom_addr_infra(docker, infra_id, infra_ele, port):
     """Get the prometheus address for an infrastructure element."""
     pub = get_pub(infra_ele['Addrs'])
+    # For dockerized infra use scion port since multiple instances can be on the same IP,
+    # so we can't use the default port.
+    port = pub['Public']['L4Port'] if docker else port
     return "[%s]:%s" % (pub['Public']['Addr'].ip, port)
+
+
+def prom_addr_sciond(docker, topo_id, networks, port):
+    for i, net in enumerate(networks):
+        for prog, ip_net in networks[net].items():
+            if prog == 'sd%s' % topo_id.file_fmt():
+                return '[%s]:%s' % (ip_net.ip, port)
+    return None
 
 
 def get_pub(topo_addr):

@@ -20,8 +20,8 @@ TEST_TOPOLOGY="acceptance/sigutil/SIG.topo"
 test_run() {
     set -e
     # Insert path policies
-    local act1='"through-111": {"Sequence": ["0", "1-ff00:0:111", "0"]}'
-    local act2='"through-112": {"Sequence": ["0", "1-ff00:0:112", "0"]}'
+    local act1='"through-111": {"Sequence": "0 1-ff00:0:111 0"}'
+    local act2='"through-112": {"Sequence": "0 1-ff00:0:112 0"}'
     jq ".PathPolicies = {$act1, $act2}" $SIG_JSON | sponge $SIG_JSON
     # Insert PktPolicies and Session
     jq ".ASes.\"$DST_IA\".PktPolicies = [{\"ClassName\": \"default\", \"SessIds\": [1]}]" $SIG_JSON | sponge $SIG_JSON

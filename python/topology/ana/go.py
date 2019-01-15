@@ -98,13 +98,13 @@ class GoGenerator(VanillaGenerator):
             for k, v in topo.get("PathService", {}).items():
                 # without consul only a single go PS is supported
                 if k.endswith("-1") or (self.args.consul and self.args.ps_db == 'postgres'):
-                    ps_conf = self._build_ps_conf(topo_id, topo["ISD_AS"], base, k)
+                    ps_conf = self._build_ps_conf(topo_id, topo["ISD_AS"], base, k, v)
                     write_file(os.path.join(base, k, PS_CONFIG_NAME), toml.dumps(ps_conf))
                     self._genereate_pg_user_init(topo_id, SVC_PS, DB_TYPE_PATH, k)
                     self._genereate_pg_user_init(topo_id, SVC_PS, DB_TYPE_TRUST, k)
 
-    def _build_ps_conf(self, topo_id, ia, base, name):
-        raw_entry = super()._build_ps_conf(topo_id, ia, base, name)
+    def _build_ps_conf(self, topo_id, ia, base, name, elem):
+        raw_entry = super()._build_ps_conf(topo_id, ia, base, name, elem)
         if self.args.ps_db != 'postgres':
             return raw_entry
         db_host = docker_host(self.args.in_docker, self.args.docker, 'localhost')
@@ -133,12 +133,12 @@ class GoGenerator(VanillaGenerator):
             for k, v in topo.get("CertificateService", {}).items():
                 # only a single Go-CS per AS is currently supported
                 if k.endswith("-1") or (self.args.consul and self.args.cs_db == 'postgres'):
-                    cs_conf = self._build_cs_conf(topo_id, topo["ISD_AS"], base, k)
+                    cs_conf = self._build_cs_conf(topo_id, topo["ISD_AS"], base, k, v)
                     write_file(os.path.join(base, k, CS_CONFIG_NAME), toml.dumps(cs_conf))
                     self._genereate_pg_user_init(topo_id, SVC_CS, DB_TYPE_TRUST, k)
 
-    def _build_cs_conf(self, topo_id, ia, base, name):
-        raw_entry = super()._build_cs_conf(topo_id, ia, base, name)
+    def _build_cs_conf(self, topo_id, ia, base, name, elem):
+        raw_entry = super()._build_cs_conf(topo_id, ia, base, name, elem)
         if self.args.cs_db != 'postgres':
             return raw_entry
         db_user = self._pg_db_user(SVC_CS, DB_TYPE_TRUST, name)

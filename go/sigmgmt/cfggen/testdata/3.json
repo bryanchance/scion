@@ -54,14 +54,10 @@
     "PathPolicies": {
         "any": {},
         "bar": {
-            "Sequence": [
-                "1-ff00:0:132#1910"
-            ]
+            "Sequence": "1-ff00:0:132#1910"
         },
         "foo": {
-            "Sequence": [
-                "1-ff00:0:133#1010"
-            ]
+            "Sequence": "1-ff00:0:133#1010"
         }
     },
     "ConfigVersion": 0

@@ -26,17 +26,25 @@ import yaml
 # SCION
 from lib.defines import PROM_FILE
 from lib.util import write_file
-from topology.common import prom_addr_br, prom_addr_infra, ArgsTopoDicts
+from topology.common import (
+    ArgsTopoDicts,
+    prom_addr_br,
+    prom_addr_infra,
+    prom_addr_sciond,
+)
 
 PS_PROM_PORT = 30453
 BS_PROM_PORT = 30452
 CS_PROM_PORT = 30454
+SCIOND_PROM_PORT = 30455
 SIG_PROM_PORT = 30456
 DEFAULT_BR_PROM_PORT = 30442
 
 
 class PrometheusGenArgs(ArgsTopoDicts):
-    pass
+    def __init__(self, args, topo_dicts, networks, port_gen=None):
+        super().__init__(args, topo_dicts, port_gen)
+        self.networks = networks
 
 
 class PrometheusGenerator(object):
@@ -46,12 +54,14 @@ class PrometheusGenerator(object):
         "BeaconService": "bs.yml",
         "CertificateService": "cs.yml",
         "PathService": "ps.yml",
+        "Sciond": "sd.yml",
     }
     JOB_NAMES = {
         "BorderRouters": "BR",
         "BeaconService": "BS",
         "CertificateService": "CS",
         "PathService": "PS",
+        "Sciond": "SD",
     }
 
     def __init__(self, args):
@@ -67,11 +77,17 @@ class PrometheusGenerator(object):
             for br_id, br_ele in as_topo["BorderRouters"].items():
                 ele_dict["BorderRouters"].append(prom_addr_br(br_id, br_ele, DEFAULT_BR_PROM_PORT))
             for elem_id, elem in as_topo["BeaconService"].items():
-                ele_dict["BeaconService"].append(prom_addr_infra(elem_id, elem, BS_PROM_PORT))
+                prom_addr = prom_addr_infra(self.args.docker, elem_id, elem, BS_PROM_PORT)
+                ele_dict["BeaconService"].append(prom_addr)
             for elem_id, elem in as_topo["PathService"].items():
-                ele_dict["PathService"].append(prom_addr_infra(elem_id, elem, PS_PROM_PORT))
+                prom_addr = prom_addr_infra(self.args.docker, elem_id, elem, PS_PROM_PORT)
+                ele_dict["PathService"].append(prom_addr)
             for elem_id, elem in as_topo["CertificateService"].items():
-                ele_dict["CertificateService"].append(prom_addr_infra(elem_id, elem, CS_PROM_PORT))
+                prom_addr = prom_addr_infra(self.args.docker, elem_id, elem, CS_PROM_PORT)
+                ele_dict["CertificateService"].append(prom_addr)
+            sd_prom_addr = prom_addr_sciond(self.args.docker, topo_id,
+                                            self.args.networks, SCIOND_PROM_PORT)
+            ele_dict["Sciond"].append(sd_prom_addr)
             config_dict[topo_id] = ele_dict
         self._write_config_files(config_dict)
 

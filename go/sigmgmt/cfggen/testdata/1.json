@@ -25,10 +25,7 @@
     },
     "PathPolicies": {
         "foo": {
-            "Sequence": [
-                "1-ff00:0:133#1010",
-                "1-ff00:0:132#1910"
-            ]
+            "Sequence": "1-ff00:0:133#1010 1-ff00:0:132#1910"
         }
     },
     "ConfigVersion": 0

@@ -31,16 +31,25 @@ from topology.common import (
     CS_CONFIG_NAME,
     DISP_CONFIG_NAME,
     prom_addr_br,
+    prom_addr_infra,
+    prom_addr_sciond,
     PS_CONFIG_NAME,
     sciond_name,
     SD_CONFIG_NAME,
     trust_db_conf_entry,
 )
-from topology.prometheus import DEFAULT_BR_PROM_PORT
+from topology.prometheus import (
+    CS_PROM_PORT,
+    DEFAULT_BR_PROM_PORT,
+    PS_PROM_PORT,
+    SCIOND_PROM_PORT,
+)
 
 
 class GoGenArgs(ArgsTopoDicts):
-    pass
+    def __init__(self, args, topo_dicts, networks, port_gen=None):
+        super().__init__(args, topo_dicts, port_gen)
+        self.networks = networks
 
 
 class GoGenerator(object):
@@ -79,14 +88,14 @@ class GoGenerator(object):
 
     def generate_ps(self):
         for topo_id, topo in self.args.topo_dicts.items():
-            for k, v in topo.get("PathService", {}).items():
+            for elem_id, elem in topo.get("PathService", {}).items():
                 # only a single Go-PS per AS is currently supported
-                if k.endswith("-1"):
+                if elem_id.endswith("-1"):
                     base = topo_id.base_dir(self.args.output_dir)
-                    ps_conf = self._build_ps_conf(topo_id, topo["ISD_AS"], base, k)
-                    write_file(os.path.join(base, k, PS_CONFIG_NAME), toml.dumps(ps_conf))
+                    ps_conf = self._build_ps_conf(topo_id, topo["ISD_AS"], base, elem_id, elem)
+                    write_file(os.path.join(base, elem_id, PS_CONFIG_NAME), toml.dumps(ps_conf))
 
-    def _build_ps_conf(self, topo_id, ia, base, name):
+    def _build_ps_conf(self, topo_id, ia, base, name, infra_elem):
         config_dir = '/share/conf' if self.args.docker else os.path.join(base, name)
         raw_entry = {
             'general': {
@@ -106,6 +115,7 @@ class GoGenerator(object):
                 },
                 'SegSync': True,
             },
+            'metrics': self._metrics_entry(name, infra_elem, PS_PROM_PORT),
         }
         return raw_entry
 
@@ -134,19 +144,23 @@ class GoGenerator(object):
                     'Connection': os.path.join(self.db_dir, '%s.path.db' % name),
                 },
             },
+            'metrics': {
+                'Prometheus': prom_addr_sciond(self.args.docker, topo_id,
+                                               self.args.networks, SCIOND_PROM_PORT)
+            }
         }
         return raw_entry
 
     def generate_cs(self):
         for topo_id, topo in self.args.topo_dicts.items():
-            for k, v in topo.get("CertificateService", {}).items():
+            for elem_id, elem in topo.get("CertificateService", {}).items():
                 # only a single Go-CS per AS is currently supported
-                if k.endswith("-1"):
+                if elem_id.endswith("-1"):
                     base = topo_id.base_dir(self.args.output_dir)
-                    cs_conf = self._build_cs_conf(topo_id, topo["ISD_AS"], base, k)
-                    write_file(os.path.join(base, k, CS_CONFIG_NAME), toml.dumps(cs_conf))
+                    cs_conf = self._build_cs_conf(topo_id, topo["ISD_AS"], base, elem_id, elem)
+                    write_file(os.path.join(base, elem_id, CS_CONFIG_NAME), toml.dumps(cs_conf))
 
-    def _build_cs_conf(self, topo_id, ia, base, name):
+    def _build_cs_conf(self, topo_id, ia, base, name, infra_elem):
         config_dir = '/share/conf' if self.args.docker else os.path.join(base, name)
         raw_entry = {
             'general': {
@@ -167,6 +181,7 @@ class GoGenerator(object):
                 'ReissueRate': "10s",
                 'ReissueTimeout': "5s",
             },
+            'metrics': self._metrics_entry(name, infra_elem, CS_PROM_PORT),
         }
         return raw_entry
 
@@ -205,3 +220,9 @@ class GoGenerator(object):
             },
         }
         return entry
+
+    def _metrics_entry(self, name, infra_elem, base_port):
+        prom_addr = prom_addr_infra(self.args.docker, name, infra_elem, base_port)
+        return {
+            'Prometheus': prom_addr
+        }

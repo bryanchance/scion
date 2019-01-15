@@ -48,9 +48,7 @@
     "PathPolicies": {
         "any": {},
         "foo": {
-            "Sequence": [
-                "1-ff00:0:133#1010"
-            ]
+            "Sequence": "1-ff00:0:133#1010"
         }
     },
     "ConfigVersion": 0
