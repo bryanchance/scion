@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 
@@ -92,12 +93,7 @@ func (c *Controller) GetPolicies(w http.ResponseWriter, r *http.Request, _ http.
 		return
 	}
 	for _, policy := range policies {
-		selIDs, err := stringToIntSlice(policy.Selectors)
-		if err != nil {
-			respondError(w, err,
-				"Could not convert string to array", http.StatusInternalServerError)
-		}
-		policy.SelectorIDs = selIDs
+		policy.PathPolicyNames = strings.Split(policy.PathPolicies, ",")
 	}
 	respondJSON(w, policies)
 }
@@ -118,18 +114,17 @@ func (c *Controller) PostPolicy(w http.ResponseWriter, r *http.Request, _ http.H
 		respondNotFound(w)
 		return
 	}
-	// Make sure selectors exist
-	var selectors []db.PathSelector
-	if err := c.db.Where("id in (?)", policy.SelectorIDs).Find(&selectors).Error; err != nil {
-		respondError(w, err, DBFindError, http.StatusBadRequest)
-		return
-	}
-	policy.Selectors = intSliceToString(policy.SelectorIDs)
 	var as db.ASEntry
 	if !c.findOne(w, mux.Vars(r)["as"], &as) {
 		return
 	}
 	policy.ASEntryID = as.ID
+	// Make sure policies exist
+	if err := c.pathPoliciesExists(policy.PathPolicyNames, policy.ASEntryID); err != nil {
+		respondError(w, err, DBFindError, http.StatusBadRequest)
+		return
+	}
+	policy.PathPolicies = strings.Join(policy.PathPolicyNames, ",")
 	if !c.createOne(w, &policy) {
 		return
 	}
@@ -152,9 +147,12 @@ func (c *Controller) UpdatePolicy(w http.ResponseWriter, r *http.Request, _ http
 		respondNotFound(w)
 		return
 	}
-	// Make sure selectors exist
-	var selectors []db.PathSelector
-	if err := c.db.Where("id in (?)", policy.SelectorIDs).Find(&selectors).Error; err != nil {
+	// Make sure policies exist
+	var as db.ASEntry
+	if !c.findOne(w, mux.Vars(r)["as"], &as) {
+		return
+	}
+	if err := c.pathPoliciesExists(policy.PathPolicyNames, as.ID); err != nil {
 		respondError(w, err, DBFindError, http.StatusBadRequest)
 		return
 	}
@@ -168,7 +166,7 @@ func (c *Controller) UpdatePolicy(w http.ResponseWriter, r *http.Request, _ http
 		map[string]interface{}{
 			"Name":         policy.Name,
 			"TrafficClass": policy.TrafficClass,
-			"Selectors":    intSliceToString(policy.SelectorIDs),
+			"PathPolicies": strings.Join(policy.PathPolicyNames, ","),
 		}).Error
 	if err != nil {
 		respondError(w, err, DBUpdateError, http.StatusBadRequest)

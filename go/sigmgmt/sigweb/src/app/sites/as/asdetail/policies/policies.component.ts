@@ -4,8 +4,7 @@ import { forkJoin } from 'rxjs'
 
 import { ApiService } from '../../../../api/api.service'
 import { UserService } from '../../../../api/user.service'
-import { ASEntry, PathSelector, Policy, Site, TrafficClass } from '../../../models/models'
-
+import { ASEntry, TrafficPolicy, Site, TrafficClass, PathPolicyFile, PathPolicy } from '../../../models/models'
 
 @Component({
   selector: 'ana-policies',
@@ -15,18 +14,18 @@ import { ASEntry, PathSelector, Policy, Site, TrafficClass } from '../../../mode
 export class PoliciesComponent implements OnChanges {
   @Input() ia: ASEntry
   @Input() site: Site
-  @ViewChild('policyForm') form: NgForm
+  @ViewChild('trafficPolicyForm') form: NgForm
   success = ''
   error = ''
   editing = false
 
-  policies: Policy[]
-  policy = new Policy
+  trafficPolicies: TrafficPolicy[]
+  trafficPolicy = new TrafficPolicy
   trafficClasses: TrafficClass[]
-  searchSel = ''
-  selectors: PathSelector[]
+  searchPP = ''
+  pathPolicies: PathPolicy[] = []
   filteredTCs: TrafficClass[]
-  filteredSelectors: PathSelector[]
+  filteredPathPolicies: PathPolicy[]
 
   constructor(private api: ApiService, private userService: UserService) { }
 
@@ -35,27 +34,22 @@ export class PoliciesComponent implements OnChanges {
       option.Name.toLowerCase().includes(val.toLowerCase()))
   }
 
-  searchSelector() {
+  searchPathPolicy() {
     // Remove selectors that are already used, then filter for search text
-    const selectors = this.selectors.filter(el => this.policy.Selectors.indexOf(el.ID) === -1)
-    this.filteredSelectors = this.searchSel === '' ? selectors : selectors.filter(option =>
-      option.Name.toLowerCase().includes(this.searchSel.toLowerCase()))
+    const pathPolicies = this.pathPolicies.filter(el => this.trafficPolicy.PathPolicies.indexOf(el.Name) === -1)
+    this.filteredPathPolicies = this.searchPP === '' ? pathPolicies : pathPolicies.filter(option =>
+      option.Name.toLowerCase().includes(this.searchPP.toLowerCase()))
   }
 
-  addSelector(id: number) {
-    const selector = this.selectors.find(el => el.ID === id)
-    this.policy.Selectors.push(selector.ID)
-    this.searchSelector()
+  addPathPolicy(name: string) {
+    const pathPolicy = this.pathPolicies.find(el => el.Name === name)
+    this.trafficPolicy.PathPolicies.push(pathPolicy.Name)
+    this.searchPathPolicy()
   }
 
-  removeSelector(idx: number) {
-    const selector = this.selectors.find(el => el.ID === this.policy.Selectors[idx])
-    this.policy.Selectors.splice(idx, 1)
-    this.searchSelector()
-  }
-
-  getSelector(id: number) {
-    return this.selectors.find(el => el.ID === id)
+  removePathPolicy(idx: number) {
+    this.trafficPolicy.PathPolicies.splice(idx, 1)
+    this.searchPathPolicy()
   }
 
   getTrafficClass(id: number) {
@@ -65,15 +59,24 @@ export class PoliciesComponent implements OnChanges {
   ngOnChanges() {
     if (this.ia && this.site) {
       forkJoin(
-        this.api.getPolicies(this.ia),
+        this.api.getTrafficPolicies(this.ia),
         this.api.getTrafficClasses(this.site),
-        this.api.getPathSelectors(this.site)
+        this.api.getPathPolicies()
       ).subscribe(
-        ([policies, tcs, sel]) => {
-          this.policies = policies
+        ([trPol, tcs, pPolFiles]) => {
+          this.trafficPolicies = trPol
           this.trafficClasses = tcs
-          this.selectors = sel
-          this.filteredSelectors = sel
+          // go through policy files
+          pPolFiles.forEach((ppf) => {
+            if (ppf.Code) {
+              // go through policies in a policy file
+              ppf.Code.forEach((pp2) => {
+                const npp = new PathPolicy(Object.keys(pp2)[0], pp2[Object.keys(pp2)[0]])
+                this.pathPolicies.push(npp)
+              })
+            }
+          })
+          this.filteredPathPolicies = this.pathPolicies
         },
         error => this.error = error.msg
       )
@@ -83,9 +86,9 @@ export class PoliciesComponent implements OnChanges {
   onSubmit() {
     this.clearMsg()
     if (this.editing) {
-      this.api.updatePolicy(this.policy).subscribe(
+      this.api.updatePolicy(this.ia, this.trafficPolicy).subscribe(
         policy => {
-          this.policy = new Policy
+          this.trafficPolicy = new TrafficPolicy
           this.form.resetForm()
           this.editing = false
           this.success = 'Successfully updated Policy.'
@@ -93,12 +96,12 @@ export class PoliciesComponent implements OnChanges {
         error => this.error = error.msg
       )
     } else {
-      this.api.createPolicy(this.ia, this.policy).subscribe(
+      this.api.createPolicy(this.ia, this.trafficPolicy).subscribe(
         policy => {
-          this.policies.push(policy)
+          this.trafficPolicies.push(policy)
           this.form.resetForm()
-          this.policy.Selectors = []
-          this.searchSelector()
+          this.trafficPolicy.PathPolicies = []
+          this.searchPathPolicy()
         },
         error => this.error = error.msg
       )
@@ -107,13 +110,14 @@ export class PoliciesComponent implements OnChanges {
 
   edit(idx: number) {
     this.editing = true
-    this.policy = this.policies[idx]
+    this.trafficPolicy = this.trafficPolicies[idx]
+    this.searchPathPolicy()
   }
 
   delete(idx: number) {
     this.clearMsg()
-    this.api.deletePolicy(this.policies[idx]).subscribe(
-      () => this.policies.splice(idx, 1)
+    this.api.deletePolicy(this.trafficPolicies[idx]).subscribe(
+      () => this.trafficPolicies.splice(idx, 1)
     )
   }
 

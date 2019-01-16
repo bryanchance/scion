@@ -1,0 +1,41 @@
+<div class="flex-container">
+    <h2 class="mat-h2">Path Policy File</h2>
+    <button color="primary" routerLink="/policies" mat-button>
+        <mat-icon>arrow_back</mat-icon>
+    </button>
+</div>
+
+<mat-card *ngIf="success" class="success">{{success}}</mat-card>
+<mat-card *ngIf="error" class="error">{{error}}</mat-card>
+<div class="flex-container">
+    <div class="flex-container-vertical">
+        <form #policyForm="ngForm">
+            <mat-form-field>
+                <input matInput name="name" [(ngModel)]="policy.Name" minlength="1" type="text" placeholder="Policy File Name"
+                    required>
+            </mat-form-field>
+        </form>
+        <ngx-monaco-editor [options]="options" [(ngModel)]="code"></ngx-monaco-editor>
+        <button mat-button (click)="check()">Validate Policy File</button>
+        <button mat-button [disabled]="!policy.Name" (click)="save()">Save Policy File</button>
+    </div>
+    <div class="flex-container-vertical">
+        <h2 class="mat-h2">Sample Policy File</h2>
+        <markdown ngPreserveWhitespaces class="markdown">
+            ```yaml
+            - extending_policy:
+                extends:
+                - pol_1
+                - pol_2
+            - pol_1:
+                acl:
+                - "- 1-ff00:0:133#0"
+                - "- 2"
+                - "+"
+            - pol_2:
+                sequence: "0 1-ff00:0:110#0 1-ff00:0:110#0 0"
+            ```
+        </markdown>
+        <a routerLink="/config">Find more detailed information in the docs!</a>
+    </div>
+</div>

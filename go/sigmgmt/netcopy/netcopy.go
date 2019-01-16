@@ -29,7 +29,6 @@ func CopyFileToSite(ctx context.Context, spath string, site *db.Site, dpath stri
 	for _, host := range site.Hosts {
 		errMap[host.Name] = nil
 		if err := copyFileToHost(ctx, spath, &host, dpath, logger); err != nil {
-			logger.Info("Unable to copy configuration to host", "err", err)
 			errMap[host.Name] = err
 			ok = false
 		}
@@ -107,7 +106,7 @@ func reloadHost(ctx context.Context, host *db.Host, logger log.Logger) error {
 
 func runCommand(cmd *exec.Cmd) error {
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return common.NewBasicError("command error", err, "output", string(output))
+		return common.NewBasicError(string(output), err)
 	}
 	return nil
 }

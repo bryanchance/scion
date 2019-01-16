@@ -4,7 +4,6 @@ import { SiteDetailsComponent } from './site-details.component'
 import { HttpHandler } from '@angular/common/http'
 import { TestingModule } from '../../testing/testing.module'
 import { SiteConfigurationComponent } from '../site-configuration/site-configuration.component'
-import { PathSelectorComponent } from '../path-selector/path-selector.component'
 import { ASListComponent } from '../as/aslist/aslist.component'
 
 describe('SiteDetailsComponent', () => {
@@ -15,7 +14,7 @@ describe('SiteDetailsComponent', () => {
     TestBed.configureTestingModule({
       imports: [TestingModule],
       providers: [HttpHandler],
-      declarations: [ SiteDetailsComponent, SiteConfigurationComponent, PathSelectorComponent, ASListComponent ]
+      declarations: [ SiteDetailsComponent, SiteConfigurationComponent, ASListComponent ]
     })
     .compileComponents()
   }))

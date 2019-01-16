@@ -1,0 +1,30 @@
+<div class="flex-container">
+  <div>
+    <h2 class="mat-h2">Path Policies</h2>
+    <p>Path policies can be configured on a global level and per site. You may create multiple policy files on a global
+      level but there is exactly one per site.</p>
+  </div>
+</div>
+
+<mat-nav-list>
+  <h3>Global Path Policies</h3>
+  <mat-list-item class="add" routerLink="/policies/new">
+    <a matLine>Add a new global policy file...</a>
+    <button mat-icon-button>
+      <mat-icon>add_box</mat-icon>
+    </button>
+  </mat-list-item>
+  <mat-list-item class="flex-container" *ngFor="let policy of globalPolicies; let idx = index" routerLink="/policies/{{policy?.ID}}">
+    <a matLine>{{ policy.Name }}</a>
+    <button *ngIf="!formDisabled" mat-icon-button (click)="delete($event, idx)">
+      <mat-icon>delete</mat-icon>
+    </button>
+  </mat-list-item>
+  <h3 class="list-title">Per Site Path Policies</h3>
+  <mat-list-item class="flex-container" *ngFor="let policy of sitePolicies; let idx = index" routerLink="/policies/{{policy?.ID}}">
+    <a matLine>{{ policy.Name }}</a>
+  </mat-list-item>
+  <mat-list-item *ngIf="!sitePolicies || sitePolicies.length == 0">
+    <a matLine>You haven't configured any sites yet.</a>
+  </mat-list-item>
+</mat-nav-list>

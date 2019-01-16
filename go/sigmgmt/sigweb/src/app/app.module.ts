@@ -1,3 +1,5 @@
+import './utils/swap'
+
 import { HttpClientModule } from '@angular/common/http'
 import { NgModule } from '@angular/core'
 import { FormsModule } from '@angular/forms'
@@ -6,6 +8,7 @@ import { BrowserAnimationsModule } from '@angular/platform-browser/animations'
 import { RouterModule } from '@angular/router'
 import { JwtModule } from '@auth0/angular-jwt'
 import { MarkdownModule, MarkedOptions } from 'ngx-markdown'
+import { MonacoEditorModule, NgxMonacoEditorConfig } from 'ngx-monaco-editor'
 
 import { environment } from '../environments/environment'
 import { ApiModule } from './api/api.module'
@@ -18,8 +21,14 @@ import { ContactComponent } from './contact/contact.component'
 import { LicensesComponent } from './licenses/licenses.component'
 import { LoginComponent } from './login/login.component'
 import { MaterialModule } from './material/material.module'
+import { PoliciesComponent } from './policies/policies.component'
+import { PolicyEditComponent } from './policies/policy-edit/policy-edit.component'
 import { SitesModule } from './sites/sites.module'
-import './utils/swap'
+
+const monacoConfig: NgxMonacoEditorConfig = {
+  baseUrl: environment.deployUrl + 'assets',
+  defaultOptions: { scrollBeyondLastLine: false, theme: 'vs-dark', language: 'yaml' },
+}
 
 @NgModule({
   declarations: [
@@ -29,6 +38,8 @@ import './utils/swap'
     ConfigComponent,
     LicensesComponent,
     OfflineDialogComponent,
+    PoliciesComponent,
+    PolicyEditComponent,
   ],
   imports: [
     BrowserModule,
@@ -48,11 +59,14 @@ import './utils/swap'
       }
     }),
     MarkdownModule.forRoot({
-      provide: MarkedOptions,
-      useValue: {
-        baseUrl: 'doc/',
+      markedOptions: {
+        provide: MarkedOptions,
+        useValue: {
+          baseUrl: 'doc/',
+        },
       },
-    })
+    }),
+    MonacoEditorModule.forRoot(monacoConfig),
   ],
   providers: [
     AuthGuard

@@ -3,7 +3,6 @@
 package db
 
 import (
-	"encoding/json"
 	"net"
 
 	"github.com/scionproto/scion/go/lib/pathpol"
@@ -23,20 +22,22 @@ func IPNetsFromNetworks(networks []Network) ([]*config.IPNet, error) {
 	return ipNets, nil
 }
 
-func (pp *PathPolicyFile) GetExtPolicies() (map[string]*pathpol.ExtPolicy, error) {
-	var policies []string
-	err := json.Unmarshal([]byte(pp.CodeStr), &policies)
-	if err != nil {
-		return nil, err
-	}
-	extPolicies := make(map[string]*pathpol.ExtPolicy, len(policies))
-	for _, policy := range policies {
-		var extPolicy pathpol.ExtPolicy
-		err := json.Unmarshal([]byte(policy), &extPolicy)
-		if err != nil {
-			return nil, err
+func (pp *PathPolicyFile) GetExtPolicies() ([]*pathpol.ExtPolicy, error) {
+	var extPolicies []*pathpol.ExtPolicy
+	for _, polMap := range pp.Code {
+		for name, origPol := range polMap {
+			policy := pathpol.ExtPolicy{}
+			if origPol == nil || origPol.Policy == nil {
+				policy.Policy = &pathpol.Policy{}
+			} else {
+				policy.Policy = origPol.Policy
+			}
+			if origPol != nil {
+				policy.Extends = origPol.Extends
+			}
+			policy.Policy.Name = name
+			extPolicies = append(extPolicies, &policy)
 		}
-		extPolicies[extPolicy.Name] = &extPolicy
 	}
 	return extPolicies, nil
 }

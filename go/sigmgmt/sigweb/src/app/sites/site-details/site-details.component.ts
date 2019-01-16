@@ -23,7 +23,7 @@ export class SiteDetailsComponent implements OnInit {
     private api: ApiService) { }
 
   ngOnInit() {
-    const id = this.route.snapshot.paramMap.get('site')
+    const id = this.route.snapshot.params.site
     if (id) {
       this.api.getSite(id).subscribe(
         site => {

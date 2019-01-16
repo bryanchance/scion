@@ -3,34 +3,9 @@
 package ctrl
 
 import (
-	"strconv"
-	"strings"
-
 	"github.com/scionproto/scion/go/sigmgmt/db"
 	"github.com/scionproto/scion/go/sigmgmt/util"
 )
-
-func stringToIntSlice(s string) ([]int, error) {
-	sArr := strings.Split(s, ",")
-	iArr := []int{}
-	for _, str := range sArr {
-		i, err := strconv.Atoi(str)
-		if err != nil {
-			return nil, err
-		}
-		iArr = append(iArr, i)
-	}
-	return iArr, nil
-}
-
-func intSliceToString(iArr []int) string {
-	sArr := []string{}
-	for _, i := range iArr {
-		str := strconv.Itoa(i)
-		sArr = append(sArr, str)
-	}
-	return strings.Join(sArr, ",")
-}
 
 func parseHosts(hosts []db.Host) error {
 	for _, host := range hosts {

@@ -11,5 +11,6 @@ export const environment = {
   production: false,
   logLevel: LogLevel.Debug,
   domain: domain,
-  url: 'https://' + domain
+  url: 'https://' + domain,
+  deployUrl: ''
 }

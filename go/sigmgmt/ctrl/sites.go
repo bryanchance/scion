@@ -5,6 +5,7 @@ package ctrl
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -70,8 +71,9 @@ func (c *Controller) PostSite(w http.ResponseWriter, r *http.Request, _ http.Han
 	if !c.createOne(w, &site) {
 		return
 	}
-	selector := db.PathSelector{Name: "any", SiteID: site.ID, Filter: "0-0#0"}
-	if !c.createOne(w, &selector) {
+	policy := db.PathPolicyFile{Name: site.Name, SiteID: &site.ID, Type: db.SitePolicy,
+		CodeStr: fmt.Sprintf("[{\"policy_%s\": null}]", site.Name)}
+	if !c.createOne(w, &policy) {
 		return
 	}
 	respondJSON(w, &site)

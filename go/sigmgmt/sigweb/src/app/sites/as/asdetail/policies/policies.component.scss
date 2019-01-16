@@ -1,8 +1,14 @@
-.policy-form {
-    width: 400px;
+.traffic-policy-form {
     display: flex;
-    ng-select {
-        width: 180px;
+
+    ng-select,
+    .mat-form-field {
+        width: 220px;
+    }
+
+    button {
+        margin-right: 35px;
+        float: right;
     }
 }
 
@@ -11,43 +17,53 @@ mat-card.error {
     margin-bottom: 40px;
 }
 
-.mat-list {
-    margin-left: -16px;
+.selected-path-policies {
+    width: 300px;
+    margin-right: 40px;
+
+    .mat-list-item {
+        margin-left: -15px;
+    }
+
     .name {
-        width: 265px;
+        width: 220px;
+    }
+
+    .policy-hint {
+        margin-top: 10px;
     }
 }
 
-.mat-list .mat-list-item {
-    min-height: 48px;
-    height: auto;
-}
-
-.selectors {
-    margin-left: 10px;
-    margin-top: -20px;
-    p {
-        margin-right: 10px;
-        margin-bottom: 0;
-        &.inline {
-            margin-top: 35px;
-        }
-    }
+.all-path-policies {
     .mat-list {
         margin-left: -25px;
     }
+
+    .mat-form-field {
+        height: 30px;
+        margin-top: -10px;
+    }
 }
 
-.policies {
+.traffic-policies {
     margin-top: 20px;
     border-top: 1px solid lightgray;
+
     .name {
-        width: 180px;
+        width: 220px;
+        overflow-wrap: break-word;
+
         .small {
             font-size: 12px;
         }
     }
+
+    .mat-list-item {
+        margin-bottom: 10px;
+        min-height: 50px;
+    }
+
     .traffic-class {
-        width: 140px;
+        width: 150px;
     }
 }

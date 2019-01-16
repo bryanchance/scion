@@ -1,0 +1,52 @@
+{
+    "ASes": {
+        "1-1": {
+            "Sessions": {
+                "0": "any",
+                "1": "bar2"
+            },
+            "PktPolicies": [
+                {
+                    "ClassName": "class-1",
+                    "SessIds": [
+                        0
+                    ]
+                },
+                {
+                    "ClassName": "class-1",
+                    "SessIds": [
+                        1
+                    ]
+                }
+            ]
+        }
+    },
+    "PktClasses": {
+        "class-1": {
+            "CondIPv4": {
+                "MatchSource": {
+                    "Net": "12.12.127.0/24"
+                }
+            }
+        }
+    },
+    "PathPolicies": {
+        "any": {
+            "ACL": [
+                "+ 0-123#0",
+                "+ 0-124#0",
+                "- 0-0#0"
+            ],
+            "Sequence": "1-ff00:0:133#1010"
+        },
+        "bar2": {
+            "ACL": [
+                "+ 0-123#0",
+                "+ 0-124#0",
+                "- 0-0#0"
+            ],
+            "Sequence": "1-ff00:0:132#1910"
+        }
+    },
+    "ConfigVersion": 0
+}

@@ -4,5 +4,6 @@ export const environment = {
   production: true,
   logLevel: LogLevel.Error,
   domain: '',
-  url: ''
+  url: '',
+  deployUrl: 'app/'
 }

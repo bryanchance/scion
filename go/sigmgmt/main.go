@@ -105,8 +105,10 @@ func configureRouter(cfg *config.Global, dbase *gorm.DB) http.Handler {
 			"GET":  c.GetPolicies,
 			"POST": c.PostPolicy,
 		},
+		"/api/ases/{as}/policies/{policy}": {
+			"PUT": c.UpdatePolicy,
+		},
 		"/api/policies/{policy}": {
-			"PUT":    c.UpdatePolicy,
 			"DELETE": c.DeletePolicy,
 		},
 		"/api/ases/{as}/networks": {
@@ -115,6 +117,17 @@ func configureRouter(cfg *config.Global, dbase *gorm.DB) http.Handler {
 		},
 		"/api/networks/{network}": {
 			"DELETE": c.DeleteNetwork,
+		},
+		"/api/pathpolicies": {
+			"GET":  c.GetPathPolicies,
+			"POST": c.PostPathPolicy,
+		},
+		"/api/pathpolicies/validate": {
+			"POST": c.ValidatePathPolicy,
+		},
+		"/api/pathpolicies/{policy}": {
+			"GET": c.GetPathPolicy,
+			"PUT": c.PutPathPolicy,
 		},
 		"/api/token/refresh": {
 			"POST": auth.RefreshToken,

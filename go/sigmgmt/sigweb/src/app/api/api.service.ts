@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http'
 import { Injectable } from '@angular/core'
 import { map } from 'rxjs/operators'
 
-import { ASEntry, CIDR, PathSelector, Site, Policy } from '../sites/models/models'
+import { ASEntry, CIDR, Site, TrafficPolicy, PathPolicyFile } from '../sites/models/models'
 import { TrafficClass, TrafficClassFromJSON } from '../sites/models/models'
 import { User } from './user.service'
 
@@ -41,22 +41,30 @@ export class ApiService {
   }
 
   /**
-   * Path predicates / selectors
+   * Path Policies
    */
-  getPathSelectors(site: Site) {
-    return this.http.get<PathSelector[]>('sites/' + site.ID + '/paths')
+  getPathPolicies() {
+    return this.http.get<PathPolicyFile[]>('pathpolicies')
   }
 
-  createPathSelector(site: Site, ps: PathSelector) {
-    return this.http.post<PathSelector>('sites/' + site.ID + '/paths', ps)
+  getPathPolicy(policy: string) {
+    return this.http.get<PathPolicyFile>('pathpolicies/' + policy)
   }
 
-  updatePathSelector(ps: PathSelector) {
-    return this.http.put('paths/' + ps.ID, ps)
+  createPathPolicy(pp: PathPolicyFile) {
+    return this.http.post<PathPolicyFile>('pathpolicies', pp)
   }
 
-  deletePathSelector(site: Site, ps: PathSelector) {
-    return this.http.delete('paths/' + ps.ID)
+  updatePathPolicy(pp: PathPolicyFile) {
+    return this.http.put<PathPolicyFile>('pathpolicies/' + pp.ID, pp)
+  }
+
+  deletePathPolicy(pp: PathPolicyFile) {
+    return this.http.delete('pathpolicies/' + pp.ID)
+  }
+
+  validatePathPolicy(pp: PathPolicyFile) {
+    return this.http.post<PathPolicyFile>('pathpolicies/validate', pp)
   }
 
   /**
@@ -129,19 +137,19 @@ export class ApiService {
   }
 
   /** Policies */
-  getPolicies(as: ASEntry) {
-    return this.http.get<Policy[]>('ases/' + as.ID + '/policies')
+  getTrafficPolicies(as: ASEntry) {
+    return this.http.get<TrafficPolicy[]>('ases/' + as.ID + '/policies')
   }
 
-  createPolicy(as: ASEntry, policy: Policy) {
-    return this.http.post<Policy>('ases/' + as.ID + '/policies', policy)
+  createPolicy(as: ASEntry, policy: TrafficPolicy) {
+    return this.http.post<TrafficPolicy>('ases/' + as.ID + '/policies', policy)
   }
 
-  updatePolicy(policy: Policy) {
-    return this.http.put<Policy>('policies/' + policy.ID, policy)
+  updatePolicy(as: ASEntry, policy: TrafficPolicy) {
+    return this.http.put<TrafficPolicy>('ases/' + as.ID + '/policies/' + policy.ID, policy)
   }
 
-  deletePolicy(policy: Policy) {
+  deletePolicy(policy: TrafficPolicy) {
     return this.http.delete('policies/' + policy.ID)
   }
 

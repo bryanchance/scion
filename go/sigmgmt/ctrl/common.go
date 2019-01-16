@@ -23,6 +23,7 @@ const (
 	DBDeleteError      = "Error deleting object in DB"
 	PathPredicateError = "Bad Path Predicate"
 	TrafficClassError  = "Bad Traffic Class"
+	PathPolicyError    = "Bad Path Policy"
 )
 
 func respond(w http.ResponseWriter, data []byte, status int) {

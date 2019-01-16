@@ -4,6 +4,7 @@ package db
 
 import (
 	"github.com/scionproto/scion/go/lib/addr"
+	"github.com/scionproto/scion/go/lib/pathpol"
 	"github.com/scionproto/scion/go/lib/pktcls"
 )
 
@@ -40,11 +41,11 @@ type ASEntry struct {
 	ISD                  string          `gorm:"column:isd_id"`
 	AS                   string          `gorm:"column:as_id"`
 	Policies             string          `gorm:"column:policies"`
+	IPAllocationProvider string          `json:",omitempty"`
 	SiteID               uint            `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name, isd_id, as_id)" json:"-"`
 	SIGs                 []SIG           `json:",omitempty"`
 	Networks             []Network       `json:",omitempty"`
 	Policy               []TrafficPolicy `json:",omitempty"`
-	IPAllocationProvider string          `json:",omitempty"`
 }
 
 func (ASEntry) TableName() string {
@@ -73,8 +74,8 @@ type Network struct {
 type PathPolicyFile struct {
 	ID      uint
 	Name    string
-	CodeStr string   `json:"-"`
-	Code    []string `gorm:"-"`
+	CodeStr string                          `json:"-"`
+	Code    []map[string]*pathpol.ExtPolicy `gorm:"-"`
 	Type    ppFileType
 	SiteID  *uint `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id)"`
 }
@@ -90,18 +91,17 @@ const (
 	GlobalPolicy ppFileType = "global"
 	// SitePolicy is a Path Policy File for the referenced site
 	SitePolicy ppFileType = "site"
-	// TemplatePolicy is a Path Policy Template for new sites
-	TemplatePolicy ppFileType = "template"
 )
 
 type TrafficPolicy struct {
-	ID           uint
-	Name         string
-	TrafficClass uint   `sql:"type:integer REFERENCES traffic_classes ON DELETE CASCADE ON UPDATE CASCADE"`
-	Selectors    string `json:"-"`
-	SelectorIDs  []int  `gorm:"-" json:"Selectors"`
-	ASEntryID    uint   `sql:"type:integer REFERENCES asentries ON DELETE CASCADE ON UPDATE CASCADE" json:"-"`
-	PathPolicies []string
+	ID              uint
+	Name            string
+	TrafficClass    uint     `sql:"type:integer REFERENCES traffic_classes ON DELETE CASCADE ON UPDATE CASCADE"`
+	Selectors       string   `json:"-"`
+	SelectorIDs     []int    `gorm:"-" json:"Selectors"`
+	ASEntryID       uint     `sql:"type:integer REFERENCES asentries ON DELETE CASCADE ON UPDATE CASCADE" json:"-"`
+	PathPolicies    string   `json:"-"`
+	PathPolicyNames []string `gorm:"-" json:"PathPolicies"`
 }
 
 func (TrafficPolicy) TableName() string {

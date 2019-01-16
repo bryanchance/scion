@@ -7,6 +7,8 @@
 package cfggen
 
 import (
+	"strings"
+
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/pathpol"
@@ -46,8 +48,12 @@ func Compile(cfg *config.Cfg, policies map[addr.IA][]db.TrafficPolicy,
 			if err != nil {
 				return err
 			}
+			ppNames := []string{}
+			for _, policyName := range strings.Split(policy.PathPolicies, ",") {
+				ppNames = append(ppNames, strings.Trim(policyName, " "))
+			}
 			commands = append(commands, &Command{Name: trafficClasses[policy.TrafficClass].Name,
-				Condition: cond, Policies: policy.PathPolicies})
+				Condition: cond, Policies: ppNames})
 		}
 
 		// Make sure there is a default policy
@@ -86,9 +92,14 @@ func Compile(cfg *config.Cfg, policies map[addr.IA][]db.TrafficPolicy,
 			for policy, id := range sessionMap.sessions {
 				sessions[id] = policy
 			}
-			// Add the necessary policies
+			// Add the necessary path policies
 			for _, name := range command.Policies {
-				cfg.PathPolicies[name] = polMap[name]
+				extPolicy := polMap[name]
+				policy, err := pathpol.PolicyFromExtPolicy(extPolicy, pathPolicies)
+				if err != nil {
+					return err
+				}
+				cfg.PathPolicies[name] = &pathpol.ExtPolicy{Policy: policy}
 			}
 			asEntry.Sessions = sessions
 		}

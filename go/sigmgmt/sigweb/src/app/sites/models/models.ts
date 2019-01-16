@@ -22,10 +22,16 @@ export class Host {
     }
 }
 
-export class PathSelector {
+export class PathPolicyFile {
     ID: number
     Name: string
-    Filter: string
+    Code: object[]
+    Type = 'global'
+    SiteID: number
+}
+
+export class PathPolicy {
+    constructor(public Name: string, public Policy) { }
 }
 
 export class ASEntry {
@@ -35,11 +41,11 @@ export class ASEntry {
     AS: string
 }
 
-export class Policy {
+export class TrafficPolicy {
     ID: number
     Name: string
     TrafficClass: number
-    Selectors: number[] = []
+    PathPolicies: string[] = []
 }
 
 export class CIDR {

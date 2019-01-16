@@ -40,7 +40,7 @@ func TestCompile(t *testing.T) {
 			},
 			Policies: map[addr.IA][]db.TrafficPolicy{
 				{I: 1, A: 1}: {
-					{Name: "audio", PathPolicies: []string{"foo"}, TrafficClass: 0},
+					{Name: "audio", PathPolicies: "foo", TrafficClass: 0},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
@@ -65,10 +65,10 @@ func TestCompile(t *testing.T) {
 			},
 			Policies: map[addr.IA][]db.TrafficPolicy{
 				{I: 1, A: 1}: {
-					{Name: "audio", PathPolicies: []string{"any", "foo"}, TrafficClass: 0},
+					{Name: "audio", PathPolicies: "any, foo", TrafficClass: 0},
 				},
 				{I: 2, A: 2}: {
-					{Name: "video", PathPolicies: []string{"foo"}, TrafficClass: 1},
+					{Name: "video", PathPolicies: "foo", TrafficClass: 1},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
@@ -97,8 +97,8 @@ func TestCompile(t *testing.T) {
 			},
 			Policies: map[addr.IA][]db.TrafficPolicy{
 				{I: 1, A: 1}: {
-					{Name: "audio", PathPolicies: []string{"any", "foo"}, TrafficClass: 0},
-					{Name: "video", PathPolicies: []string{"foo", "bar"}, TrafficClass: 1},
+					{Name: "audio", PathPolicies: "any, foo", TrafficClass: 0},
+					{Name: "video", PathPolicies: "foo, bar", TrafficClass: 1},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
@@ -130,14 +130,14 @@ func TestCompile(t *testing.T) {
 			},
 			Policies: map[addr.IA][]db.TrafficPolicy{
 				{I: 1, A: 1}: {
-					{Name: "audio", PathPolicies: []string{"any", "foo"}, TrafficClass: 0},
-					{Name: "video", PathPolicies: []string{"foo", "bar"}, TrafficClass: 1},
-					{Name: "http", PathPolicies: []string{"baz", "foo"}, TrafficClass: 2},
+					{Name: "audio", PathPolicies: "any, foo", TrafficClass: 0},
+					{Name: "video", PathPolicies: "foo, bar", TrafficClass: 1},
+					{Name: "http", PathPolicies: "baz, foo", TrafficClass: 2},
 				},
 				{I: 2, A: 2}: {
-					{Name: "audio", PathPolicies: []string{"bax", "bar"}, TrafficClass: 2},
-					{Name: "video", PathPolicies: []string{"foo", "any"}, TrafficClass: 4},
-					{Name: "http", PathPolicies: []string{"any", "bar"}, TrafficClass: 3},
+					{Name: "audio", PathPolicies: "bax, bar", TrafficClass: 2},
+					{Name: "video", PathPolicies: "foo, any", TrafficClass: 4},
+					{Name: "http", PathPolicies: "any, bar", TrafficClass: 3},
 				},
 			},
 			Classes: map[uint]db.TrafficClass{
@@ -171,6 +171,58 @@ func TestCompile(t *testing.T) {
 			Config: &config.Cfg{
 				ASes: map[addr.IA]*config.ASEntry{
 					{I: 1, A: 1}: {},
+				},
+			},
+		},
+		{
+			Name: "extended policies",
+			File: "6",
+			Config: &config.Cfg{
+				ASes: map[addr.IA]*config.ASEntry{
+					{I: 1, A: 1}: {},
+				},
+			},
+			Policies: map[addr.IA][]db.TrafficPolicy{
+				{I: 1, A: 1}: {
+					{Name: "audio", PathPolicies: "any", TrafficClass: 0},
+					{Name: "audio", PathPolicies: "bar2", TrafficClass: 0},
+				},
+			},
+			Classes: map[uint]db.TrafficClass{
+				0: {Name: "class-1", CondStr: "src=12.12.127.0/24"},
+			},
+			PathPolicies: []*pathpol.ExtPolicy{
+				{
+					Policy:  &pathpol.Policy{Name: "any"},
+					Extends: []string{"bar", "foo"},
+				},
+				{
+					Policy: &pathpol.Policy{Name: "foo",
+						Sequence: newSequence(t, []string{"1-ff00:0:133#1010"})}},
+				{
+					Policy: &pathpol.Policy{Name: "bar",
+						ACL: mustACL(t,
+							&pathpol.ACLEntry{
+								Action: pathpol.Allow,
+								Rule:   mustHopPredicate(t, "0-123"),
+							},
+							&pathpol.ACLEntry{
+								Action: pathpol.Allow,
+								Rule:   mustHopPredicate(t, "0-124"),
+							},
+							&pathpol.ACLEntry{
+								Action: pathpol.Deny,
+								Rule:   mustHopPredicate(t, "0"),
+							},
+						),
+						Sequence: newSequence(t, []string{"1-ff00:0:132#1910"})}},
+				{
+					Policy:  &pathpol.Policy{Name: "bar2"},
+					Extends: []string{"foo2"},
+				},
+				{
+					Policy:  &pathpol.Policy{Name: "foo2"},
+					Extends: []string{"bar"},
 				},
 			},
 		},
@@ -214,7 +266,7 @@ func TestCompile(t *testing.T) {
 			},
 			Policies: map[addr.IA][]db.TrafficPolicy{
 				{I: 1, A: 1}: {
-					{Name: "audio", PathPolicies: []string{"foo"}, TrafficClass: 0},
+					{Name: "audio", PathPolicies: "foo", TrafficClass: 0},
 				},
 			},
 		},
@@ -230,7 +282,7 @@ func TestCompile(t *testing.T) {
 			},
 			Policies: map[addr.IA][]db.TrafficPolicy{
 				{I: 1, A: 1}: {
-					{Name: "audio", PathPolicies: []string{"foo"}, TrafficClass: 0},
+					{Name: "audio", PathPolicies: "foo", TrafficClass: 0},
 				},
 			},
 		},
@@ -246,7 +298,7 @@ func TestCompile(t *testing.T) {
 			},
 			Policies: map[addr.IA][]db.TrafficPolicy{
 				{I: 1, A: 1}: {
-					{Name: "audio", PathPolicies: []string{"foo"}},
+					{Name: "audio", PathPolicies: "foo"},
 				},
 			},
 		},
@@ -266,4 +318,16 @@ func newSequence(t *testing.T, str []string) pathpol.Sequence {
 	seq, err := pathpol.NewSequence(str)
 	xtest.FailOnErr(t, err)
 	return seq
+}
+
+func mustACL(t *testing.T, entries ...*pathpol.ACLEntry) *pathpol.ACL {
+	acl, err := pathpol.NewACL(entries...)
+	xtest.FailOnErr(t, err)
+	return acl
+}
+
+func mustHopPredicate(t *testing.T, str string) *pathpol.HopPredicate {
+	hp, err := pathpol.HopPredicateFromString(str)
+	xtest.FailOnErr(t, err)
+	return hp
 }

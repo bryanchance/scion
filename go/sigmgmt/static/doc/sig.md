@@ -6,21 +6,22 @@ configuration file.
 SIGs connect IPv4 and/or IPv6 islands across SCION networks. In the most common scenario, SIGs sit
 at the edge of both IP networks and the SCION network, tunneling all IP traffic by encapsulating it
 in SCION packets. The health of SCION paths (that is, the sequences of SCION Autonomous Systems and
-Interface IDs that packets transit) is continuously monitored, allowing SIGs to ensure fast failover
-whenever network conditions degrade.
+Interface IDs that packets transit) is continuously monitored, allowing SIGs to ensure fast
+failover whenever network conditions degrade.
 
 ## Table of contents
 
-*   [Basic path selection](#basic-path-selection)
-    *   [Use case - Single path traffic](#use-case-1)
-*   [Policy-based path selection](#policy-based-path-selection)
-    *   [Traffic policies](#traffic-policies)
-    *   [Traffic classes](#traffic-classes)
-    *   [Sessions](#sessions)
-    *   [Path selectors](#path-selectors)
-    *   [Use case - Multiple paths with failover](#multiple-paths-with-failover)
-        *   [Choosing different paths for different traffic](#different-paths)
-        *   [Session of last resort](#session-of-last-resort)
+-   [Basic path selection](#basic-path-selection)
+    -   [Use case - Single path traffic](#use-case-1)
+-   [Path policies](#path-policies)
+-   [Policy-based path selection](#policy-based-path-selection)
+    -   [Traffic policies](#traffic-policies)
+    -   [Traffic classes](#traffic-classes)
+    -   [Sessions](#sessions)
+    -   [Path policies](#path-policies)
+    -   [Use case - Multiple paths with failover](#multiple-paths-with-failover)
+        -   [Choosing different paths for different traffic](#different-paths)
+        -   [Session of last resort](#session-of-last-resort)
 
 ## Basic path selection <a id="basic-path-selection"> </a>
 
@@ -76,7 +77,6 @@ To send traffic, the local SIG also needs to know the address of the remote endp
   "ASes": {
     "2-ff00:0:2": {
       "Nets": ["192.168.2.0/24", "192.168.3.0/24"],
-      "Sigs": {"Madrid": {"Addr": "192.168.2.1"}},
       ... rest of config omitted ...
     }
   }
@@ -93,21 +93,20 @@ monitoring.
 ### Use case #1 - Single path traffic <a id="use-case-1"> </a>
 
 In the topology below, two SIGs from two different ASes communicate across a single SCION path. The
-Berlin AS (`1-ff00:0:11`) contains one IPv4 network (`192.168.1.0/24`) that is directly connected to
-a SIG. The hosts in this network (e.g., HostA) want to talk to the hosts in the London AS
+Berlin AS (`1-ff00:0:11`) contains one IPv4 network (`192.168.1.0/24`) that is directly connected
+to a SIG. The hosts in this network (e.g., HostA) want to talk to the hosts in the London AS
 (`2-ff00:0:2`), located in networks `192.168.2.0/24` and `192.168.3.0/24`. The two ASes communicate
 via the path that goes through the Zürich and Paris ASes.
 
 ![Use case 1](case1.png)
 
-Configuring a SIG is done by editing the JSON file. This can be done either via the SIG WebUI, or by
-manually creating the file.
+Configuring a SIG is done by editing the JSON file. This can be done either via the SIG WebUI, or
+by manually creating the file.
 
 At a minimum, the config file must specify the following:
 
-*   The known remote ASes;
-*   The IP networks contained in each remote AS;
-*   The list of SIGs in each remote AS.
+-   The known remote ASes;
+-   The IP networks contained in each remote AS;
 
 For example, a minimal configuration file for the Berlin SIG looks like:
 
@@ -115,8 +114,7 @@ For example, a minimal configuration file for the Berlin SIG looks like:
 {
     "ASes": {
         "2-ff00:0:2": {
-            "Nets": ["192.168.2.0/24", "192.168.3.0/24"],
-            "Sigs": { "London": { "Addr": "192.168.2.1" } }
+            "Nets": ["192.168.2.0/24", "192.168.3.0/24"]
         }
     }
 }
@@ -128,8 +126,7 @@ The London SIG configuration file is similar:
 {
     "ASes": {
         "1-ff00:0:11": {
-            "Nets": ["192.168.1.0/24"],
-            "Sigs": { "Berlin": { "Addr": "192.168.1.1" } }
+            "Nets": ["192.168.1.0/24"]
         }
     }
 }
@@ -143,8 +140,9 @@ immediately take effect. The signal can be sent manually (e.g., via `kill`) or v
 scion@berlin$ sudo systemctl kill -sSIGHUP sig.service
 ```
 
-If the configuration could not be loaded (e.g., due to a syntax error) the SIG configuration remains
-unchanged. In both cases, check the log to verify that the SIG reloaded the config successfully:
+If the configuration could not be loaded (e.g., due to a syntax error) the SIG configuration
+remains unchanged. In both cases, check the log to verify that the SIG reloaded the config
+successfully:
 
 ```bash
 scion@berlin$ tail /var/log/scion/sig*.log
@@ -155,26 +153,141 @@ scion@berlin$ tail /var/log/scion/sig*.log
 2018-04-30 15:10:35.012658+0000 [INFO] reloadOnSIGHUP: reload done success=true
 ```
 
+## Path policies <a id="path-policies"></a>
+
+A path policy filters out sets of paths depending on a set of predicates.
+
+### Hop Predicate (HP)
+
+A hop predicate is of the form **ISD-AS#IF**, where _0_ can be used as a wildcard for **ISD**,
+**AS** and **IF** indepedently. If the **AS** identifier is set to _0_, the **IF** identifier must
+also be set to _0_. To specify both interfaces of an AS, one must separate them by `,` ie.
+**ISD-AS#IF1,IF2**.
+
+If the tail elements in a HP are 0, they can be omitted. See the following examples for details.
+
+Examples:
+
+-   Match interface _2_ and _3_ of AS _1-ff00:0:133_: `1-ff00:0:133#2,3`"
+-   Match interface _2_ of AS _1-ff00:0:133_: `1-ff00:0:133#2`
+-   Match any interface of AS _1-ff00:0:133_: `1-ff00:0:133#0` or `1-ff00:0:133`
+-   Match any interface in ISD _1_: `1-0#0`, `1-0` or `1`
+
+### Policy
+
+A policy is defined by a policy object. It can have the following attributes:
+
+-   [`acl`](#ACL) (list of HPs, preceded by `+` or `-`)
+-   [`sequence`](#Sequence) (space separated list of HPs, one HP for every AS on a path)
+-   [`extends`](#Extends) (list of extended policies)
+
+### Specification
+
+#### ACL
+
+##### Operators
+
+The ACL uses the following operators:
+
+-   `+` (allow predicate)
+-   `-` (deny predicate)
+
+The ACL can be used to deny (blacklist) or allow (whitelist) ISDs, ASes and IFs. A deny entry is of
+the following form `- ISD-AS#IF`, where the second part is a [HP](#HP). If a deny entry matches any
+hop on a path, the path is not allowed.
+
+An allow entry uses `+` with a HP, ie. `+ ISD-AS#IF`. For a path to be allowed, every hop of the
+path must be allowed by the ACL. When using allow and deny entries in the same ACL, the first
+matched entry wins. Thus, if an interface is denied by the first entry but allowed by the second
+entry it is still denied.
+
+Every ACL must end with a blanket accept or deny (i.e. `+` or `-`, or equivalent such as
+`+ 0-0#0`). If a policy has no acl attribute (and doesn't inherit one from any policy it extends),
+then by default everything is whitelisted.
+
+The following is an example for allowing all interfaces in ASes _1-ff00:0:133_ and _1-ff00:0:120_,
+but denying all other ASes in ISD _1_. The last entry makes sure that any other ISD is allowed.
+
+```yaml
+- acl_policy_example:
+      acl:
+          - "+ 1-ff00:0:133"
+          - "+ 1-ff00:0:120"
+          - "- 1"
+          - "+"
+```
+
+#### Sequence
+
+The sequence is a string of space separated HPs. The [operators](#Operators) can be used for
+advanced interface sequences.
+
+The following example specifies a path from any interface in AS _1-ff00:0:133_ to two subsequent
+interfaces in AS _1-ff00:0:120_ (entering on interface _2_ and exiting on interface _1_), then
+there are two wildcards that each match any AS. The path must end with any interface in AS
+_1-ff00:0:110_.
+
+```yaml
+- sequence_example_2:
+      sequence: "1-ff00:0:133#0 1-ff00:0:120#2,1 0 0 1-ff00:0:110#0"
+```
+
+Any path that is matched by the above policy must traverse three transit ASes. In many cases the
+number of ASes or hops is not known. With the regex-style it is possible to express such sequences.
+
+#### Extends
+
+Path policies can be composed by extending other policies. The `extends` attribute requires a list
+of named policies. If an attribute exists in multiple policies in that list, the last occurence has
+precedence. Also, an attribute specified at top level (the policy that has the `extends` attribute)
+always has precedence over attributes of an extended policy.
+
+The following example uses three sub-policies to create the top-level policy. As `sub_pol_1` and
+`sub_pol_3` both define an ACL but `sub_pol_3` has precedence, the ACL of `sub_pol_1` is discarded.
+
+```yaml
+- extends_example:
+      extends:
+          - sub_pol_1
+          - sub_pol_2
+          - sub_pol_3
+
+- sub_pol_1:
+      acl:
+          - "- 1-ff00:0:133#0"
+          - "+"
+
+- sub_pol_2:
+      sequence: "0 1-ff00:0:110#0 1-ff00:0:110#0 0"
+
+- sub_pol_3:
+      acl:
+          - "- 1-ff00:0:131#0"
+          - "- 1-ff00:0:132#0"
+          - "- 1-ff00:0:133#0"
+          - "+"
+```
+
 ## Policy-based path selection <a id="policy-based-path-selection"> </a>
 
 SIGs can be configured to forward packets across certain paths, depending on the values of various
 packet fields. To implement this, SIGs define and support the following:
 
-*   [Traffic policies](#traffic-policies)
-*   [Traffic classes](#traffic-classes)
-*   [Sessions](#sessions)
-*   [Path selectors](#path-selectors)
+-   [Traffic policies](#traffic-policies)
+-   [Traffic classes](#traffic-classes)
+-   [Sessions](#sessions)
+-   [Path policies](#path-policies)
 
 Traffic flow is controlled via **traffic policies**. Each policy is composed of two elements:
 
-*   A class name, used to identify the **traffic class** used to match the packets.
-*   A list of **sessions**, in order of priority, used to tell the SIG which session should be used
+-   A class name, used to identify the **traffic class** used to match the packets.
+-   A list of **sessions**, in order of priority, used to tell the SIG which session should be used
     to send the packet.
 
 A **session** is the state related to a tunneling (i.e., encapsulation) session. The session
 contains information such as usable paths, the health of the active path and sequence numbers.
 
-Each session is defined by a name (a number between 0 and 255), and a **path selector** that chooses
+Each session is defined by a name (a number between 0 and 255), and a **path policy** that chooses
 the paths that can be used (out of the pool of all known paths).
 
 The following sections take a more in-depth look at these concepts, and how they can be configured.
@@ -187,20 +300,20 @@ composed, thus creating arbitrarily complex classifiers.
 
 Classes can be written using the following conditions:
 
-*   **CondAllOf**: contains a list of subconditions. Returns true if all subconditions yield true.
+-   **CondAllOf**: contains a list of subconditions. Returns true if all subconditions yield true.
     If empty, it returns true.
-*   **CondAnyOf**: contains a list of subconditions and returns true if at least one subcondition
+-   **CondAnyOf**: contains a list of subconditions and returns true if at least one subcondition
     yields true. If empty, it return true.
-*   **CondNot**: contains a single subcondition; CondNot returns the negation of the result of the
+-   **CondNot**: contains a single subcondition; CondNot returns the negation of the result of the
     subcondition.
-*   **CondBool**: can be true or false, and always evaluates to its chosen value. This is useful
+-   **CondBool**: can be true or false, and always evaluates to its chosen value. This is useful
     during testing.
-*   **CondIPv4**: contains a condition for an IPv4 packet. Possible options are:
-    *   **MatchSource**: checks whether the source address of the packet is within the network in
+-   **CondIPv4**: contains a condition for an IPv4 packet. Possible options are:
+    -   **MatchSource**: checks whether the source address of the packet is within the network in
         field "Net".
-    *   **MatchDestination**: checks whether the destination address of the packet is within the
+    -   **MatchDestination**: checks whether the destination address of the packet is within the
         network in field "Net".
-    *   **MatchDSCP**: checks whether the ToS/DSCP fields of the packet exactly match the value in
+    -   **MatchDSCP**: checks whether the ToS/DSCP fields of the packet exactly match the value in
         field "DSCP".
 
 Classes are defined in the top level of the JSON config file, under name "Classes".
@@ -216,8 +329,8 @@ follows:
 }
 ```
 
-Note that we also needed to specify a name for the class, in this case `example-source`. The name is
-later used in traffic policies to refer to this specific class.
+Note that we also needed to specify a name for the class, in this case `example-source`. The name
+is later used in traffic policies to refer to this specific class.
 
 To select traffic coming from multiple networks, compose multiple conditions using **CondAnyOf**:
 
@@ -233,8 +346,8 @@ To select traffic coming from multiple networks, compose multiple conditions usi
 }
 ```
 
-**CondAnyOf** and **CondAllOf** can be used together to create more complex classes. For example, to
-select either traffic going from `192.168.1.0` to `192.168.2.0`, or from `192.168.3.0` to
+**CondAnyOf** and **CondAllOf** can be used together to create more complex classes. For example,
+to select either traffic going from `192.168.1.0` to `192.168.2.0`, or from `192.168.3.0` to
 `192.168.4.0`:
 
 ```json
@@ -258,14 +371,7 @@ select either traffic going from `192.168.1.0` to `192.168.2.0`, or from `192.16
 }
 ```
 
-### Path selectors <a id="path-selectors"></a>
-
-A path selector filters out sets of paths depending on a set of predicates. They are similar to a
-route map, except they operate on paths. Currently, the SIG accepts selectors with a single
-predicate, `PP`, that specifies what ISDs, ASes and IFIDs should be contained by a path in order to
-be selected.
-
-![Selectors](case2.png)
+![Path Policies](case2.png)
 
 Refer to the topology above. It similar to the topology in the previous use case, except a new
 transit AS, Frankfurt, is available between Berlin and London. As opposed to the other ASes, the
@@ -279,130 +385,73 @@ more paths in addition to those listed below might exist):
 1-ff00:0:11#1, 3-ff00:0:3#1, 3-ff00:0:3#2, 4-ff00:0:4#1, 4-ff00:0:4#2, 2-ff00:0:2#1
 ```
 
-The path elements above are in ISD-AS#IFID notation. The same notation is used when defining path
-selectors.
+The path elements above are in ISD-AS#IFID notation. The same notation can be used when defining
+path policy sequences.
 
-A selector specifies a certain ISD, AS and IFID that the path must contain. For example, to select
-only the path going through border router Frankfurt-1 in the Frankfurt AS, we can define the
-following selector:
+A sequence specifies a list of HopPredicates a path must be made of. For example, to select only
+the path going through border router Frankfurt-1 in the Frankfurt AS, we can define the following
+sequence:
 
-```basic
-1-ff00:0:12#1
+```yaml
+sequence: "1-ff00:0:11 1-ff00:0:12#1 2-ff00:0:2"
 ```
 
 This means that paths going through ISD 1, AS `ff00:0:12` and IFID 1 are selected. Paths going
-through border router Frankfurt-2 are avoided, so sessions using this path selector will never
+through border router Frankfurt-2 are avoided, so sessions using this path policy will never
 forward traffic through Frankfurt-2. If we don't care about the IFID and want to select all paths
-going through any border router in the Frankfurt AS, we can replace the IFID in the path selector
+going through any border router in the Frankfurt AS, we can replace the IFID in the path policy
 with a wildcard 0:
 
 ```basic
 1-ff00:0:12#0
 ```
 
-Wildcards can also be used for ASes or IFIDs. For example, the match all path selector would look
-like (note the shorthand AS notation for AS 0):
-
-```basic
-0-0#0
-```
-
-Selectors can include multiple comma-separated items. All the items must match parts of the path.
-Gaps are allowed, but the matching must be done in order. Specifically, the Berlin to London path
-that goes through Paris is matched by the following rules:
-
-```basic
-3-ff00:0:3#0,4-ff00:0:4#0
-3-ff00:0:3#1,2-ff00:0:2#1
-```
-
-but is not matched by:
-
-```basic
-4-ff00:0:4#0,3-ff00:0:3#0
-```
-
-because the items are in the wrong order.
-
-To write a selector in JSON format, the predicate string is embedded in a **CondPathPredicate**
-object, with the predicate string itself added under name `PP`:
+To write a path policy in JSON format, the sequence string is embedded in a policy object, with
+the:
 
 ```json
-"CondPathPredicate": {"PP": "4-ff00:0:4#0"}
+"policy-name": {"Sequence": "4-ff00:0:4#0"}
 ```
 
-Path selectors are specified in the SIG config file under the top level name "Actions". The format
-is the following:
+Path policies are specified in the SIG config file under the top level name "PathPolicies". The
+format is the following:
 
 ```json
-"Actions": {
-  "custom-name": {
-    "ActionFilterPaths": {
-      ... filter omitted ...
-    }
+"PathPolicies": {
+  "policy-name": {
+    "Sequence": "1-ff00:0:11 1-ff00:0:12#1 2-ff00:0:2"
   }
 }
 ```
 
-Only **ActionFilterPaths** is supported for now, but other actions might be added in the future. An
-example with one of the predicates defined above would look like:
+One useful configuration pattern is the path avoidance pattern, which can be used to prevent
+routing through certain ISDs and ASes. Suppose ISD 10 is now connected to the SCION network, but
+this ISD has a history of data theft and other security issues. We want to avoid routing through
+this ISD. The simplest way to do this is to only select paths that do not go through ISD 10 using
+the ACL:
 
 ```json
-"Actions": {
-  "go-through-paris": {
-    "ActionFilterPaths": {
-      "CondPathPredicate": {"PP": "4-ff00:0:4#0"}
-    }
-  }
-}
-```
-
-To create more complex predicates, the conditions can be combined the same way traffic class
-conditions are. For example, to create a path selector that chooses paths that go through either ISD
-1 or ISD 2:
-
-```json
-"Actions": {
-  "go-through-either": {
-    "ActionFilterPaths": {
-      "CondAnyOf": [
-        {"CondPathPredicate": {"PP": "1-0#0"}},
-        {"CondPathPredicate": {"PP": "2-0#0"}}
-      ]
-    }
-  }
-}
-```
-
-One useful configuration pattern is the path avoidance pattern, which can be used to prevent routing
-through certain ISDs and ASes. Suppose ISD 10 is now connected to the SCION network, but this ISD
-has a history of data theft and other security issues. We want to avoid routing through this ISD.
-The simplest way to do this is to only select paths that do not go through ISD 10 via a `CondNot`
-condition:
-
-```json
-"Actions": {
-  "avoid-isd": {
-    "ActionFilterPaths": {
-      "CondNot": {"CondPathPredicate": {"PP": "10-0#0"}}
-    }
+"PathPolicies": {
+  "policy-name": {
+    "Sequence": "...",
+    "ACL": [
+      "- 10",
+      "+"
+    ]
   }
 }
 ```
 
 ### Sessions <a id="sessions"> </a>
 
-Sessions describe independent SIG to SIG tunneling states. Sessions are defined per remote AS, under
-name "Sessions":
+Sessions describe independent SIG to SIG tunneling states. Sessions are defined per remote AS,
+under name "Sessions":
 
 ```json
 {
   "ASes": {
     "2-ff00:0:2": {
        "Nets": ["192.168.2.0/24", "192.168.3.0/24"],
-       "Sigs": {
-         "LondonA": { "Addr": "192.168.2.1" }
-       },
        "Sessions": {
          ... define sessions here ...
        }
@@ -411,9 +460,9 @@ name "Sessions":
 }
 ```
 
-To select eligible paths, each session either needs to reference an **ActionFilterPaths** object, or
-the empty quotes "" (meaning no filter, and all paths are used). For example, to define a session
-that allows all paths and a session that uses the `go-trough-either` paths defined in the previous
+To select eligible paths, each session either needs to reference a **PathPolicy** object, or the
+empty quotes "" (meaning no filter, and all paths are used). For example, to define a session that
+allows all paths and a session that uses the `go-trough-either` paths defined in the previous
 section, use the following:
 
 ```json
@@ -423,9 +472,9 @@ section, use the following:
 }
 ```
 
-In the above example, two session are defined. The session with ID 0 will use all available paths to
-the destination AS. The session with ID 10 will only use paths that go through ISD 1 or ISD 2 (as
-defined in the previous section). Session IDs are only used to identify the session, and do not
+In the above example, two session are defined. The session with ID 0 will use all available paths
+to the destination AS. The session with ID 10 will only use paths that go through ISD 1 or ISD 2
+(as defined in the previous section). Session IDs are only used to identify the session, and do not
 represent any form of priority.
 
 ### Traffic policies <a id="traffic-policies"> </a>
@@ -438,7 +487,6 @@ Traffic policies map traffic classes to sessions. Traffic policies are configure
   "ASes": {
     "2-ff00:0:2": {
       "Nets": ...omitted...,
-      "Sigs": ...omitted...,
       "Sessions": ...omitted...,
       "PktPolicies": [
         {
@@ -458,7 +506,7 @@ list is healthy (i.e., has at least one usable path and traffic can flow across 
 always be used. If the first session is unhealthy, the next one is used and so on and so forth.
 
 To see a `PktPolicies` example, recall that in the previous sections we defined the following
-sessions, path selectors and traffic classes:
+sessions, path policies and traffic classes:
 
 ```json
 "Sessions": {
@@ -468,14 +516,26 @@ sessions, path selectors and traffic classes:
 ```
 
 ```json
-"Actions": {
+"PathPolicies": {
   "go-through-either": {
-    "ActionFilterPaths": {
-      "CondAnyOf": [
-        {"CondPathPredicate": {"PP": "1-0#0"}},
-        {"CondPathPredicate": {"PP": "2-0#0"}}
-      ]
-    }
+    "Options": [
+        {
+            "Policy": {
+                "ACL": [
+                  "+ 1"
+                  "-"
+                ]
+            }
+        },
+        {
+            "Policy": {
+                "ACL": [
+                  "+ 2"
+                  "-"
+                ]
+            }
+        }
+    ]
   }
 }
 ```
@@ -488,9 +548,9 @@ sessions, path selectors and traffic classes:
 }
 ```
 
-For simplicity, we do not include the whole file, but note that `Classes`, `Actions` and `Sessions`
-need to be inserted at specific points in the JSON file. One example of `PktPolicies`, based on the
-classes and sessions above could look like:
+For simplicity, we do not include the whole file, but note that `Classes`, `PathPolicies` and
+`Sessions` need to be inserted at specific points in the JSON file. One example of `PktPolicies`,
+based on the classes and sessions above could look like:
 
 ```json
 "PktPolicies": [
@@ -503,18 +563,18 @@ classes and sessions above could look like:
 
 In this example, we state that IP traffic matching traffic class `example-source` should be
 forwarded across session 10, if possible. Also, session 10 uses the `go-through-either` path
-selector, which means that it will only allow paths going through ISD 1 (`1-0#0`) or ISD 2
-(`2-0#0`). If session 10 is unhealthy, session 0 will be used. This session doesn't specify any path
-selector, so any path can be used. Note that the list of session names does not include quotes.
+policy, which means that it will only allow paths going through ISD 1 (`1-0#0`) or ISD 2 (`2-0#0`).
+If session 10 is unhealthy, session 0 will be used. This session doesn't specify any path policy,
+so any path can be used. Note that the list of session names does not include quotes.
 
 ### Use case #2 - Multiple paths with failover <a id="multiple-paths-with-failover"> </a>
 
-This use case presents how traffic classes, path selectors, sessions and traffic policies come
+This use case presents how traffic classes, path policies, sessions and traffic policies come
 together to implement path failover policies in the SIG.
 
 SIGs monitor paths to detect network failures. As soon as a path is down, the SIG can transparently
 change to the remaining healthy paths. The topology below (which is the same as the topology in the
-Path selectors section) presents such a scenario.
+Path policy section) presents such a scenario.
 
 The Berlin AS wants to communicate with the London AS. If all the paths are healthy, the path
 through Zürich should be preferred. If the path through Zürich becomes unavailable, traffic should
@@ -532,55 +592,42 @@ To implement this, first the packets must be classified. Define one class matchi
 }
 ```
 
-Then, define path selectors for the paths through Zürich:
+Then, define a path policy for the paths through Zürich:
 
 ```json
 "go-through-zuerich": {
-  "ActionFilterPaths": {
-    "CondPathPredicate": {"PP": "3-ff00:0:3#0"}
-  }
+  "Sequence": "1-ff00:0:11 3-ff00:0:3 4-ff00:0:4 2-ff00:0:2"
 }
 ```
 
-And a path selector for the path through Frankfurt:
+And a path policy for the path through Frankfurt:
 
 ```json
-"go-through-frankfurt": {
-  "ActionFilterPaths": {
-    "CondPathPredicate": {"PP": "1-ff00:0:12#0"}
-  }
+"go-through-zuerich": {
+  "Sequence": "1-ff00:0:11 1-ff00:0:12 2-ff00:0:2"
 }
 ```
 
-Putting it all together, the "Actions" section of the configuration file should now look like:
+Putting it all together, the "PathPolicies" section of the configuration file should now look like:
 
 ```json
-"Actions": {
+"PathPolicies": {
   "go-through-zuerich": {
-    "ActionFilterPaths": {
-      "CondPathPredicate": {"PP": "3-ff00:0:3#0"}
-    }
+    "Sequence": "1-ff00:0:11 3-ff00:0:3 4-ff00:0:4 2-ff00:0:2"
   },
-  "go-through-frankfurt": {
-    "ActionFilterPaths": {
-      "CondPathPredicate": {"PP": "1-ff00:0:12#0"}
-    }
+  "go-through-zuerich": {
+    "Sequence": "1-ff00:0:11 1-ff00:0:12 2-ff00:0:2"
   }
 }
 ```
 
-Now that the selectors are in place, define SIG sessions through Zürich and Frankfurt for the remote
-London AS:
+Now that the path policies are in place, define SIG sessions through Zürich and Frankfurt for the
+remote London AS:
 
 ```json
 "ASes": {
   "2-ff00:0:2": {
     "Nets": ["192.168.2.0/24", "192.168.3.0/24"],
-    "Sigs": {
-      "LondonA": {
-        "Addr": "192.168.2.1"
-      }
-    },
     "Sessions": {
       "10": "go-through-zuerich",
       "20": "go-through-frankfurt"
@@ -604,11 +651,6 @@ The final configuration file for the Berlin SIG:
   "ASes": {
     "2-ff00:0:2": {
       "Nets": ["192.168.2.0/24", "192.168.3.0/24"],
-      "Sigs": {
-        "LondonA": {
-          "Addr": "192.168.2.1"
-        }
-      },
       "Sessions": {
         "10": "go-through-zuerich",
         "20": "go-through-frankfurt"
@@ -623,16 +665,12 @@ The final configuration file for the Berlin SIG:
       "CondBool": true
     }
   }
-  "Actions": {
+  "PathPolicies": {
     "go-through-zuerich": {
-      "ActionFilterPaths": {
-        "CondPathPredicate": {"PP": "3-ff00:0:3#0"}
-      }
+      "Sequence": "1-ff00:0:11 3-ff00:0:3 4-ff00:0:4 2-ff00:0:2"
     },
-    "go-through-frankfurt": {
-      "ActionFilterPaths": {
-        "CondPathPredicate": {"PP": "1-ff00:0:12#0"}
-      }
+    "go-through-zuerich": {
+      "Sequence": "1-ff00:0:11 1-ff00:0:12 2-ff00:0:2"
     }
   }
 }
@@ -640,11 +678,11 @@ The final configuration file for the Berlin SIG:
 
 #### Choosing different paths for different traffic <a id="different-paths"> </a>
 
-Suppose traffic going to `192.168.2.0/24` should prefer paths through Frankfurt, and only go through
-Zürich if that path becomes unavailable. Also, traffic to `192.168.3.0/24` should prefer going
-through Zürich, and only go through Frankfurt if that path becomes unavailable. In this case, the
-path selectors and sessions from the previous section remain the same. However, we need to define
-two new classes for the criteria we chose:
+Suppose traffic going to `192.168.2.0/24` should prefer paths through Frankfurt, and only go
+through Zürich if that path becomes unavailable. Also, traffic to `192.168.3.0/24` should prefer
+going through Zürich, and only go through Frankfurt if that path becomes unavailable. In this case,
+the path policies and sessions from the previous section remain the same. However, we need to
+define two new classes for the criteria we chose:
 
 ```json
 "Classes": {
@@ -673,8 +711,8 @@ choose 10 (with paths through Zürich) only if the former is unhealthy. For traf
 
 #### Session of last resort <a id="session-of-last-resort"> </a>
 
-One useful pattern is to always have a "session of last resort" that allows any path to be used. For
-this, define a session without a selector (typically, session 0):
+One useful pattern is to always have a "session of last resort" that allows any path to be used.
+For this, define a session without a path policy (typically, session 0):
 
 ```json
 "Sessions": {

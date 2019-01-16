@@ -3,6 +3,7 @@
   <div class="menu">
     <div class="buttons">
       <button mat-button color="accent" routerLink="/sites">Sites</button>
+      <button mat-button color="accent" routerLink="/policies">Path Policies</button>
       <button mat-button color="accent" routerLink="/config">Config Doc</button>
       <button mat-button color="accent" routerLink="/contact">Contact</button>
       <button mat-button color="accent" *ngIf="userService.isLoggedIn | async" (click)="logout()" s>Logout</button>

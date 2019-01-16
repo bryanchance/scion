@@ -6,16 +6,6 @@
 </div>
 
 <div class="flex-container cards" *ngIf="!newSite">
-  <a routerLink="/sites/{{site?.ID}}/selectors">
-    <mat-card>
-      <mat-card-title>
-        <p>Path Selectors</p>
-        <button mat-icon-button>
-          <mat-icon>settings</mat-icon>
-        </button>
-      </mat-card-title>
-    </mat-card>
-  </a>
   <a routerLink="/sites/{{site?.ID}}/classes">
     <mat-card>
       <mat-card-title>
@@ -47,8 +37,10 @@
         Generate and push SIG config files
       </mat-panel-description>
     </mat-expansion-panel-header>
-    <p>Clicking the Push and reload config button will generate a new JSON SIG Config file from saved settings, copy it to each
-      host in the site and then send a reload signal to the running SIG. Finally, the SIG is queried via HTTP to verify that
+    <p>Clicking the Push and reload config button will generate a new JSON SIG Config file from saved settings, copy it
+      to each
+      host in the site and then send a reload signal to the running SIG. Finally, the SIG is queried via HTTP to verify
+      that
       it has loaded the correct config.</p>
     <mat-spinner [diameter]="40" *ngIf="loadingConfig" color="accent"></mat-spinner>
     <span *ngIf="reloadSuccess" class="success">Config successfully reloaded!</span>
@@ -57,6 +49,7 @@
       <div *ngFor="let k of errorKeys" class="hosts">
         <span>{{k}}</span>
         <mat-icon class="error" *ngIf="reloadErrorDesc[k]">error</mat-icon>
+        <span class="error" *ngIf="reloadErrorDesc[k]">{{reloadErrorDesc[k].Msg}}</span>
         <mat-icon class="success" *ngIf="!reloadErrorDesc[k]">done</mat-icon>
       </div>
     </div>

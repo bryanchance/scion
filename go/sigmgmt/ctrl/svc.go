@@ -224,6 +224,14 @@ func (c *Controller) getPathPolicies(siteID uint) ([]*pathpol.ExtPolicy, string,
 	}
 	pathPolicies := make([]*pathpol.ExtPolicy, 0)
 	for _, ppF := range pathPolicyFiles {
+		err := json.Unmarshal([]byte(ppF.CodeStr), &ppF.Code)
+		if err != nil {
+			return nil, "", err
+		}
+		err = c.validatePathPolicyFile(ppF)
+		if err != nil {
+			return nil, "", err
+		}
 		policies, err := ppF.GetExtPolicies()
 		if err != nil {
 			return nil, "Error getting extPolicies", err
@@ -235,6 +243,45 @@ func (c *Controller) getPathPolicies(siteID uint) ([]*pathpol.ExtPolicy, string,
 		}
 	}
 	return pathPolicies, "", nil
+}
+
+func (c *Controller) pathPoliciesExists(names []string, asID uint) error {
+	var as db.ASEntry
+	var err error
+	if err = c.db.First(&as, asID).Error; err != nil {
+		return common.NewBasicError("AS not found", nil, "AS", asID)
+	}
+	var pathPolicies []*pathpol.ExtPolicy
+	if pathPolicies, _, err = c.getPathPolicies(as.SiteID); err != nil {
+		return err
+	}
+	policyNames := make(map[string]struct{})
+	for _, policy := range pathPolicies {
+		policyNames[policy.Name] = struct{}{}
+	}
+	for _, name := range names {
+		if _, ok := policyNames[name]; !ok {
+			return common.NewBasicError("Could not find path policy", nil, "policy", name)
+		}
+	}
+	return nil
+}
+
+// validatePathPolicyFile tests for exach policy in the file if it compiles
+func (c *Controller) validatePathPolicyFile(pF db.PathPolicyFile) error {
+	policies, err := pF.GetExtPolicies()
+	if err != nil {
+		return err
+	}
+	for _, policy := range policies {
+		if len(policy.Extends) > 0 {
+			_, err := pathpol.PolicyFromExtPolicy(policy, policies)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // substituteTrafficClasses replaces `cls=xx` by the corresponding class
@@ -253,7 +300,7 @@ func substituteTrafficClasses(tc *db.TrafficClass, dbase *gorm.DB) error {
 		}
 		cls := db.TrafficClass{}
 		if err := dbase.First(&cls, id).Error; err != nil {
-			return err
+			return common.NewBasicError("Traffic Class not found", nil, "ID", id)
 		}
 		// replace `cls=xx` by corresponding condStr
 		tc.CondStr = strings.Replace(tc.CondStr, match, cls.CondStr, 1)
