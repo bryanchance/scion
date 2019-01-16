@@ -8,6 +8,7 @@ import (
 	"github.com/scionproto/scion/go/lib/pktcls"
 )
 
+// Site is an AS owned and managed by this instance of sigmgmt.
 type Site struct {
 	ID             uint
 	Name           string `gorm:"unique;not null"`
@@ -35,6 +36,8 @@ type PathSelector struct {
 	SiteID uint `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name), UNIQUE (site_id, filter)" json:"-"`
 }
 
+// ASEntry is a reference to a remote AS.
+// Remote AS may or may not be managed by this sigmgmt instance.
 type ASEntry struct {
 	ID                   uint
 	Name                 string
@@ -56,6 +59,8 @@ func (as *ASEntry) ToAddrIA() (addr.IA, error) {
 	return addr.IAFromString(as.ISD + "-" + as.AS)
 }
 
+// SIGs field is obsolete since SIGs are now discovered automatically.
+// Keeping it in place not to mess with the existing database deployments.
 type SIG struct {
 	ID        uint
 	Name      string
