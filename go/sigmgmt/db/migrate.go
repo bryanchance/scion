@@ -9,6 +9,7 @@ func MigrateDB(dbase *gorm.DB) {
 	dbase.Exec("PRAGMA foreign_keys = ON;")
 	dbase.AutoMigrate(&Site{})
 	dbase.AutoMigrate(&Host{})
+	dbase.AutoMigrate(&SiteNetwork{})
 	dbase.AutoMigrate(&PathSelector{})
 	dbase.AutoMigrate(&ASEntry{})
 	dbase.AutoMigrate(&SIG{})

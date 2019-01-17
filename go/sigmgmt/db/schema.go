@@ -19,6 +19,8 @@ type Site struct {
 	PathSelectors  []PathSelector   `json:",omitempty"`
 	TrafficClasses []TrafficClass   `json:",omitempty"`
 	PathPolicies   []PathPolicyFile `json:",omitempty"`
+	// Networks to be exported from the site by ipprovider.
+	Networks []SiteNetwork `json:",omitempty"`
 }
 
 type Host struct {
@@ -27,6 +29,16 @@ type Host struct {
 	User   string
 	Key    string `gorm:"size:400"`
 	SiteID uint   `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name)" json:"-"`
+}
+
+type SiteNetwork struct {
+	ID uint
+	// The network to be exported to remote organization.
+	CIDR string `gorm:"column:cidr"`
+	// A string with a space-separated list of IAs that should see this allocation.
+	// Set to * to make the allocation visible to everyone.
+	ACL    string
+	SiteID uint `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (cidr, site_id)" json:"-"`
 }
 
 type PathSelector struct {
@@ -39,11 +51,12 @@ type PathSelector struct {
 // ASEntry is a reference to a remote AS.
 // Remote AS may or may not be managed by this sigmgmt instance.
 type ASEntry struct {
-	ID                   uint
-	Name                 string
-	ISD                  string          `gorm:"column:isd_id"`
-	AS                   string          `gorm:"column:as_id"`
-	Policies             string          `gorm:"column:policies"`
+	ID       uint
+	Name     string
+	ISD      string `gorm:"column:isd_id"`
+	AS       string `gorm:"column:as_id"`
+	Policies string `gorm:"column:policies"`
+	// Address of the ipprovider in the remote AS in host:port format, or empty is there's none.
 	IPAllocationProvider string          `json:",omitempty"`
 	SiteID               uint            `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name, isd_id, as_id)" json:"-"`
 	SIGs                 []SIG           `json:",omitempty"`
@@ -71,7 +84,9 @@ type SIG struct {
 }
 
 type Network struct {
-	ID        uint
+	ID uint
+	// True if this network was imported by ipscraper.
+	Scraped   bool
 	CIDR      string `gorm:"column:cidr"`
 	ASEntryID uint   `sql:"type:integer REFERENCES asentries ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (cidr, as_entry_id)" json:"-"`
 }
