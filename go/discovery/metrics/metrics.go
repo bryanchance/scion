@@ -28,18 +28,17 @@ var (
 
 func Init(elem string) {
 	namespace := "discovery"
-	constLabels := prometheus.Labels{"elem": elem}
 	reqLabels := []string{"src", "scope"}
 	loadLabels := []string{"result"}
 
 	newC := func(name, help string) prometheus.Counter {
-		return prom.NewCounter(namespace, "", name, help, constLabels)
+		return prom.NewCounter(namespace, "", name, help)
 	}
 	newCVec := func(name, help string, lNames []string) *prometheus.CounterVec {
-		return prom.NewCounterVec(namespace, "", name, help, constLabels, lNames)
+		return prom.NewCounterVec(namespace, "", name, help, lNames)
 	}
 	newG := func(name, help string) prometheus.Gauge {
-		return prom.NewGauge(namespace, "", name, help, constLabels)
+		return prom.NewGauge(namespace, "", name, help)
 	}
 	// Global counters used by both the static and the dynamic part
 	TotalRequests = newCVec("total_requests", "Number of requests served", reqLabels)

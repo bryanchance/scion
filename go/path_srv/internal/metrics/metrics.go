@@ -1,4 +1,4 @@
-// Copyright 2016 ETH Zurich
+// Copyright 2019 Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,6 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Dummy file so that govendor doesn't error when it tries to install this package.
+package metrics
 
-package hsr
+import (
+	"github.com/scionproto/scion/go/lib/prom"
+)
+
+const (
+	namespace = "path_srv"
+)
+
+// Init initializes the metrics for the PS.
+func Init(elem string) {
+	prom.UseDefaultRegWithElem(elem)
+}

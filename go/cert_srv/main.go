@@ -26,7 +26,7 @@ import (
 	"github.com/BurntSushi/toml"
 	consulapi "github.com/hashicorp/consul/api"
 
-	"github.com/scionproto/scion/go/cert_srv/internal/csconfig"
+	"github.com/scionproto/scion/go/cert_srv/internal/config"
 	"github.com/scionproto/scion/go/cert_srv/internal/reiss"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/consul"
@@ -38,24 +38,11 @@ import (
 	"github.com/scionproto/scion/go/lib/infra/modules/itopo"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/periodic"
-	"github.com/scionproto/scion/go/lib/truststorage"
 )
 
-type Config struct {
-	General env.General
-	Sciond  env.SciondClient `toml:"sd_client"`
-	Logging env.Logging
-	Metrics env.Metrics
-	TrustDB truststorage.TrustDBConf
-	Infra   env.Infra
-	CS      csconfig.Conf
-	state   *csconfig.State
-
-	Consul consulconfig.Config
-}
-
 var (
-	config      Config
+	cfg         config.Config
+	state       *config.State
 	environment *env.Env
 	reissRunner *periodic.Runner
 	reissMtx    sync.Mutex
@@ -79,7 +66,7 @@ func realMain() int {
 	fatal.Init()
 	env.AddFlags()
 	flag.Parse()
-	if v, ok := env.CheckFlags(csconfig.Sample); !ok {
+	if v, ok := env.CheckFlags(config.Sample); !ok {
 		return v
 	}
 	if err := setupBasic(); err != nil {
@@ -87,14 +74,14 @@ func realMain() int {
 		return 1
 	}
 	defer log.Flush()
-	defer env.LogAppStopped(common.CS, config.General.ID)
+	defer env.LogAppStopped(common.CS, cfg.General.ID)
 	defer log.LogPanicAndExit()
 	// Setup the state and the messenger
 	if err := setup(); err != nil {
 		log.Crit("Setup failed", "err", err)
 		return 1
 	}
-	if config.Consul.Enabled {
+	if cfg.Consul.Enabled {
 		c, err := setupConsul()
 		if err != nil {
 			log.Crit("Setup consul failed", "err", err)
@@ -110,14 +97,14 @@ func realMain() int {
 		msgr.ListenAndServe()
 	}()
 	// Set environment to listen for signals.
-	environment = infraenv.InitInfraEnvironmentFunc(config.General.TopologyPath, func() {
+	environment = infraenv.InitInfraEnvironmentFunc(cfg.General.TopologyPath, func() {
 		if err := reload(); err != nil {
 			log.Error("Unable to reload", "err", err)
 		}
 	})
 	// Cleanup when the CS exits.
 	defer stop()
-	config.Metrics.StartPrometheus()
+	cfg.Metrics.StartPrometheus()
 	select {
 	case <-environment.AppShutdownSignal:
 		// Whenever we receive a SIGINT or SIGTERM we exit without an error.
@@ -131,17 +118,17 @@ func realMain() int {
 func reload() error {
 	// FIXME(roosd): KeyConf reloading is not yet supported.
 	// https://github.com/scionproto/scion/issues/2077
-	config.General.Topology = itopo.GetCurrentTopology()
-	var newConf Config
+	cfg.General.Topology = itopo.GetCurrentTopology()
+	var newConf config.Config
 	// Load new config to get the CS parameters.
 	if _, err := toml.DecodeFile(env.ConfigFile(), &newConf); err != nil {
 		return err
 	}
-	if err := newConf.CS.Init(config.General.ConfigDir); err != nil {
+	if err := newConf.CS.Init(cfg.General.ConfigDir); err != nil {
 		return common.NewBasicError("Unable to initialize CS config", err)
 	}
-	config.CS = newConf.CS
-	if config.Consul.Enabled {
+	cfg.CS = newConf.CS
+	if cfg.Consul.Enabled {
 		stopLeaderElector()
 		if err := startLeaderElector(); err != nil {
 			err = common.NewBasicError("Failed to start leader election", err)
@@ -160,22 +147,22 @@ func reload() error {
 func startReissRunner() {
 	reissMtx.Lock()
 	defer reissMtx.Unlock()
-	if !config.CS.AutomaticRenewal {
+	if !cfg.CS.AutomaticRenewal {
 		log.Info("Reissue disabled, not starting reiss task.")
 		return
 	}
-	if config.General.Topology.Core {
+	if cfg.General.Topology.Core {
 		log.Info("Starting periodic reiss.Self task")
 		reissRunner = periodic.StartPeriodicTask(
 			&reiss.Self{
 				Msgr:     msgr,
-				State:    config.state,
-				IA:       config.General.Topology.ISD_AS,
-				IssTime:  config.CS.IssuerReissueLeadTime.Duration,
-				LeafTime: config.CS.LeafReissueLeadTime.Duration,
+				State:    state,
+				IA:       cfg.General.Topology.ISD_AS,
+				IssTime:  cfg.CS.IssuerReissueLeadTime.Duration,
+				LeafTime: cfg.CS.LeafReissueLeadTime.Duration,
 			},
-			periodic.NewTicker(config.CS.ReissueRate.Duration),
-			config.CS.ReissueTimeout.Duration,
+			periodic.NewTicker(cfg.CS.ReissueRate.Duration),
+			cfg.CS.ReissueTimeout.Duration,
 		)
 		return
 	}
@@ -183,12 +170,12 @@ func startReissRunner() {
 	reissRunner = periodic.StartPeriodicTask(
 		&reiss.Requester{
 			Msgr:     msgr,
-			State:    config.state,
-			IA:       config.General.Topology.ISD_AS,
-			LeafTime: config.CS.LeafReissueLeadTime.Duration,
+			State:    state,
+			IA:       cfg.General.Topology.ISD_AS,
+			LeafTime: cfg.CS.LeafReissueLeadTime.Duration,
 		},
-		periodic.NewTicker(config.CS.ReissueRate.Duration),
-		config.CS.ReissueTimeout.Duration,
+		periodic.NewTicker(cfg.CS.ReissueRate.Duration),
+		cfg.CS.ReissueTimeout.Duration,
 	)
 }
 
@@ -211,7 +198,7 @@ func stopReissRunner() {
 }
 
 func stop() {
-	if config.Consul.Enabled {
+	if cfg.Consul.Enabled {
 		stopLeaderElector()
 	} else {
 		stopReissRunner()
@@ -227,8 +214,8 @@ func (cf closerFunc) Close() error {
 
 func setupConsul() (io.Closer, error) {
 	fatal.Check()
-	config.Consul.InitDefaults()
-	c, err := config.Consul.Client()
+	cfg.Consul.InitDefaults()
+	c, err := cfg.Consul.Client()
 	if err != nil {
 		return nil, err
 	}
@@ -247,14 +234,14 @@ func setupConsul() (io.Closer, error) {
 }
 
 func startLeaderElector() error {
-	config.Consul.InitDefaults()
-	c, err := config.Consul.Client()
+	cfg.Consul.InitDefaults()
+	c, err := cfg.Consul.Client()
 	if err != nil {
 		return err
 	}
-	leaderKey := fmt.Sprintf("cert_srv/leader/%s", config.General.Topology.ISD_AS.FileFmt(false))
+	leaderKey := fmt.Sprintf("cert_srv/leader/%s", cfg.General.Topology.ISD_AS.FileFmt(false))
 	leaderElector, err = consul.StartLeaderElector(c, leaderKey, consulconfig.LeaderElectorConf{
-		Name:           config.General.ID,
+		Name:           cfg.General.ID,
 		AcquiredLeader: startReissRunner,
 		LostLeader:     killReissRunner,
 	})
@@ -271,13 +258,13 @@ func startUpdateTTL(c *consulapi.Client) (*periodic.Runner, error) {
 		Type:        consul.CS,
 		Agent:       c.Agent(),
 		Logger:      log.New("part", "UpdateTTL"),
-		CheckParams: config.Consul.Health,
+		CheckParams: cfg.Consul.Health,
 		Check: func() consul.CheckInfo {
 			return consul.CheckInfo{
-				Id:     config.General.ID,
+				Id:     cfg.General.ID,
 				Status: consul.StatusPass,
 			}
 		},
 	}
-	return svc.StartUpdateTTL(config.Consul.InitConnPeriod.Duration)
+	return svc.StartUpdateTTL(cfg.Consul.InitConnPeriod.Duration)
 }
