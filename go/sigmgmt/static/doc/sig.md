@@ -238,7 +238,7 @@ number of ASes or hops is not known. With the regex-style it is possible to expr
 #### Extends
 
 Path policies can be composed by extending other policies. The `extends` attribute requires a list
-of named policies. If an attribute exists in multiple policies in that list, the last occurence has
+of named policies. If an attribute exists in multiple policies in that list, the last occurrence has
 precedence. Also, an attribute specified at top level (the policy that has the `extends` attribute)
 always has precedence over attributes of an extended policy.
 
