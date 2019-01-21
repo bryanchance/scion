@@ -51,7 +51,7 @@ func TestCompile(t *testing.T) {
 					Policy: &pathpol.Policy{
 						Name: "foo",
 						Sequence: newSequence(t,
-							[]string{"1-ff00:0:133#1010", "1-ff00:0:132#1910"})}},
+							"1-ff00:0:133#1010 1-ff00:0:132#1910")}},
 			},
 		},
 		{
@@ -80,10 +80,10 @@ func TestCompile(t *testing.T) {
 					Policy: &pathpol.Policy{Name: "any"}},
 				{
 					Policy: &pathpol.Policy{Name: "foo",
-						Sequence: newSequence(t, []string{"1-ff00:0:133#1010"})}},
+						Sequence: newSequence(t, "1-ff00:0:133#1010")}},
 				{
 					Policy: &pathpol.Policy{Name: "bar",
-						Sequence: newSequence(t, []string{"1-ff00:0:132#1910"})}},
+						Sequence: newSequence(t, "1-ff00:0:132#1910")}},
 			},
 		},
 		{
@@ -110,13 +110,13 @@ func TestCompile(t *testing.T) {
 					Policy: &pathpol.Policy{Name: "any"}},
 				{
 					Policy: &pathpol.Policy{Name: "foo",
-						Sequence: newSequence(t, []string{"1-ff00:0:133#1010"})}},
+						Sequence: newSequence(t, "1-ff00:0:133#1010")}},
 				{
 					Policy: &pathpol.Policy{Name: "bar",
-						Sequence: newSequence(t, []string{"1-ff00:0:132#1910"})}},
+						Sequence: newSequence(t, "1-ff00:0:132#1910")}},
 				{
 					Policy: &pathpol.Policy{Name: "baz",
-						Sequence: newSequence(t, []string{"1-ff00:0:132"})}},
+						Sequence: newSequence(t, "1-ff00:0:132#0")}},
 			},
 		},
 		{
@@ -153,16 +153,16 @@ func TestCompile(t *testing.T) {
 					Policy: &pathpol.Policy{Name: "any"}},
 				{
 					Policy: &pathpol.Policy{Name: "foo",
-						Sequence: newSequence(t, []string{"1-ff00:0:133#1010"})}},
+						Sequence: newSequence(t, "1-ff00:0:133#1010")}},
 				{
 					Policy: &pathpol.Policy{Name: "bar",
-						Sequence: newSequence(t, []string{"1-ff00:0:132#1910"})}},
+						Sequence: newSequence(t, "1-ff00:0:132#1910")}},
 				{
 					Policy: &pathpol.Policy{Name: "baz",
-						Sequence: newSequence(t, []string{"1-ff00:0:132"})}},
+						Sequence: newSequence(t, "1-ff00:0:132#0")}},
 				{
 					Policy: &pathpol.Policy{Name: "bax",
-						Sequence: newSequence(t, []string{"1-0"})}},
+						Sequence: newSequence(t, "1-0#0")}},
 			},
 		},
 		{
@@ -198,7 +198,7 @@ func TestCompile(t *testing.T) {
 				},
 				{
 					Policy: &pathpol.Policy{Name: "foo",
-						Sequence: newSequence(t, []string{"1-ff00:0:133#1010"})}},
+						Sequence: newSequence(t, "1-ff00:0:133#1010")}},
 				{
 					Policy: &pathpol.Policy{Name: "bar",
 						ACL: mustACL(t,
@@ -215,7 +215,7 @@ func TestCompile(t *testing.T) {
 								Rule:   mustHopPredicate(t, "0"),
 							},
 						),
-						Sequence: newSequence(t, []string{"1-ff00:0:132#1910"})}},
+						Sequence: newSequence(t, "1-ff00:0:132#1910")}},
 				{
 					Policy:  &pathpol.Policy{Name: "bar2"},
 					Extends: []string{"foo2"},
@@ -314,7 +314,7 @@ func TestCompile(t *testing.T) {
 	})
 }
 
-func newSequence(t *testing.T, str []string) pathpol.Sequence {
+func newSequence(t *testing.T, str string) *pathpol.Sequence {
 	seq, err := pathpol.NewSequence(str)
 	xtest.FailOnErr(t, err)
 	return seq

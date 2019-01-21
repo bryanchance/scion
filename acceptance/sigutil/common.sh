@@ -15,10 +15,7 @@ test_setup() {
     ./scion.sh run nobuild
     ./tools/dc start 'tester*'
     sleep 10
-}
-
-test_teardown() {
-    ./tools/dc down
+    docker_status
 }
 
 print_help() {

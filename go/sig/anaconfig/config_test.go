@@ -212,11 +212,11 @@ func TestLoadFromFile(t *testing.T) {
 				},
 				PathPolicies: pathpol.PolicyMap{
 					"policy-A": &pathpol.ExtPolicy{Policy: pathpol.NewPolicy("", nil,
-						mustSequence(t, []string{"0-123#0", "0-234#0"}),
+						mustSequence(t, "0-123#0 0-234#0"),
 						nil,
 					)},
 					"policy-B": &pathpol.ExtPolicy{Policy: pathpol.NewPolicy("", nil,
-						mustSequence(t, []string{"0-123#0", "0-134#0"}), nil,
+						mustSequence(t, "0-123#0 0-134#0"), nil,
 					)},
 					"policy-C": &pathpol.ExtPolicy{Policy: pathpol.NewPolicy("",
 						mustACL(t,
@@ -233,18 +233,18 @@ func TestLoadFromFile(t *testing.T) {
 								Rule:   mustHopPredicate(t, "0"),
 							},
 						),
-						mustSequence(t, []string{"0-123#0", "0-134#0"}),
+						mustSequence(t, "0-123#0 0-134#0"),
 						[]pathpol.Option{
 							{
 								Weight: 1,
 								Policy: pathpol.NewPolicy("", nil,
-									mustSequence(t, []string{"0-123#0", "0-134#0"}), nil,
+									mustSequence(t, "0-123#0 0-134#0"), nil,
 								),
 							},
 							{
 								Weight: 2,
 								Policy: pathpol.NewPolicy("", nil,
-									mustSequence(t, []string{"0-134#0", "0-145#0"}), nil,
+									mustSequence(t, "0-134#0 0-145#0"), nil,
 								),
 							},
 						},
@@ -271,7 +271,7 @@ func TestLoadFromFile(t *testing.T) {
 
 func TestBuildSessions(t *testing.T) {
 	Convey("Build sessions", t, func() {
-		pol1 := &pathpol.Policy{Sequence: mustSequence(t, []string{"0"})}
+		pol1 := &pathpol.Policy{Sequence: mustSequence(t, "0")}
 		pol2 := &pathpol.Policy{}
 		sessionMap := SessionMap{1: "policy-1", 2: "policy-2"}
 		policies := pathpol.PolicyMap{"policy-1": {Policy: pol1}, "policy-2": {Policy: pol2}}
@@ -284,7 +284,7 @@ func TestBuildSessions(t *testing.T) {
 		SoMsg("sessionSet", sessionSet, ShouldResemble, resSet)
 	})
 	Convey("Build sessions fail", t, func() {
-		pol1 := &pathpol.Policy{Sequence: mustSequence(t, []string{"0"})}
+		pol1 := &pathpol.Policy{Sequence: mustSequence(t, "0")}
 		pol2 := &pathpol.Policy{}
 		sessionMap := SessionMap{1: "policy-10", 2: "policy-2"}
 		policies := pathpol.PolicyMap{"policy-1": {Policy: pol1}, "policy-2": {Policy: pol2}}
@@ -305,7 +305,7 @@ func TestBuildSessions(t *testing.T) {
 		pol1 := &pathpol.Policy{Name: "policy-1"}
 		pol2 := &pathpol.Policy{
 			Name:     "policy-2",
-			Sequence: mustSequence(t, []string{"0", "1", "2"})}
+			Sequence: mustSequence(t, "0 1 2")}
 		exPol1 := &pathpol.ExtPolicy{Policy: pol1, Extends: []string{"policy-2"}}
 		exPol2 := &pathpol.ExtPolicy{Policy: pol2}
 		sessionMap := SessionMap{1: "policy-1"}
@@ -316,7 +316,7 @@ func TestBuildSessions(t *testing.T) {
 			1: &Session{ID: 1, PolName: exPol1.Policy.Name,
 				Policy: &pathpol.Policy{
 					Name:     exPol1.Policy.Name,
-					Sequence: mustSequence(t, []string{"0", "1", "2"})}},
+					Sequence: mustSequence(t, "0 1 2")}},
 		}
 		SoMsg("sessionSet", sessionSet, ShouldResemble, resSet)
 	})
@@ -336,7 +336,7 @@ func mustACL(t *testing.T, entries ...*pathpol.ACLEntry) *pathpol.ACL {
 	return acl
 }
 
-func mustSequence(t *testing.T, str []string) pathpol.Sequence {
+func mustSequence(t *testing.T, str string) *pathpol.Sequence {
 	t.Helper()
 
 	seq, err := pathpol.NewSequence(str)
