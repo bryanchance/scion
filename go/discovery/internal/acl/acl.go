@@ -33,18 +33,18 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/scionproto/scion/go/discovery/metrics"
+	"github.com/scionproto/scion/go/discovery/internal/metrics"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/log"
 )
 
 const (
-	ERRREADFILE = "read-file-error"
-	ERRPARSEACL = "parse-acl-error"
-	SUCCESS     = "success"
+	ErrReadFile = "read-file-error"
+	ErrParseACL = "parse-acl-error"
+	Success     = "success"
 
-	RESALLOWED = "allowed"
-	RESDENIED  = "denied"
+	Allowed = "allowed"
+	Denied  = "denied"
 )
 
 type atomicACL struct {
@@ -69,16 +69,16 @@ func Load(filename string) error {
 	}()
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		l["result"] = ERRREADFILE
+		l["result"] = ErrReadFile
 		return common.NewBasicError("Could not open ACL file", err, "filename", filename)
 	}
 	newacl, err := makeACL(string(data))
 	if err != nil {
-		l["result"] = ERRPARSEACL
+		l["result"] = ErrParseACL
 		return common.NewBasicError("Could not parse ACL file", err, "filename", filename)
 	}
 	fullTopoACL.Store(newacl)
-	l["result"] = SUCCESS
+	l["result"] = Success
 	log.Info("Loaded ACL", "entries", len(newacl))
 	return nil
 }
@@ -115,13 +115,13 @@ func IsAllowed(address net.IP) bool {
 	curracl := fullTopoACL.Load()
 	for _, n := range curracl {
 		if n.Contains(address) {
-			l["result"] = RESALLOWED
+			l["result"] = Allowed
 			metrics.TotalACLChecks.With(l).Inc()
 			metrics.TotalACLCheckTime.With(l).Add(time.Since(start).Seconds())
 			return true
 		}
 	}
-	l["result"] = RESDENIED
+	l["result"] = Denied
 	metrics.TotalACLChecks.With(l).Inc()
 	metrics.TotalACLCheckTime.With(l).Add(time.Since(start).Seconds())
 	return false

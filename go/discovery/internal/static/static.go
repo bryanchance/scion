@@ -8,8 +8,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/scionproto/scion/go/discovery/metrics"
-	"github.com/scionproto/scion/go/discovery/util"
+	"github.com/scionproto/scion/go/discovery/internal/metrics"
+	"github.com/scionproto/scion/go/discovery/internal/util"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/topology"
@@ -22,11 +22,11 @@ var TopoLimited *util.AtomicTopo
 var DiskTopo *util.AtomicTopo
 
 const (
-	ERRFILEREAD       = "file-read-error"
-	ERRFILESTAT       = "stat-error"
-	ERRMARSHALFULL    = "marshal-full-error"
-	ERRMARSHALREDUCED = "marshal-reduced-error"
-	SUCCESS           = "success"
+	ErrFileRead       = "file-read-error"
+	ErrFileStat       = "stat-error"
+	ErrMarshalFull    = "marshal-full-error"
+	ErrMarshalReduced = "marshal-reduced-error"
+	Success           = "success"
 )
 
 func init() {
@@ -42,7 +42,7 @@ func Load(filename string, usefmod bool) error {
 	l := prometheus.Labels{"result": ""}
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
-		l["result"] = ERRFILEREAD
+		l["result"] = ErrFileRead
 		metrics.TotalTopoLoads.With(l).Inc()
 		return common.NewBasicError("Could not load topology.", err, "filename", filename)
 	}
@@ -55,7 +55,7 @@ func Load(filename string, usefmod bool) error {
 		log.Debug("Resetting topology timestamp to file modification time")
 		fi, err := os.Stat(filename)
 		if err != nil {
-			l["result"] = ERRFILESTAT
+			l["result"] = ErrFileStat
 			metrics.TotalTopoLoads.With(l).Inc()
 			return common.NewBasicError("Could not stat topo file", err, "filename", filename)
 		}
@@ -65,7 +65,7 @@ func Load(filename string, usefmod bool) error {
 
 	b, err = util.MarshalToJSON(rt)
 	if err != nil {
-		l["result"] = ERRMARSHALFULL
+		l["result"] = ErrMarshalFull
 		metrics.TotalTopoLoads.With(l).Inc()
 		return err
 	}
@@ -76,12 +76,12 @@ func Load(filename string, usefmod bool) error {
 	topology.StripServices(rt)
 	b, err = util.MarshalToJSON(rt)
 	if err != nil {
-		l["result"] = "marshal-limited-error"
+		l["result"] = ErrMarshalReduced
 		metrics.TotalTopoLoads.With(l).Inc()
 		return err
 	}
 	TopoLimited.Store(b)
-	l["result"] = SUCCESS
+	l["result"] = Success
 	metrics.TotalTopoLoads.With(l).Inc()
 	return nil
 }

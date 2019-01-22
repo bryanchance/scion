@@ -47,21 +47,12 @@ class GoGenerator(VanillaGenerator):
 
     def _build_ds_conf(self, topo_id, base, name, conf):
         config_dir = '/share/conf' if self.args.docker else os.path.join(base, name)
-        log_dir = '/share/logs' if self.args.docker else 'logs'
         raw_entry = {
             'general': {
                 'ID': name,
                 'ConfigDir': config_dir,
             },
-            'logging': {
-                'file': {
-                    'Path': os.path.join(log_dir, "%s.log" % name),
-                    'Level': 'debug',
-                },
-                'console': {
-                    'Level': 'crit',
-                },
-            },
+            'logging': self._log_entry(name),
             'infra': {
                 'Type': "DS"
             },
@@ -70,18 +61,13 @@ class GoGenerator(VanillaGenerator):
                 "ACL": os.path.join(config_dir, "acl"),
                 "UseFileModTime": True,
                 "ListenAddr": self._get_laddr(conf["Addrs"]),
-                "zoo": {
-                    "Instances": self._get_zk_instances(topo_id)
-                }
+                "dynamic": self._get_dyn_entry(topo_id),
             },
         }
         return raw_entry
 
-    def _get_zk_instances(self, topo_id):
-        zk = []
-        for info in self.args.topo_dicts[topo_id]["ZookeeperService"].values():
-            zk.append("%s:%d" % (info["Addr"], info["L4Port"]))
-        return zk
+    def _get_dyn_entry(self, topo_id):
+        return {"ServicePrefix": "%s/" % topo_id}
 
     def _get_laddr(self, addr):
         ip = get_pub_ip(addr)

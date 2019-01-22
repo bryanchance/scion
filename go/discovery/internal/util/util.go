@@ -11,8 +11,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/scionproto/scion/go/discovery/acl"
-	"github.com/scionproto/scion/go/discovery/metrics"
+	"github.com/scionproto/scion/go/discovery/internal/acl"
+	"github.com/scionproto/scion/go/discovery/internal/metrics"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/topology"
 )

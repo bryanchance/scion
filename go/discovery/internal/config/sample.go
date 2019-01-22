@@ -1,6 +1,6 @@
 // Copyright 2018 Anapaya Systems
 
-package dsconfig
+package config
 
 const Sample = `[general]
   # The ID of the service.
@@ -34,7 +34,7 @@ const Sample = `[general]
 
   [logging.console]
     # Console logging level (trace|debug|info|warn|error|crit) (default crit)
-    Level = "cirt"
+    Level = "crit"
 
 [metrics]
   # The address to export prometheus metrics on. If not set, metrics are not
@@ -47,7 +47,7 @@ const Sample = `[general]
 
   # Replace the topo timestamp with the file modification time for the
   # static topo. (default false) (reloadable)
-  UseFileModTime = true
+  UseFileModTime = false
 
   # Path to ACL (reloadable).
   ACL = "/etc/scion/ds-acl"
@@ -58,14 +58,27 @@ const Sample = `[general]
   # Key file to use for TLS. If unset, serve plain HTTP.
   Key = "/etc/scion/tls/key"
 
-  [ds.zoo]
-    # Array of Zookeeper instances formated as "host:port". (reloadable)
-    Instances = ["127.0.0.1:2181", "127.0.0.2:2181"]
+  [ds.dynamic]
+    # Time between querying consul (default 5s) (reloadable)
+    QueryInterval = "5s"
 
-    # Time between querying Zookeeper (default 5s) (reloadable).
-    # QueryInterval = "5s"
+    # Timeout for query to consul (default 2s) (reloadable)
+    Timeout = "2s"
 
-    # Timeout for connecting to Zookeeper (default 10s) (reloadable).
-    # Timeout = "10s"
+    # The service prefix in the service name. (default "") (reloadable)
+    ServicePrefix = ""
 
+
+[consul]
+  # The consul agent to connect to. (default: 127.0.0.1:8500)
+  Agent = "127.0.0.1:8500"
+
+  # The maximum time the initial connection to consul can take. (default 5s)
+  InitialConnectPeriod = "5s"
+
+  [consul.Health]
+    # The interval at which the health status should be reported to consul. (default 5s)
+    Interval = "5s"
+    # The timeout for setting the health status. (default 1s)
+    Timeout = "1s"
 `

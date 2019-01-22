@@ -11,19 +11,19 @@ import (
 )
 
 var (
-	TotalRequests          *prometheus.CounterVec
-	TotalBytes             *prometheus.CounterVec
-	TotalDenials           *prometheus.CounterVec
-	RequestProcessTime     *prometheus.CounterVec
-	TotalACLLoads          *prometheus.CounterVec
-	TotalACLChecks         *prometheus.CounterVec
-	TotalACLCheckTime      *prometheus.CounterVec
-	TotalTopoLoads         *prometheus.CounterVec
-	TotalZkUpdateTime      prometheus.Counter
-	ZKLastUpdate           prometheus.Gauge
-	TotalZkUpdates         *prometheus.CounterVec
-	TotalServiceUpdates    *prometheus.CounterVec
-	TotalDynamicUpdateTime prometheus.Counter
+	TotalRequests             *prometheus.CounterVec
+	TotalBytes                *prometheus.CounterVec
+	TotalDenials              *prometheus.CounterVec
+	RequestProcessTime        *prometheus.CounterVec
+	TotalACLLoads             *prometheus.CounterVec
+	TotalACLChecks            *prometheus.CounterVec
+	TotalACLCheckTime         *prometheus.CounterVec
+	TotalTopoLoads            *prometheus.CounterVec
+	TotalConsulUpdateTime     prometheus.Counter
+	ConsulLastUpdate          prometheus.Gauge
+	TotalConsulUpdates        *prometheus.CounterVec
+	TotalConsulServiceUpdates *prometheus.CounterVec
+	TotalDynamicUpdateTime    prometheus.Counter
 )
 
 func Init(elem string) {
@@ -60,15 +60,16 @@ func Init(elem string) {
 		"Number of times the topology file has been (re)loaded", loadLabels)
 
 	// Metrics used only by the dynamic part
-	TotalZkUpdateTime = newC("total_zookeeper_update_time",
-		"Total amount of time spent on getting updates from Zookeeper")
-	ZKLastUpdate = newG("zookeeper_last_update", "Time of last successful update from Zookeeper")
-	TotalZkUpdates = newCVec("total_zookeeper_updates",
-		"Total number of (attempted) updates from zookeeper", loadLabels)
-	TotalServiceUpdates = newCVec("total_service_updates",
-		"Total number of service updates from Zookeper", []string{"service", "result"})
 	TotalDynamicUpdateTime = newC("total_dynamic_update_time",
 		"Total amount of time spent on updating the dynamic topologies")
+	TotalConsulUpdateTime = newC("total_consul_update_time",
+		"Total amount of time spent on getting updates from Consul")
+	ConsulLastUpdate = newG("consul_last_update", "Time of last successful update from Consul")
+	TotalConsulUpdates = newCVec("total_consul_updates",
+		"Total number of (attempted) updates from Consul", loadLabels)
+	TotalConsulServiceUpdates = newCVec("total_consul_service_updates",
+		"Total number of service updates from Consul", []string{"service", "result"})
+
 }
 
 func MakeMainDebugPageHandler() func(http.ResponseWriter, *http.Request) {

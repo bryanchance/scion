@@ -7,6 +7,7 @@ import toml
 import yaml
 
 from lib.util import write_file
+from topology.ana.common import DS_CONFIG_NAME
 from topology.common import docker_host, get_l4_port, get_pub_ip, ArgsTopoDicts
 from topology.supervisor import (
     CS_CONFIG_NAME,
@@ -137,6 +138,7 @@ class ConsulGenerator(object):
     def _generate_client_services(self, topo_id, topo, base, port):
         for svc, conf in {'BeaconService': 'bsconfig.toml',
                           'CertificateService': CS_CONFIG_NAME,
+                          'DiscoveryService': DS_CONFIG_NAME,
                           'PathService': PS_CONFIG_NAME}.items():
             for elem_id, v in topo.get(svc, {}).items():
                 self._generate_client_svc(topo_id, topo, base, svc, elem_id, v)

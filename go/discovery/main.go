@@ -9,33 +9,28 @@ import (
 	_ "net/http/pprof"
 	"os"
 
+	consulapi "github.com/hashicorp/consul/api"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/scionproto/scion/go/discovery/dsconfig"
-	"github.com/scionproto/scion/go/discovery/dynamic"
-	"github.com/scionproto/scion/go/discovery/metrics"
-	"github.com/scionproto/scion/go/discovery/static"
-	"github.com/scionproto/scion/go/discovery/util"
+	"github.com/scionproto/scion/go/discovery/internal/config"
+	"github.com/scionproto/scion/go/discovery/internal/dynamic"
+	"github.com/scionproto/scion/go/discovery/internal/metrics"
+	"github.com/scionproto/scion/go/discovery/internal/static"
+	"github.com/scionproto/scion/go/discovery/internal/util"
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/env"
+	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/periodic"
 )
 
-type Config struct {
-	General env.General
-	Logging env.Logging
-	Metrics env.Metrics
-	Infra   env.Infra
-	DS      dsconfig.Config
-}
-
 var (
-	ia          addr.IA
-	dynUpdater  *periodic.Runner
-	environment *env.Env
+	ia           addr.IA
+	dynUpdater   *periodic.Runner
+	environment  *env.Env
+	consulClient *consulapi.Client
 )
 
 func init() {
@@ -47,10 +42,10 @@ func main() {
 }
 
 func realMain() int {
-	defer log.Flush()
+	fatal.Init()
 	env.AddFlags()
 	flag.Parse()
-	if v, ok := env.CheckFlags(dsconfig.Sample); !ok {
+	if v, ok := env.CheckFlags(config.Sample); !ok {
 		return v
 	}
 	config, err := setupBasic()
@@ -58,6 +53,9 @@ func realMain() int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	defer log.Flush()
+	defer env.LogAppStopped(common.DS, config.General.ID)
+	defer log.LogPanicAndExit()
 	if err := setup(config); err != nil {
 		log.Crit("Setup failed", "err", err)
 		return 1
@@ -115,8 +113,7 @@ func runHTTPServer(address string, certfile, keyfile string, smux *http.ServeMux
 	if certfile != "" && keyfile != "" {
 		log.Info("Starting TLS server", "certfile", certfile, "keyfile", keyfile)
 		return http.ListenAndServeTLS(address, certfile, keyfile, smux)
-	} else {
-		log.Info("Starting plain HTTP server")
-		return http.ListenAndServe(address, smux)
 	}
+	log.Info("Starting plain HTTP server")
+	return http.ListenAndServe(address, smux)
 }

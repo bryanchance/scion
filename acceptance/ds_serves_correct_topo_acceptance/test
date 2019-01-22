@@ -25,11 +25,11 @@ test_setup() {
     sudo ip addr add "$PRIVILEGED/32" dev lo
     sudo ip addr add "$REGULAR/32" dev lo
 
-    ./scion.sh topology zkclean -c $TEST_TOPOLOGY -ds -ps=py -cs=py -d
+    ./scion.sh topology -c $TEST_TOPOLOGY -ds --consul -d
     for ds in gen/ISD1/*/ds*; do
         # Add privileged to the ACL.
         printf "\n$PRIVILEGED/32" >> $ds/acl
-        sed -i '/\[ds\.zoo\]/a QueryInterval = "1s"' "$ds/dsconfig.toml"
+        sed -i '/\[ds\.dynamic\]/a QueryInterval = "1s"' "$ds/dsconfig.toml"
     done
     ./scion.sh run nobuild
     sleep 5
@@ -59,12 +59,13 @@ check_dynamic() {
     # Get address of discovery service in AS with multiple service instances.
     addr="$( get_laddr $MULTI_SVC_AS_DIR/ds1-ff00_0_111-1 )"
     # Kill services instances and check that the dynamic is updated.
-    printf "[dynamic] Killing beacon service\n"
-    kill_and_check "bs1-ff00_0_111-2" $addr 1 2 2
+    # FIXME(roosd): Beacon service does not implement health checks yet.
+    # printf "[dynamic] Killing beacon service\n"
+    # kill_and_check "bs1-ff00_0_111-2" $addr 1 2 2
     printf "[dynamic] Killing certificate service\n"
-    kill_and_check "cs1-ff00_0_111-2" $addr 1 1 2
+    kill_and_check "cs1-ff00_0_111-2" $addr 2 1 2
     printf "[dynamic] Killing path service\n"
-    kill_and_check "ps1-ff00_0_111-2" $addr 1 1 1
+    kill_and_check "ps1-ff00_0_111-2" $addr 2 1 1
     # Restart instances
     printf "[dynamic] Restarting killed services\n"
     ./scion.sh run nobuild
