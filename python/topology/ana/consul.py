@@ -78,7 +78,7 @@ class ConsulGenerator(object):
     def _generate_client_agents(self):
         port = CLIENT_BASE_PORT
         for topo_id, topo in self.args.topo_dicts.items():
-            base = os.path.join(self.output_base, topo_id.base_dir(self.args.output_dir))
+            base = topo_id.base_dir(self.args.output_dir)
             self._generate_client_dc(topo_id, topo, base, port)
             self._generate_client_config(topo_id, topo, base, port)
             port = port + 1
@@ -93,7 +93,7 @@ class ConsulGenerator(object):
                 '%s:%s' % (port, port)
             ],
             'volumes': [
-                '%s:/consul/cfg:ro' % os.path.join(base, CLIENT_DIR)
+                '%s:/consul/cfg:ro' % os.path.join(self.output_base, base, CLIENT_DIR)
             ],
             'command': ['agent', '-dev', '-client', '0.0.0.0', '-config-dir=/consul/cfg']
         }
