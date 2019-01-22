@@ -128,7 +128,7 @@ cmd_mstart() {
     if is_docker_be; then
         services="$(glob_docker "$@")"
         [ -z "$services" ] && { echo "ERROR: No process matched for $@!"; exit 255; }
-        ./tools/dc dc up -d $services
+        ./tools/dc scion up -d $services
     else
         supervisor/supervisor.sh mstart "$@"
     fi
@@ -172,7 +172,7 @@ cmd_mstop() {
     if is_docker_be; then
         services="$(glob_docker "$@")"
         [ -z "$services" ] && { echo "ERROR: No process matched for $@!"; exit 255; }
-        ./tools/dc dc stop $services
+        ./tools/dc scion stop $services
     else
         supervisor/supervisor.sh mstop "$@"
     fi
@@ -186,7 +186,7 @@ cmd_mstatus() {
     if is_docker_be; then
         services="$(glob_docker "$@")"
         [ -z "$services" ] && { echo "ERROR: No process matched for $@!"; exit 255; }
-        out=$(./tools/dc dc ps $services | tail -n +3)
+        out=$(./tools/dc scion ps $services | tail -n +3)
         rscount=$(echo "$out" | grep '\<Up\>' | wc -l) # Number of running services
         tscount=$(echo "$services" | wc -w) # Number of all globed services
         echo "$out" | grep -v '\<Up\>'
@@ -222,7 +222,7 @@ glob_supervisor() {
 glob_docker() {
     [ $# -ge 1 ] || set -- '*'
     matches=
-    for proc in $(./tools/dc dc config --services); do
+    for proc in $(./tools/dc scion config --services); do
         for spec in "$@"; do
             if glob_match $proc "scion_$spec"; then
                 matches="$matches $proc"

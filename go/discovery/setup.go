@@ -107,7 +107,7 @@ func validateConfig(cfg *config.Config) error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
-	if !ia.IsZero() && !ia.Eq(cfg.General.Topology.ISD_AS) {
+	if !ia.IsZero() && !ia.Equal(cfg.General.Topology.ISD_AS) {
 		return common.NewBasicError("IA changed", nil,
 			"newIA", cfg.General.Topology.ISD_AS, "currIA", ia)
 	}

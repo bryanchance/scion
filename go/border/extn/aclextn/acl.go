@@ -60,7 +60,7 @@ type ACL []addr.IA
 // Match returns true if ia is in acl and false otherwise.
 func (acl ACL) Match(ia addr.IA) bool {
 	for _, aclIA := range acl {
-		if ia.Eq(aclIA) {
+		if ia.Equal(aclIA) {
 			return true
 		}
 	}

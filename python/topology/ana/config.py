@@ -27,6 +27,8 @@ class ConfigGenerator(VanillaGenerator):
             go_gen.generate_sciond()
         if self.args.path_server == "go":
             go_gen.generate_ps()
+        if self.args.dispatcher == "go":
+            go_gen.generate_disp()
         if self.args.discovery:
             go_gen.generate_ds()
 
