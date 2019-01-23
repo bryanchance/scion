@@ -78,4 +78,14 @@ fi
 ./docker.sh exec "./tools/dc collect_logs zk logs"
 ./docker.sh exec "./tools/dc zk down"
 
+if ./docker.sh exec "test -e gen/postgres-dc.yml"; then
+    ./docker.sh exec "./tools/dc collect_logs postgres logs/docker"
+    ./docker.sh exec "./tools/dc postgres down"
+fi
+
+if ./docker.sh exec "test -e gen/consul-dc.yml"; then
+    ./docker.sh exec "./tools/dc collect_logs consul logs/docker"
+    ./docker.sh exec "./tools/dc consul down"
+fi
+
 exit $result

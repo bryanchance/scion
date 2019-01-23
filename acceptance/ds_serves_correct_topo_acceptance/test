@@ -175,6 +175,7 @@ query_topo() {
 }
 
 test_teardown() {
+    ./tools/dc collect_logs consul logs/docker
     ./tools/dc down
     sudo -p "Teardown virtual interfaces - [sudo] password for %p: " true
     sudo ip addr del "$PRIVILEGED/32" dev lo

@@ -24,7 +24,15 @@ log() {
 }
 
 cmd_dc() {
-    COMPOSE_FILE="acceptance/leaderutil/consul-dc.yml" docker-compose --no-ansi "$@"
+    COMPOSE_FILE="acceptance/leaderutil/consul-dc.yml" docker-compose -p acceptance_consul --no-ansi "$@"
+}
+
+collect_consul_logs() {
+    local out_dir=logs/docker
+    mkdir -p "$out_dir"
+    for svc in $(cmd_dc config --services); do
+        $(cmd_dc logs $svc &> $out_dir/$svc.log)
+    done
 }
 
 test_setup() {

@@ -41,6 +41,7 @@ test_run() {
 
 test_teardown() {
     pkill -f leader_acceptance
+    collect_consul_logs
     kill_consul
 }
 

@@ -137,11 +137,11 @@ service_running() {
 }
 
 cmd_postgres() {
-    COMPOSE_FILE="gen/postgres-dc.yml" docker-compose -p postgres --no-ansi "$@"
+    dc "postgres" "$@"
 }
 
 cmd_consul() {
-    COMPOSE_FILE="gen/consul-dc.yml" docker-compose -p consul --no-ansi "$@"
+    dc "consul" "$@"
 }
 
 is_running_in_docker() {
