@@ -13,6 +13,8 @@ import { ASEntry, Site } from '../../models/models'
 export class ASDetailComponent implements OnInit {
   site: Site
   ia = new ASEntry
+  success = ''
+  error = ''
 
   constructor(
     private route: ActivatedRoute,
@@ -35,5 +37,18 @@ export class ASDetailComponent implements OnInit {
         () => { }
       )
     }
+  }
+
+  saveIPProvider() {
+    this.api.updateAS(this.ia).subscribe(
+      () => {
+        this.error = ''
+        this.success = 'Successfully saved IP Allocation Provider.'
+      },
+      error => {
+        this.success = ''
+        this.error = error.msg
+      }
+    )
   }
 }

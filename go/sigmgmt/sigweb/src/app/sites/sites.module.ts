@@ -24,7 +24,8 @@ import { Ipv4Component } from './traffic-class-details/cond/ipv4/ipv4.component'
 import { NotComponent } from './traffic-class-details/cond/not/not.component'
 import { SrcComponent } from './traffic-class-details/cond/src/src.component'
 import { TrafficClassDetailsComponent } from './traffic-class-details/traffic-class-details.component'
-import { TrafficClassesComponent } from './traffic-classes/traffic-classes.component'
+import { TrafficClassesComponent } from './traffic-classes/traffic-classes.component';
+import { IpAllocationsComponent } from './ip-allocations/ip-allocations.component'
 
 @NgModule({
   imports: [
@@ -55,6 +56,7 @@ import { TrafficClassesComponent } from './traffic-classes/traffic-classes.compo
     MouseoverDirective,
     ClassComponent,
     BoolComponent,
+    IpAllocationsComponent,
   ],
 })
 export class SitesModule { }

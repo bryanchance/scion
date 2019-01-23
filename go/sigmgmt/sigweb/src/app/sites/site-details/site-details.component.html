@@ -26,6 +26,16 @@
       </mat-card-title>
     </mat-card>
   </a>
+  <a routerLink="/sites/{{site?.ID}}/allocations">
+    <mat-card>
+      <mat-card-title>
+        <p>IP Allocations</p>
+        <button mat-icon-button>
+          <mat-icon>settings</mat-icon>
+        </button>
+      </mat-card-title>
+    </mat-card>
+  </a>
 </div>
 <mat-accordion>
   <mat-expansion-panel *ngIf="!newSite">

@@ -1,0 +1,53 @@
+<div class="flex-container">
+  <h2 class="mat-h2">IP Allocations</h2>
+  <button color="primary" routerLink="/sites/{{site?.ID}}" mat-button>
+    <mat-icon>arrow_back</mat-icon>
+  </button>
+</div>
+
+<mat-card *ngIf="success" class="success">{{ success }}</mat-card>
+<mat-card *ngIf="error" class="error">{{ error }}</mat-card>
+
+<div class="flex-container">
+  <form #allocationForm="ngForm" (ngSubmit)="onSubmit()">
+    <mat-form-field>
+      <input matInput name="cidr" [(ngModel)]="allocation.CIDR" placeholder="CIDR" type="text" required />
+    </mat-form-field>
+    <mat-form-field class="acl">
+      <input matInput name="acl" [(ngModel)]="allocation.ACL" placeholder="ACL" type="text" required />
+    </mat-form-field>
+    <button mat-icon-button type="submit" [disabled]="allocationForm.invalid">
+      <mat-icon>save</mat-icon>
+    </button>
+  </form>
+
+  <mat-card class="help">
+    <mat-card-header>
+      <mat-card-title>IP Allocations</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <p>
+        An IP Allocation is a network that is exported to the remote AS. The ACL is a
+        space-separated list of IAs that should see this allocation. Set it to * to make the
+        allocation visible to all configured remote ASes.
+      </p>
+    </mat-card-content>
+  </mat-card>
+</div>
+
+<mat-list>
+  <mat-list-item *ngFor="let allocation of allocations; let idx=index">
+    <div class="flex-container-left">
+      <div>{{ allocation.CIDR }} is exported to:</div>
+      <ul>
+        <li *ngFor="let item of allocation.ACL.split(' ')">{{item}}</li>
+      </ul>
+    </div>
+    <button *ngIf="!formDisabled" mat-icon-button (click)="edit(idx)">
+      <mat-icon>edit</mat-icon>
+    </button>
+    <button *ngIf="!formDisabled" mat-icon-button (click)="delete(idx)">
+      <mat-icon>delete</mat-icon>
+    </button>
+  </mat-list-item>
+</mat-list>

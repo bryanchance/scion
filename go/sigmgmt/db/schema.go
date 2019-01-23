@@ -56,7 +56,7 @@ type ASEntry struct {
 	ISD      string `gorm:"column:isd_id"`
 	AS       string `gorm:"column:as_id"`
 	Policies string `gorm:"column:policies"`
-	// Address of the ipprovider in the remote AS in host:port format, or empty is there's none.
+	// Address of the ipprovider in the remote AS in host:port format, or empty if there's none.
 	IPAllocationProvider string          `json:",omitempty"`
 	SiteID               uint            `sql:"type:integer REFERENCES sites ON DELETE CASCADE ON UPDATE CASCADE, UNIQUE (site_id, name, isd_id, as_id)" json:"-"`
 	SIGs                 []SIG           `json:",omitempty"`

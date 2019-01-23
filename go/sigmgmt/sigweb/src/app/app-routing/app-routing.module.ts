@@ -15,6 +15,7 @@ import { SiteDetailsComponent } from '../sites/site-details/site-details.compone
 import { SitesComponent } from '../sites/sites.component'
 import { TrafficClassDetailsComponent } from '../sites/traffic-class-details/traffic-class-details.component'
 import { TrafficClassesComponent } from '../sites/traffic-classes/traffic-classes.component'
+import { IpAllocationsComponent } from '../sites/ip-allocations/ip-allocations.component';
 
 const appRoutes: Routes = [
   { path: '', redirectTo: '/sites', pathMatch: 'full' },
@@ -29,6 +30,7 @@ const appRoutes: Routes = [
   { path: 'sites/:site/classes', component: TrafficClassesComponent, canActivate: [AuthGuard] },
   { path: 'sites/:site/classes/new', component: TrafficClassDetailsComponent, canActivate: [AuthGuard] },
   { path: 'sites/:site/classes/:class', component: TrafficClassDetailsComponent, canActivate: [AuthGuard] },
+  { path: 'sites/:site/allocations', component: IpAllocationsComponent, canActivate: [AuthGuard] },
   { path: 'config', component: ConfigComponent },
   { path: 'contact', component: ContactComponent },
   { path: 'login', component: LoginComponent },

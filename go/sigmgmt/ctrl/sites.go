@@ -260,3 +260,71 @@ func (c *Controller) DeleteTrafficClass(w http.ResponseWriter, r *http.Request,
 	}
 	respondEmpty(w)
 }
+
+func (c *Controller) GetIPAllocations(w http.ResponseWriter, r *http.Request,
+	_ http.HandlerFunc) {
+	var allocations []*db.SiteNetwork
+	if err := c.db.Order("id asc").Where("site_id = ?", mux.Vars(r)["site"]).
+		Find(&allocations).Error; err != nil {
+		respondError(w, err, DBFindError, http.StatusBadRequest)
+		return
+	}
+	respondJSON(w, allocations)
+}
+
+func (c *Controller) PostIPAllocation(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	allocation := db.SiteNetwork{}
+	if err := json.NewDecoder(r.Body).Decode(&allocation); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
+	if msg, err := validateIPAllocation(&allocation); err != nil {
+		respondError(w, err, msg, http.StatusBadRequest)
+		return
+	}
+	var site db.Site
+	if !c.findOne(w, mux.Vars(r)["site"], &site) {
+		return
+	}
+	allocation.SiteID = site.ID
+	if !c.createOne(w, &allocation) {
+		return
+	}
+	respondJSON(w, &allocation)
+}
+
+func (c *Controller) PutIPAllocation(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
+	allocation := db.SiteNetwork{}
+	if err := json.NewDecoder(r.Body).Decode(&allocation); err != nil {
+		respondError(w, err, JSONDecodeError, http.StatusBadRequest)
+		return
+	}
+	if msg, err := validateIPAllocation(&allocation); err != nil {
+		respondError(w, err, msg, http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(mux.Vars(r)["allocation"])
+	if err != nil || int(allocation.ID) != id {
+		respondError(w, nil, IDChangeError, http.StatusBadRequest)
+		return
+	}
+	err = c.db.Model(&allocation).Updates(
+		map[string]interface{}{
+			"CIOR": allocation.CIDR,
+			"ACL":  allocation.ACL,
+		}).Error
+	if err != nil {
+		respondError(w, err, DBUpdateError, http.StatusBadRequest)
+		return
+	}
+	respondEmpty(w)
+}
+
+func (c *Controller) DeleteIPAllocation(w http.ResponseWriter, r *http.Request,
+	_ http.HandlerFunc) {
+	if err := c.db.Delete(&db.SiteNetwork{}, mux.Vars(r)["allocation"]).Error; err != nil {
+		respondError(w, err, DBDeleteError, http.StatusBadRequest)
+		return
+	}
+	respondEmpty(w)
+}

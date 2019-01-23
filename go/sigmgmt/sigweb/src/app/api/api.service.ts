@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http'
 import { Injectable } from '@angular/core'
 import { map } from 'rxjs/operators'
 
-import { ASEntry, CIDR, Site, TrafficPolicy, PathPolicyFile } from '../sites/models/models'
+import { ASEntry, CIDR, Site, TrafficPolicy, PathPolicyFile, SiteNetwork } from '../sites/models/models'
 import { TrafficClass, TrafficClassFromJSON } from '../sites/models/models'
 import { User } from './user.service'
 
@@ -68,6 +68,25 @@ export class ApiService {
   }
 
   /**
+   * IP Allocations / Site networks
+   */
+  getIPAllocations(site: Site) {
+    return this.http.get<SiteNetwork[]>('sites/' + site.ID + '/allocations')
+  }
+
+  createIPAllocation(site: Site, sn: SiteNetwork) {
+    return this.http.post<SiteNetwork>('sites/' + site.ID + '/allocations', sn)
+  }
+
+  updateIPAllocation(sn: SiteNetwork) {
+    return this.http.put<string>('allocations/' + sn.ID, sn)
+  }
+
+  deleteIPAllocation(sn: SiteNetwork) {
+    return this.http.delete('allocations/' + sn.ID)
+  }
+
+  /**
    * Traffic Classes
    */
   getTrafficClasses(site: Site) {
@@ -124,7 +143,7 @@ export class ApiService {
     return this.http.post<ASEntry>('sites/' + site.ID + '/ases', as)
   }
 
-  updateAS(site: Site, as: ASEntry) {
+  updateAS(as: ASEntry) {
     return this.http.put<string>('ases/' + as.ID, as)
   }
 
@@ -132,7 +151,7 @@ export class ApiService {
     return this.http.put<string>('ases/' + as.ID + '/policies', as)
   }
 
-  deleteAS(site: Site, as: ASEntry) {
+  deleteAS(as: ASEntry) {
     return this.http.delete('ases/' + as.ID)
   }
 
@@ -165,7 +184,7 @@ export class ApiService {
     return this.http.post<CIDR>('ases/' + as.ID + '/networks', network)
   }
 
-  deleteNetwork(as: ASEntry, network: CIDR) {
+  deleteNetwork(network: CIDR) {
     return this.http.delete('networks/' + network.ID)
   }
 

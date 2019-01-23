@@ -21,6 +21,7 @@
         <button mat-button (click)="delete(idx)">
           <mat-icon>delete</mat-icon>
         </button>
+        <span class="mat-hint" *ngIf="network.Scraped">(scraped)</span>
       </mat-list-item>
     </mat-list>
   </div>
@@ -30,7 +31,8 @@
     </mat-card-header>
     <mat-card-content>
       <p>
-        The list of IPv4 prefixes known to belong to the remote AS. These will be converted to routes to the remote AS by the SIG.
+        The list of IPv4 prefixes known to belong to the remote AS. These will be converted to routes to the remote AS
+        by the SIG.
       </p>
     </mat-card-content>
   </mat-card>

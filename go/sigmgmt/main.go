@@ -92,6 +92,14 @@ func configureRouter(cfg *config.Global, dbase *gorm.DB) http.Handler {
 			"PUT":    c.PutTrafficClass,
 			"DELETE": c.DeleteTrafficClass,
 		},
+		"/api/sites/{site}/allocations": {
+			"GET":  c.GetIPAllocations,
+			"POST": c.PostIPAllocation,
+		},
+		"/api/allocations/{allocation}": {
+			"PUT":    c.PutIPAllocation,
+			"DELETE": c.DeleteIPAllocation,
+		},
 		"/api/sites/{site}/ases": {
 			"GET":  c.GetASes,
 			"POST": c.PostAS,

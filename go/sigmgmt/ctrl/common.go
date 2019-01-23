@@ -24,6 +24,7 @@ const (
 	PathPredicateError = "Bad Path Predicate"
 	TrafficClassError  = "Bad Traffic Class"
 	PathPolicyError    = "Bad Path Policy"
+	CIDRParseError     = "Unable to parse CIDR address"
 )
 
 func respond(w http.ResponseWriter, data []byte, status int) {

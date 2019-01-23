@@ -5,7 +5,38 @@
   </button>
 </div>
 
+<mat-card *ngIf="success" class="success">{{ success }}</mat-card>
+<mat-card *ngIf="error" class="error">{{ error }}</mat-card>
+
 <mat-accordion multi="true">
+  <mat-expansion-panel [expanded]="true">
+    <mat-expansion-panel-header>
+      IP Allocation Provider
+    </mat-expansion-panel-header>
+    <div class="flex-container">
+      <div class="flex-container-vertical">
+        <form #providerForm="ngForm" (ngSubmit)="saveIPProvider()">
+          <mat-form-field>
+            <input matInput name="provider" [(ngModel)]="ia.IPAllocationProvider" placeholder="Address" type="text"
+              required>
+          </mat-form-field>
+          <button mat-button type="submit" [disabled]="providerForm.invalid">
+            <mat-icon>save</mat-icon>
+          </button>
+        </form>
+      </div>
+      <mat-card class="help">
+        <mat-card-header>
+          <mat-card-title>IP Allocation Provider</mat-card-title>
+        </mat-card-header>
+        <mat-card-content>
+          <p>
+            Address of the IP allocation provider in the remote AS, in host:port format. If there is none, leave empty.
+          </p>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  </mat-expansion-panel>
   <mat-expansion-panel [expanded]="true">
     <mat-expansion-panel-header>
       Remote IPv4 Networks

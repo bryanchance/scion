@@ -40,7 +40,7 @@ export class NetworksComponent implements OnChanges {
   }
 
   delete(idx: number) {
-    this.api.deleteNetwork(this.ia, this.networks[idx]).subscribe(
+    this.api.deleteNetwork(this.networks[idx]).subscribe(
       () => this.networks.splice(idx, 1)
     )
   }

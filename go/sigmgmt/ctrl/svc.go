@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -307,4 +308,25 @@ func substituteTrafficClasses(tc *db.TrafficClass, dbase *gorm.DB) error {
 		match = re.FindString(tc.CondStr)
 	}
 	return nil
+}
+
+func validateIPAllocation(allocation *db.SiteNetwork) (string, error) {
+	_, _, err := net.ParseCIDR(allocation.CIDR)
+	if err != nil {
+		return CIDRParseError, err
+	}
+	if len(allocation.ACL) == 0 {
+		return "No ACL found", common.NewBasicError("Bad ACL", nil)
+	}
+	aclParts := strings.Split(allocation.ACL, " ")
+	if len(aclParts) == 1 && aclParts[0] == "*" {
+		return "", nil
+	}
+	for _, part := range aclParts {
+		_, err := addr.IAFromString(part)
+		if err != nil {
+			return "Unable to parse IA in ACL", err
+		}
+	}
+	return "", nil
 }

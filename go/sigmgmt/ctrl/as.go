@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	iaParseError   = "Unable to parse ISD-AS string"
-	cidrParseError = "Unable to parse CIDR address"
+	iaParseError    = "Unable to parse ISD-AS string"
+	ipProviderError = "Unable to parse IPProvider address"
 )
 
 func (c *Controller) GetASes(w http.ResponseWriter, r *http.Request, _ http.HandlerFunc) {
@@ -79,7 +79,22 @@ func (c *Controller) UpdateAS(w http.ResponseWriter, r *http.Request, _ http.Han
 		respondError(w, nil, IDChangeError, http.StatusBadRequest)
 		return
 	}
-	if err := c.db.Model(&as).Update("Name", as.Name).Error; err != nil {
+	if as.IPAllocationProvider != "" {
+		parts := strings.Split(as.IPAllocationProvider, ":")
+		if len(parts) != 2 {
+			respondError(w, nil, ipProviderError, http.StatusBadRequest)
+			return
+		}
+		if _, err := strconv.Atoi(parts[1]); err != nil {
+			respondError(w, err, ipProviderError, http.StatusBadRequest)
+			return
+		}
+	}
+	if err := c.db.Model(&as).Update(
+		map[string]interface{}{
+			"Name":                 as.Name,
+			"IPAllocationProvider": as.IPAllocationProvider,
+		}).Error; err != nil {
 		respondError(w, err, DBUpdateError, http.StatusBadRequest)
 		return
 	}
@@ -200,7 +215,7 @@ func (c *Controller) PostNetwork(w http.ResponseWriter, r *http.Request, _ http.
 	}
 	_, _, err := net.ParseCIDR(network.CIDR)
 	if err != nil {
-		respondError(w, err, cidrParseError, 400)
+		respondError(w, err, CIDRParseError, 400)
 		return
 	}
 	var as db.ASEntry

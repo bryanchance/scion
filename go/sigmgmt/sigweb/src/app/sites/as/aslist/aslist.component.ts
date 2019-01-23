@@ -4,7 +4,7 @@ import { NgForm } from '@angular/forms'
 import { ApiService } from '../../../api/api.service'
 import { UserService } from '../../../api/user.service'
 import { ASEntry, Site } from '../../models/models'
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute } from '@angular/router'
 
 @Component({
   selector: 'ana-aslist',
@@ -43,8 +43,8 @@ export class ASListComponent implements OnInit {
   onSubmit() {
     this.error = ''
     if (this.editing) {
-      this.api.updateAS(this.site, this.ia).subscribe(
-        ia => {
+      this.api.updateAS(this.ia).subscribe(
+        () => {
           this.ia = new ASEntry
           this.form.resetForm()
           this.editing = false
@@ -69,7 +69,7 @@ export class ASListComponent implements OnInit {
   }
 
   delete(idx: number) {
-    this.api.deleteAS(this.site, this.ias[idx]).subscribe(
+    this.api.deleteAS(this.ias[idx]).subscribe(
       () => this.ias.splice(idx, 1)
     )
   }

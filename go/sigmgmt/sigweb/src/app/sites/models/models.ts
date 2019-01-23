@@ -11,6 +11,12 @@ export class Site {
     }
 }
 
+export class SiteNetwork {
+    ID: number
+    CIDR: string
+    ACL: string
+}
+
 export class Host {
     ID: number
     Name: string
@@ -39,6 +45,7 @@ export class ASEntry {
     Name: string
     ISD: string
     AS: string
+    IPAllocationProvider: string
 }
 
 export class TrafficPolicy {
@@ -51,6 +58,7 @@ export class TrafficPolicy {
 export class CIDR {
     ID: number
     CIDR: string
+    Scraped: boolean
 }
 
 export class TrafficClass {
