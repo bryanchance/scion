@@ -25,7 +25,7 @@ test_setup() {
     sudo ip addr add "$PRIVILEGED/32" dev lo
     sudo ip addr add "$REGULAR/32" dev lo
 
-    ./scion.sh topology -c $TEST_TOPOLOGY -ds --consul -d
+    ./scion.sh topology -c $TEST_TOPOLOGY -ds -d
     for ds in gen/ISD1/*/ds*; do
         # Add privileged to the ACL.
         printf "\n$PRIVILEGED/32" >> $ds/acl

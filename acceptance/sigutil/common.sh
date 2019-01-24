@@ -8,7 +8,7 @@ DST_IA=${DST_IA:-1-ff00:0:112}
 
 test_setup() {
     set -e
-    ./scion.sh topology zkclean -c $TEST_TOPOLOGY -d --sig -n 242.254.0.0/16
+    ./scion.sh topology zkclean -c $TEST_TOPOLOGY -d --sig -n 242.254.0.0/16 --no-consul
     for sig in gen/ISD1/*/sig*/sig.toml; do
         sed -i '/\[logging\.file\]/a FlushInterval = 1' "$sig"
     done

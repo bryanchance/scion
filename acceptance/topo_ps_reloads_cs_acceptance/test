@@ -15,7 +15,7 @@ AS_FILE="$(as_file $IA)"
 
 test_setup() {
     set -e
-    ./scion.sh topology zkclean -c $TEST_TOPOLOGY -d -sd=go -ps=go
+    ./scion.sh topology zkclean -c $TEST_TOPOLOGY -d --no-consul
     for sd in gen/ISD1/*/endhost/sciond.toml; do
         sed -i '/\[logging\.file\]/a FlushInterval = 1' "$sd"
     done

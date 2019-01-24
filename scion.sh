@@ -16,6 +16,9 @@ cmd_topology() {
         echo "Shutting down: $(./scion.sh stop)"
     fi
     supervisor/supervisor.sh shutdown
+    # Stop postgres and consul if they are still running, they might not be needed in the new topo.
+    stop_pg
+    stop_consul
     mkdir -p logs traces gen gen-cache
     find gen gen-cache -mindepth 1 -maxdepth 1 -exec rm -r {} +
     if [ "$1" = "zkclean" ]; then
@@ -31,8 +34,8 @@ cmd_topology() {
         ./tools/quiet ./tools/dc run utils_chowner
     fi
     run_zk "$zkclean"
-    stop_pg
     run_pg
+    run_consul
     load_cust_keys
     if [ ! -e "gen-certs/tls.pem" -o ! -e "gen-certs/tls.key" ]; then
         local old=$(umask)
@@ -147,6 +150,7 @@ run_setup() {
     run_zk
     # Make sure postgres is running.
     run_pg
+    # Make sure consul is running.
     run_consul
 }
 
@@ -157,7 +161,6 @@ cmd_stop() {
     else
         ./tools/quiet ./supervisor/supervisor.sh stop all
     fi
-    stop_consul
     if [ "$1" = "clean" ]; then
         python/integration/set_ipv6_addr.py -d
     fi
