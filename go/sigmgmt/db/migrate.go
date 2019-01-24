@@ -11,6 +11,7 @@ func MigrateDB(dbase *gorm.DB) {
 	dbase.AutoMigrate(&Host{})
 	dbase.AutoMigrate(&SiteNetwork{})
 	dbase.AutoMigrate(&PathSelector{})
+	dbase.AutoMigrate(&SiteNetwork{})
 	dbase.AutoMigrate(&ASEntry{})
 	dbase.AutoMigrate(&SIG{})
 	dbase.AutoMigrate(&Network{})

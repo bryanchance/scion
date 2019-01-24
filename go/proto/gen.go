@@ -39,6 +39,8 @@ var RootTypes = []string{
 	"SignedCtrlPld",
 	"RevInfo",
 	"PushACL",
+	"AllocationsRequest",
+	"AllocationsReply",
 }
 
 func main() {
