@@ -27,8 +27,10 @@ Build all images: `make all`, specific image: `make border` or specific debug im
 -   path: Runs `/app/bin/path_server`
 -   certificate: Runs `/app/bin/cert_server`
 -   sciond: Runs `/app/bin/sciond`
+-   ipscraper: Runs `/app/bin/ipscraper`
+-   ipprovider: Runs `/app/bin/ipprovider`
 
-Dispatcher, sig and border are based on `base`, the other images on `python`.
+Dispatcher, sig, border, ipscraper, ipprovider are based on `base`, the other images on `python`.
 
 ## Debug images
 

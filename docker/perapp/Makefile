@@ -39,7 +39,7 @@ hashes/debug_base: base/Dockerfile.debug hashes/scion
 	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $< files/
 
 # App images
-APP_TARGETS = border discovery dispatcher dispatcher_go sig path_py path beacon_py cert_py cert sciond_py sciond
+APP_TARGETS = border discovery dispatcher dispatcher_go sig path_py path ipscraper ipprovider beacon_py cert_py cert sciond_py sciond
 .PHONY: $(APP_TARGETS)
 apps: $(APP_TARGETS)
 
@@ -75,6 +75,14 @@ path: hashes/path
 hashes/path: app/Dockerfile.path hashes/app_base hashes/app_builder
 	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
 
+ipscraper: hashes/ipscraper
+hashes/ipscraper: app/Dockerfile.ipscraper hashes/app_base hashes/app_builder
+	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
+
+ipprovider: hashes/ipprovider
+hashes/ipprovider: app/Dockerfile.ipprovider hashes/app_base hashes/app_builder
+	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
+
 beacon_py: hashes/beacon_py
 hashes/beacon_py: app/Dockerfile.beacon_py hashes/python_base
 	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
@@ -96,7 +104,7 @@ hashes/sciond: app/Dockerfile.sciond hashes/app_base hashes/app_builder
 	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
 
 # Debug images
-DEBUG_TARGETS = border_debug discovery_debug dispatcher_debug dispatcher_go_debug sig_debug path_py_debug path_debug beacon_py_debug cert_py_debug cert_debug sciond_py_debug sciond_debug
+DEBUG_TARGETS = border_debug discovery_debug dispatcher_debug dispatcher_go_debug sig_debug path_py_debug path_debug ipscraper_debug ipprovider_debug beacon_py_debug cert_py_debug cert_debug sciond_py_debug sciond_debug
 .PHONY: $(DEBUG_TARGETS)
 debug: $(DEBUG_TARGETS)
 
@@ -130,6 +138,14 @@ hashes/path_py_debug: debug/Dockerfile.path_py hashes/debug_base hashes/path_py
 
 path_debug: hashes/path_debug
 hashes/path_debug: debug/Dockerfile.path hashes/debug_base hashes/path
+	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
+
+ipscraper_debug: hashes/ipscraper_debug
+hashes/ipscraper_debug: debug/Dockerfile.ipscraper hashes/debug_base hashes/ipscraper
+	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
+
+ipprovider_debug: hashes/ipprovider_debug
+hashes/ipprovider_debug: debug/Dockerfile.ipprovider hashes/debug_base hashes/ipprovider
 	DOCKER_ARGS="$(DOCKER_ARGS)" ./docker_build $@ $<
 
 beacon_py_debug: hashes/beacon_py_debug
