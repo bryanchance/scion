@@ -46,6 +46,11 @@ pkg_tar(
         "//go/acceptance/sig_iperf_acceptance:sig_iperf_acceptance",
         "//go/acceptance/sig_ping_acceptance:sig_ping_acceptance",
         "//go/tools/topopruner:topopruner",
+        "//go/prodspec/prodgen:prodgen",
+        "//go/prodspec/testgen:testgen",
+        "//go/prodspec/validate:validate",
+        "//go/prodspec/gen_topology:gen_topology",
+        "//go/prodspec/query:query",
     ],
     mode = "0755",
 )

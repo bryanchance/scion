@@ -374,3 +374,8 @@ go_repository(
     importpath = "github.com/jmhodges/bazel_gomock",
     commit = "ff6c20a9b6978c52b88b7a1e2e55b3b86e26685b",
 )
+go_repository(
+    name = "com_github_davecgh_go_spew",
+    importpath = "github.com/davecgh/go-spew", # spew
+    tag = "v1.1.1",
+)

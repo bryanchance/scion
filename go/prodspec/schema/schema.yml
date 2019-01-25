@@ -1,0 +1,153 @@
+Organization:
+  Site:
+    type: Refs
+    refentity: Site
+    reffield: Organization
+  AS:
+    type: Refs
+    refentity: AS
+    reffield: Organization
+
+Site:
+  Organization:
+    type: Ref
+    refentity: Organization
+    reffield: Site
+  Host:
+    type: Refs
+    refentity: Host
+    reffield: Site
+
+Host:
+  MachineType:
+    type: int
+  Location:
+    type: string
+  SerialNumber:
+    type: string
+  Site:
+    type: Ref
+    refentity: Site
+    reffield: Host
+  Interface:
+    type: Refs
+    refentity: Interface
+    reffield: Host
+
+Interface:
+  Host:
+    type: Ref
+    refentity: Host
+    reffield: Interface
+  PhysicalName:
+    type: string
+  SerialNumber:
+    type: string
+  IMEI:
+    type: string
+  PhoneNumber:
+    type: string
+  SIMNumber:
+    type: string
+  OSName:
+    type: string
+  IP4MaskInt:
+    type: string
+  IP4MaskExt:
+    type: string
+  IP6MaskInt:
+    type: string
+  Routes4:
+    type: string
+  Routes6:
+    type: string
+  PublicKey:
+    type: string
+  IP4PTP:
+    type: string
+  IP4Peer:
+    type: string
+  PeerName:
+    type: string
+
+ISD:
+  Name:
+    type: string
+  AS:
+    type: Refs
+    refentity: AS
+    reffield: ISD
+
+AS:
+  Organization:
+    type: Ref
+    refentity: Organization
+    reffield: AS
+  ISD:
+    type: Refs
+    refentity: ISD
+    reffield: AS
+  BR:
+    type: Refs
+    refentity: BR
+    reffield: AS
+  BS:
+    type: Refs
+    refentity: BS
+    reffield: AS
+  CS:
+    type: Refs
+    refentity: CS
+    reffield: AS
+  PS:
+    type: Refs
+    refentity: PS
+    reffield: AS
+  SIG:
+    type: Refs
+    refentity: SIG
+    reffield: AS
+  Core:
+    type: bool
+  MTU:
+    type: int
+
+BR:
+  Name:
+    type: string
+  AS:
+    type: Ref
+    refentity: AS
+    reffield: BR
+
+BS:
+  Name:
+    type: string
+  AS:
+    type: Ref
+    refentity: AS
+    reffield: BS
+
+CS:
+  Name:
+    type: string
+  AS:
+    type: Ref
+    refentity: AS
+    reffield: CS
+
+PS:
+  Name:
+    type: string
+  AS:
+    type: Ref
+    refentity: AS
+    reffield: PS
+
+SIG:
+  Name:
+    type: string
+  AS:
+    type: Ref
+    refentity: AS
+    reffield: SIG

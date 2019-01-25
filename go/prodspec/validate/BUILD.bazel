@@ -1,0 +1,28 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "as.go",
+        "br.go",
+        "bs.go",
+        "cs.go",
+        "host.go",
+        "interface.go",
+        "isd.go",
+        "layout.go",
+        "main.go",
+        "organization.go",
+        "ps.go",
+        "sig.go",
+    ],
+    importpath = "github.com/scionproto/scion/go/prodspec/validate",
+    visibility = ["//visibility:private"],
+    deps = ["//go/prodspec/schema:go_default_library"],
+)
+
+go_binary(
+    name = "validate",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)
