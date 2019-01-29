@@ -22,6 +22,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/BurntSushi/toml"
 	consulapi "github.com/hashicorp/consul/api"
@@ -47,6 +48,7 @@ var (
 	reissRunner *periodic.Runner
 	reissMtx    sync.Mutex
 	msgr        infra.Messenger
+	corePusher  *periodic.Runner
 )
 
 var (
@@ -147,6 +149,16 @@ func reload() error {
 func startReissRunner() {
 	reissMtx.Lock()
 	defer reissMtx.Unlock()
+	corePusher = periodic.StartPeriodicTask(
+		&reiss.CorePusher{
+			LocalIA: cfg.General.Topology.ISD_AS,
+			TrustDB: state.TrustDB,
+			Msger:   msgr,
+		},
+		periodic.NewTicker(time.Hour),
+		time.Minute,
+	)
+	corePusher.TriggerRun()
 	if !cfg.CS.AutomaticRenewal {
 		log.Info("Reissue disabled, not starting reiss task.")
 		return
@@ -155,11 +167,12 @@ func startReissRunner() {
 		log.Info("Starting periodic reiss.Self task")
 		reissRunner = periodic.StartPeriodicTask(
 			&reiss.Self{
-				Msgr:     msgr,
-				State:    state,
-				IA:       cfg.General.Topology.ISD_AS,
-				IssTime:  cfg.CS.IssuerReissueLeadTime.Duration,
-				LeafTime: cfg.CS.LeafReissueLeadTime.Duration,
+				Msgr:       msgr,
+				State:      state,
+				IA:         cfg.General.Topology.ISD_AS,
+				IssTime:    cfg.CS.IssuerReissueLeadTime.Duration,
+				LeafTime:   cfg.CS.LeafReissueLeadTime.Duration,
+				CorePusher: corePusher,
 			},
 			periodic.NewTicker(cfg.CS.ReissueRate.Duration),
 			cfg.CS.ReissueTimeout.Duration,
@@ -169,10 +182,11 @@ func startReissRunner() {
 	log.Info("Starting periodic reiss.Requester task")
 	reissRunner = periodic.StartPeriodicTask(
 		&reiss.Requester{
-			Msgr:     msgr,
-			State:    state,
-			IA:       cfg.General.Topology.ISD_AS,
-			LeafTime: cfg.CS.LeafReissueLeadTime.Duration,
+			Msgr:       msgr,
+			State:      state,
+			IA:         cfg.General.Topology.ISD_AS,
+			LeafTime:   cfg.CS.LeafReissueLeadTime.Duration,
+			CorePusher: corePusher,
 		},
 		periodic.NewTicker(cfg.CS.ReissueRate.Duration),
 		cfg.CS.ReissueTimeout.Duration,
@@ -182,6 +196,9 @@ func startReissRunner() {
 func killReissRunner() {
 	reissMtx.Lock()
 	defer reissMtx.Unlock()
+	if corePusher != nil {
+		corePusher.Kill()
+	}
 	if reissRunner != nil {
 		reissRunner.Kill()
 		reissRunner = nil
@@ -191,6 +208,9 @@ func killReissRunner() {
 func stopReissRunner() {
 	reissMtx.Lock()
 	defer reissMtx.Unlock()
+	if corePusher != nil {
+		corePusher.Stop()
+	}
 	if reissRunner != nil {
 		reissRunner.Stop()
 		reissRunner = nil
