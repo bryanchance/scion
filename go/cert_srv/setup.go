@@ -15,7 +15,9 @@
 package main
 
 import (
+	"context"
 	"path/filepath"
+	"time"
 
 	"github.com/BurntSushi/toml"
 
@@ -61,7 +63,7 @@ func setup() error {
 	if err := env.InitGeneral(&cfg.General); err != nil {
 		return common.NewBasicError("Unable to initialize General config", err)
 	}
-	itopo.Init(proto.ServiceType_cs, itopo.Callbacks{})
+	itopo.Init(cfg.General.ID, proto.ServiceType_cs, itopo.Callbacks{})
 	if _, _, err := itopo.SetStatic(cfg.General.Topology, false); err != nil {
 		return common.NewBasicError("Unable to set initial static topology", err)
 	}
@@ -118,7 +120,9 @@ func initState(cfg *config.Config) error {
 // setDefaultSignerVerifier sets the signer and verifier. The newest certificate chain version
 // in the store is used.
 func setDefaultSignerVerifier(c *config.State, pubIA addr.IA) error {
-	sign, err := trust.CreateSign(pubIA, c.Store)
+	ctx, cancelF := context.WithTimeout(context.Background(), time.Second)
+	defer cancelF()
+	sign, err := trust.CreateSign(ctx, pubIA, c.TrustDB)
 	if err != nil {
 		return err
 	}
