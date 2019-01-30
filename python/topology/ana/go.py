@@ -8,16 +8,22 @@ import toml
 from lib.util import write_file
 from topology.common import docker_host, get_l4_port, get_pub, get_pub_ip
 from topology.go import GoGenerator as VanillaGenerator
-from topology.ana.postgres import CSDB_NAME, CSDB_PORT, PSDB_NAME, PSDB_PORT
+from topology.ana.common import (
+    DB_TYPE_TRUST,
+    DB_TYPE_PATH,
+    SVC_PS,
+    SVC_CS,
+    trust_db_conf_entry,
+)
+from topology.ana.postgres import (
+    PSDB_NAME,
+    PSDB_PORT,
+    pg_db_user,
+)
 from topology.supervisor import (
     CS_CONFIG_NAME,
     PS_CONFIG_NAME,
 )
-
-DB_TYPE_TRUST = 'trust'
-DB_TYPE_PATH = 'path'
-SVC_PS = 'ps'
-SVC_CS = 'cs'
 
 
 class GoGenerator(VanillaGenerator):
@@ -94,7 +100,7 @@ class GoGenerator(VanillaGenerator):
         if self.args.ps_db != 'postgres':
             return raw_entry
         db_host = docker_host(self.args.in_docker, self.args.docker, 'localhost')
-        db_user = self._pg_db_user(SVC_PS, DB_TYPE_PATH, name)
+        db_user = pg_db_user(SVC_PS, DB_TYPE_PATH, name)
         raw_entry['ps']['PathDB'] = {
             'Backend': 'postgres',
             # sslmode=disable is because dockerized postgres doesn't have SSL enabled.
@@ -104,7 +110,7 @@ class GoGenerator(VanillaGenerator):
         raw_entry['ps']['RevCache'] = {
             'Backend': 'postgres',
         }
-        db_user = self._pg_db_user(SVC_PS, DB_TYPE_TRUST, name)
+        db_user = pg_db_user(SVC_PS, DB_TYPE_TRUST, name)
         raw_entry['TrustDB'] = {
             'Backend': 'postgres',
             'Connection': 'host=%s user=%s password=password' % (db_host, db_user) +
@@ -127,13 +133,7 @@ class GoGenerator(VanillaGenerator):
         raw_entry = super()._build_cs_conf(topo_id, ia, base, name, elem)
         if self.args.cs_db != 'postgres':
             return raw_entry
-        db_user = self._pg_db_user(SVC_CS, DB_TYPE_TRUST, name)
-        db_host = docker_host(self.args.in_docker, self.args.docker, 'localhost')
-        raw_entry['TrustDB'] = {
-            'Backend': 'postgres',
-            'Connection': 'host=%s user=%s password=password' % (db_host, db_user) +
-                          ' sslmode=disable dbname=%s port=%s' % (CSDB_NAME, CSDB_PORT),
-        }
+        raw_entry['TrustDB'] = trust_db_conf_entry(self.args, name)
         return raw_entry
 
     def _generate_path_postgres_init(self, topo_id, svc):
@@ -158,7 +158,7 @@ class GoGenerator(VanillaGenerator):
         if not self._pg_db_enabled(svc):
             return
         schema_name = self._pg_db_schema(topo_id, svc, db_type)
-        db_user = self._pg_db_user(svc, db_type, name)
+        db_user = pg_db_user(svc, db_type, name)
         sql = 'CREATE USER "%s" WITH PASSWORD \'password\';\n' % db_user
         sql += 'GRANT ALL ON SCHEMA "%s" TO "%s";\n' % (schema_name, db_user)
         sql += 'GRANT ALL ON ALL TABLES IN SCHEMA "%s" TO "%s";\n' % (schema_name, db_user)
@@ -171,9 +171,6 @@ class GoGenerator(VanillaGenerator):
     def _pg_init_file_path(self, topo_id, svc, db_type):
         return os.path.join(self.args.output_dir, 'postgres_%s' % svc,
                             'init', '%s.sql' % self._pg_db_schema(topo_id, svc, db_type))
-
-    def _pg_db_user(self, svc, db_type, name):
-        return '%s%s_%s' % (svc, db_type, name)
 
     def _pg_db_schema(self, topo_id, svc, db_type):
         return '%s%s_%s' % (svc, db_type, topo_id.file_fmt())

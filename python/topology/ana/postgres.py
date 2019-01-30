@@ -58,3 +58,7 @@ class PostgresGenerator(object):
             'command': ['postgres', '-c', 'max_connections=200'],
         }
         self.pg_conf['services'][name_prefix] = entry
+
+
+def pg_db_user(svc, db_type, name):
+    return '%s%s_%s' % (svc, db_type, name)

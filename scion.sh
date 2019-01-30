@@ -75,6 +75,10 @@ cmd_run() {
 
 load_cust_keys() {
     if [ -f 'gen/load_custs.sh' ]; then
+        if [ -f "gen/postgres-dc.yml" ]; then
+            # Sleep a bit to get postgres some time to get ready
+            sleep 5
+        fi
         echo "Loading customer keys..."
         ./tools/quiet ./gen/load_custs.sh
     fi

@@ -2,6 +2,7 @@
 
 # SCION
 from topology.ana.consul import ConsulGenArgs, ConsulGenerator
+from topology.ana.common import trust_db_conf_entry
 from topology.ana.docker import DockerGenerator
 from topology.ana.go import GoGenerator
 from topology.ana.postgres import PostgresGenArgs, PostgresGenerator
@@ -57,3 +58,8 @@ class ConfigGenerator(VanillaGenerator):
     def _generate_consul(self, topo_dicts):
         consul_gen = ConsulGenerator(ConsulGenArgs(self.args, topo_dicts))
         consul_gen.generate()
+
+    def _cust_db_conf_entry(self, cs_name):
+        if self.args.cs_db != 'postgres':
+            return super()._cust_db_conf_entry(cs_name)
+        return trust_db_conf_entry(self.args, cs_name)
