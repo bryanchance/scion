@@ -39,6 +39,10 @@ cmd_tester() {
     docker build -f docker/acceptance/sig/Dockerfile -t "scion_sig_acceptance:latest" docker/acceptance/sig
 }
 
+cmd_patroni_dev() {
+    docker build -f docker/patroni/dev/Dockerfile -t "scion_patroni_dev:latest" docker/patroni/dev
+}
+
 copy_tree() {
     set -e
     set -o pipefail
@@ -213,6 +217,8 @@ cmd_help() {
 	        Stop the Docker container.
 	    $PROGRAM clean
 	        Remove all Docker containers and all generated images.
+	    $PROGRAM patroni_dev
+	        Build a patroni dev image.
 	    $PROGRAM help
 	        Show this text.
 	_EOF
@@ -244,6 +250,7 @@ case $COMMAND in
     start)              cmd_start ;;
     exec)               shift; cmd_exec "$@" ;;
     stop)               shift; cmd_stop "$@" ;;
+    patroni_dev)        cmd_patroni_dev ;;
     help)               cmd_help ;;
     *)                  cmd_help ;;
 esac
