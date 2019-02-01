@@ -1,0 +1,35 @@
+version: "3"
+services:
+  ipprovider:
+    container_name: ipprovider
+    image: scion_ipprovider
+    environment:
+      SU_EXEC_USERSPEC: "$SU_EXEC_USERSPEC"
+    volumes:
+      - "/etc/passwd:/etc/passwd:ro"
+      - "/etc/group:/etc/group:ro"
+      - "${DC_ARTIFACTS}/logs:/share/logs"
+      - "${DC_ARTIFACTS}/conf:/share/conf"
+      - "VOLUME_PREFIX_sciond_1-ff00_0_111:/run/shm/sciond:rw"
+      - "VOLUME_PREFIX_disp_1-ff00_0_111:/run/shm/dispatcher:rw"
+  ipscraper:
+    container_name: ipscraper
+    image: scion_ipscraper
+    environment:
+      SU_EXEC_USERSPEC: "$SU_EXEC_USERSPEC"
+    volumes:
+      - "/etc/passwd:/etc/passwd:ro"
+      - "/etc/group:/etc/group:ro"
+      - "${DC_ARTIFACTS}/logs:/share/logs"
+      - "${DC_ARTIFACTS}/conf:/share/conf"
+      - "VOLUME_PREFIX_sciond_1-ff00_0_110:/run/shm/sciond:rw"
+      - "VOLUME_PREFIX_disp_1-ff00_0_110:/run/shm/dispatcher:rw"
+volumes:
+  VOLUME_PREFIX_sciond_1-ff00_0_110:
+    external: true
+  VOLUME_PREFIX_disp_1-ff00_0_110:
+    external: true
+  VOLUME_PREFIX_sciond_1-ff00_0_111:
+    external: true
+  VOLUME_PREFIX_disp_1-ff00_0_111:
+    external: true

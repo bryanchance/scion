@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# This test runs ipscraper and ipprovider and checks whether the IP allocations
+# are sent to the peer AS correctly.
+# IPProvider runs in AS 1-ff00:0:111, IPScraper runs in AS 1-ff00:0:110.
+
+PROGRAM=`basename "$0"`
+COMMAND="$1"
+TEST_NAME="ipscraper"
+TEST_TOPOLOGY="acceptance/ipscraper_acceptance/Test.topo"
+TEST_ARTIFACTS_DIR="${ACCEPTANCE_ARTIFACTS:?}/${TEST_NAME}"
+export SU_EXEC_USERSPEC="${SCION_USERSPEC:-$LOGNAME}"
+export DC_ARTIFACTS="$TEST_ARTIFACTS_DIR"
+CONF_DIR="$TEST_ARTIFACTS_DIR/conf"
+DBFILE="$CONF_DIR/testdb"
+
+. acceptance/sigutil/common.sh
+
+is_running_in_docker() {
+    cut -d: -f 3 /proc/1/cgroup | grep -q '^/docker/'
+}
+
+test_run() {
+    set -e
+
+    # Get IP addresses for IPScraper and IPProvider. We don't have automatic IP assignment in dispatcher yet
+    # so instead we'll look at the topology and see what IP address BeaconService is using.
+    IPSCRAPER_ADDR=$(jq -r '.BeaconService."bs1-ff00_0_110-1".Addrs.IPv4.Public.Addr' gen/ISD1/ASff00_0_110/br1-ff00_0_110-1/topology.json)
+    IPPROVIDER_ADDR=$(jq -r '.BeaconService."bs1-ff00_0_111-1".Addrs.IPv4.Public.Addr' gen/ISD1/ASff00_0_111/br1-ff00_0_111-1/topology.json)
+
+    # Insert the IP addresses into the config files.
+    mkdir -p "$CONF_DIR" "$TEST_ARTIFACTS_DIR/logs"
+    sed -e "s/IPSCRAPER_ADDR/$IPSCRAPER_ADDR/g" acceptance/ipscraper_acceptance/ipscraper.toml.template > $CONF_DIR/ipscraper.toml
+    sed -e "s/IPPROVIDER_ADDR/$IPPROVIDER_ADDR/g" acceptance/ipscraper_acceptance/ipprovider.toml.template > $CONF_DIR/ipprovider.toml
+
+    # Docker volume names are different based on whether the test is running in a docker container.
+    VOLUME_PREFIX="scion_vol_scion"
+    is_running_in_docker && { VOLUME_PREFIX="scion_docker_vol_scion_docker"; export DC_ARTIFACTS="$SCION_OUTPUT_BASE/$TEST_ARTIFACTS_DIR"; }
+    sed -e "s/VOLUME_PREFIX/$VOLUME_PREFIX/g" acceptance/ipscraper_acceptance/docker-compose.yml.template > $CONF_DIR/docker-compose.yml
+
+    # Create the sigmgmt database.
+    rm -f $DBFILE
+    ./bin/sigmgmt_createdb $DBFILE
+
+    # Set up the AS running IPScraper.
+    sqlite3 $DBFILE 'insert into sites (id, name) values (1, "1-ff00:0:110")'
+    sqlite3 $DBFILE 'insert into asentries (id, name, isd_id, as_id, site_id, ip_allocation_provider) values (1, "1-ff00:0:111", "1", "ff00:0:111", 1, "'"$IPPROVIDER_ADDR"':9000")'
+    sqlite3 $DBFILE 'insert into networks (id, as_entry_id, scraped, cidr) values (1, 1, 0, "192.168.0.0/24")'
+
+    # Set up the AS running IPProvider.
+    sqlite3 $DBFILE 'insert into sites (id, name) values (2, "1-ff00:0:111")'
+    sqlite3 $DBFILE 'insert into site_networks (id, site_id, cidr, acl) values (1, 2, "192.168.1.0/24", "*")'
+    sqlite3 $DBFILE 'insert into site_networks (id, site_id, cidr, acl) values (2, 2, "192.168.2.0/24", "1-ff00:0:110")'
+    sqlite3 $DBFILE 'insert into site_networks (id, site_id, cidr, acl) values (3, 2, "192.168.3.0/24", "1-ff00:0:112")'
+
+    # Start IPProvider and wait a bit so that it starts processing requests.
+    docker-compose -f $CONF_DIR/docker-compose.yml --no-ansi up --detach ipprovider
+
+    # IPScraper is a cron job and as such it does not retry on error.
+    # To make sure it succeeds wait until the infrastructure stabilizes.
+    sleep 30
+    docker-compose -f $CONF_DIR/docker-compose.yml --no-ansi up --exit-code-from ipscraper --abort-on-container-exit ipscraper
+
+    # Stop the leftover containers.
+    docker-compose -f $CONF_DIR/docker-compose.yml --no-ansi down
+
+    # Check whether the scraped allocations are as expected.
+    NETWORKSFILE="$CONF_DIR/networks"
+    sqlite3 $DBFILE "select * from networks" > $NETWORKSFILE
+    diff $NETWORKSFILE ./acceptance/ipscraper_acceptance/networks.expected
+}
+
+shift
+do_command $PROGRAM $COMMAND $TEST_NAME "$@"

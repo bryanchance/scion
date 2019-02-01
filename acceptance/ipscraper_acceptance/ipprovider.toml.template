@@ -1,0 +1,15 @@
+[ipprovider]
+LocalIA = "1-ff00:0:111"
+LocalAddr = "IPPROVIDER_ADDR"
+LocalPort = 9000
+DBPath = "/share/conf/testdb"
+
+[sd_client]
+Path = "/run/shm/sciond/sd1-ff00_0_111.sock"
+
+[logging.file]
+Level = "debug"
+Path = "/share/logs/ipprovider.log"
+
+[logging.console]
+Level = "error"

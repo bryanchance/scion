@@ -1,0 +1,15 @@
+[ipscraper]
+LocalIA = "1-ff00:0:110"
+LocalAddr = "IPSCRAPER_ADDR"
+DBPath = "/share/conf/testdb"
+Timeout = 60
+
+[sd_client]
+Path = "/run/shm/sciond/sd1-ff00_0_110.sock"
+
+[logging.file]
+Level = "debug"
+Path = "/share/logs/ipscraper.log"
+
+[logging.console]
+Level = "error"
