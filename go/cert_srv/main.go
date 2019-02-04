@@ -32,10 +32,12 @@ import (
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/consul"
 	"github.com/scionproto/scion/go/lib/consul/consulconfig"
+	"github.com/scionproto/scion/go/lib/discovery"
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/infra"
 	"github.com/scionproto/scion/go/lib/infra/infraenv"
+	"github.com/scionproto/scion/go/lib/infra/modules/idiscovery"
 	"github.com/scionproto/scion/go/lib/infra/modules/itopo"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/periodic"
@@ -46,9 +48,10 @@ var (
 	state       *config.State
 	environment *env.Env
 	reissRunner *periodic.Runner
+	discRunners idiscovery.Runners
 	reissMtx    sync.Mutex
-	msgr        infra.Messenger
 	corePusher  *periodic.Runner
+	msgr        infra.Messenger
 )
 
 var (
@@ -93,6 +96,8 @@ func realMain() int {
 	} else {
 		startReissRunner()
 	}
+	// Start the periodic fetching from discovery service.
+	startDiscovery()
 	// Start the messenger.
 	go func() {
 		defer log.LogPanicAndExit()
@@ -193,6 +198,13 @@ func startReissRunner() {
 	)
 }
 
+func startDiscovery() {
+	var err error
+	if discRunners, err = idiscovery.StartRunners(cfg.Discovery, discovery.Full, nil); err != nil {
+		fatal.Fatal(common.NewBasicError("Unable to start dynamic topology fetcher", err))
+	}
+}
+
 func killReissRunner() {
 	reissMtx.Lock()
 	defer reissMtx.Unlock()
@@ -223,6 +235,7 @@ func stop() {
 	} else {
 		stopReissRunner()
 	}
+	discRunners.Stop()
 	msgr.CloseServer()
 }
 

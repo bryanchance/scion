@@ -20,6 +20,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/consul/consulconfig"
 	"github.com/scionproto/scion/go/lib/env"
+	"github.com/scionproto/scion/go/lib/infra/modules/idiscovery"
 	"github.com/scionproto/scion/go/lib/pathstorage"
 	"github.com/scionproto/scion/go/lib/truststorage"
 	"github.com/scionproto/scion/go/lib/util"
@@ -30,18 +31,20 @@ var (
 )
 
 type Config struct {
-	General env.General
-	Logging env.Logging
-	Metrics env.Metrics
-	TrustDB truststorage.TrustDBConf
-	Infra   env.Infra
-	PS      PSConfig
+	General   env.General
+	Logging   env.Logging
+	Metrics   env.Metrics
+	TrustDB   truststorage.TrustDBConf
+	Infra     env.Infra
+	Discovery idiscovery.Config
+	PS        PSConfig
 
 	Consul consulconfig.Config
 }
 
 func (c *Config) InitDefaults() {
 	c.PS.initDefaults()
+	c.Discovery.InitDefaults()
 }
 
 type PSConfig struct {

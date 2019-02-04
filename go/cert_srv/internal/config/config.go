@@ -21,6 +21,7 @@ import (
 	"github.com/scionproto/scion/go/lib/as_conf"
 	"github.com/scionproto/scion/go/lib/consul/consulconfig"
 	"github.com/scionproto/scion/go/lib/env"
+	"github.com/scionproto/scion/go/lib/infra/modules/idiscovery"
 	"github.com/scionproto/scion/go/lib/scrypto/cert"
 	"github.com/scionproto/scion/go/lib/truststorage"
 	"github.com/scionproto/scion/go/lib/util"
@@ -40,18 +41,20 @@ const (
 )
 
 type Config struct {
-	General env.General
-	Sciond  env.SciondClient `toml:"sd_client"`
-	Logging env.Logging
-	Metrics env.Metrics
-	TrustDB truststorage.TrustDBConf
-	Infra   env.Infra
-	CS      CSConfig
+	General   env.General
+	Sciond    env.SciondClient `toml:"sd_client"`
+	Logging   env.Logging
+	Metrics   env.Metrics
+	TrustDB   truststorage.TrustDBConf
+	Infra     env.Infra
+	Discovery idiscovery.Config
+	CS        CSConfig
 
 	Consul consulconfig.Config
 }
 
 func (c *Config) Init(confDir string) error {
+	c.Discovery.InitDefaults()
 	return c.CS.Init(confDir)
 }
 
