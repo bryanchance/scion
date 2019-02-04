@@ -125,6 +125,8 @@ func (u *Updater) updateServices(ctx context.Context, rt *topology.RawTopo) bool
 	rt.CertificateService, ok = u.fillService(ctx, consul.CS, rt.CertificateService)
 	allOk = allOk && ok
 	rt.PathService, ok = u.fillService(ctx, consul.PS, rt.PathService)
+	allOk = allOk && ok
+	rt.SIG, ok = u.fillService(ctx, consul.SIG, rt.SIG)
 	return allOk && ok
 }
 

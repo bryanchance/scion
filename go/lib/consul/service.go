@@ -30,10 +30,11 @@ type CheckInfo struct {
 type SvcType string
 
 const (
-	BS SvcType = "BeaconService"
-	CS SvcType = "CertificateService"
-	DS SvcType = "DiscoveryService"
-	PS SvcType = "PathService"
+	BS  SvcType = "BeaconService"
+	CS  SvcType = "CertificateService"
+	DS  SvcType = "DiscoveryService"
+	PS  SvcType = "PathService"
+	SIG SvcType = "SIG"
 )
 
 type Service struct {

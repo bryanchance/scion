@@ -22,6 +22,7 @@ import (
 	"github.com/BurntSushi/toml"
 	. "github.com/smartystreets/goconvey/convey"
 
+	"github.com/scionproto/scion/go/lib/consul/consulconfig"
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/xtest"
@@ -32,6 +33,9 @@ type TestConfig struct {
 	Metrics env.Metrics
 	Sciond  env.SciondClient `toml:"sd_client"`
 	Sig     Conf
+
+	// Intentional break.
+	Consul consulconfig.Config
 }
 
 func TestSample(t *testing.T) {
@@ -70,5 +74,15 @@ func TestSample(t *testing.T) {
 
 		// Metrics
 		SoMsg("Prom correct", cfg.Metrics.Prometheus, ShouldEqual, "127.0.0.1:8000")
+
+		// Consul specific
+		SoMsg("Consul.Enabled correct", cfg.Consul.Enabled, ShouldBeFalse)
+		SoMsg("Consul.Agent correct", cfg.Consul.Agent, ShouldEqual, consulconfig.DefaultAgent)
+		SoMsg("Consul.Health.Interval correct", cfg.Consul.Health.Interval.Duration,
+			ShouldEqual, consulconfig.DefaultHealthInterval)
+		SoMsg("Consul.Health.Timeout correct", cfg.Consul.Health.Timeout.Duration,
+			ShouldEqual, consulconfig.DefaultHealthTimeout)
+		SoMsg("Consul.InitConnPeriod correct", cfg.Consul.InitConnPeriod.Duration,
+			ShouldEqual, consulconfig.DefaultInitConnPeriod)
 	})
 }

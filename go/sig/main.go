@@ -28,6 +28,8 @@ import (
 	"github.com/syndtr/gocapability/capability"
 
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/consul"
+	"github.com/scionproto/scion/go/lib/consul/consulconfig"
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/log"
@@ -50,6 +52,9 @@ type Config struct {
 	Metrics env.Metrics
 	Sciond  env.SciondClient `toml:"sd_client"`
 	Sig     sigconfig.Conf
+
+	// Intentional break
+	Consul consulconfig.Config
 }
 
 var (
@@ -103,6 +108,14 @@ func realMain() int {
 			log.Info("reloadOnSIGHUP: reload done", "success", success)
 		},
 	)
+	if cfg.Consul.Enabled {
+		c, err := setupConsul()
+		if err != nil {
+			log.Crit("Unable to start consul", "err", err)
+			return 1
+		}
+		defer c.Close()
+	}
 	// Spawn egress reader
 	go func() {
 		defer log.LogPanicAndExit()
@@ -236,4 +249,38 @@ func spawnIngressDispatcher(tunIO io.ReadWriteCloser) {
 			fatal.Fatal(err)
 		}
 	}()
+}
+
+type closerFunc func() error
+
+func (cf closerFunc) Close() error {
+	return cf()
+}
+
+func setupConsul() (io.Closer, error) {
+	cfg.Consul.InitDefaults()
+	c, err := cfg.Consul.Client()
+	if err != nil {
+		return nil, err
+	}
+	svc := &consul.Service{
+		Type:        consul.SIG,
+		Agent:       c.Agent(),
+		Logger:      log.New("part", "UpdateTTL"),
+		CheckParams: cfg.Consul.Health,
+		Check: func() consul.CheckInfo {
+			return consul.CheckInfo{
+				Id:     cfg.Sig.ID,
+				Status: consul.StatusPass,
+			}
+		},
+	}
+	ttlUpdater, err := svc.StartUpdateTTL(cfg.Consul.InitConnPeriod.Duration)
+	if err != nil {
+		return nil, err
+	}
+	return closerFunc(func() error {
+		ttlUpdater.Stop()
+		return nil
+	}), nil
 }
