@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# This test is to investigate the behavior of a 2 node consul setup.
+# The expectation is that after a node failure the cluster behaves normally again.
+
+. acceptance/common.sh
+
+TEST_NAME="consul_2node_failure"
+
+test_setup() {
+    log "Start consul servers"
+    dc up -d 
+}
+
+test_run() {
+    # Check consul internal leader election worked.
+    wait_leader_count consul_server1 "1"
+    check_leader_count consul_server2 "1"
+    log "OK: Initial leader election worked."
+    # Kill node1
+    log "Killing consul_server1"
+    dc kill consul_server1
+    sleep 2
+    # Restart node1
+    log "Restart consul_server1"
+    dc up -d consul_server1
+    # Check leader is found.
+    wait_leader_count consul_server1 "2"
+    check_leader_count consul_server2 "2"
+    log "OK: Leader election after node1 failure worked."
+    # Give some time to be in sync again
+    sleep 10
+    # Kill node2
+    log "Killing consul_server2"
+    dc kill consul_server2
+    sleep 2
+    # Restart node2
+    log "Restart consul_server2"
+    dc up -d consul_server2
+    # Check leader is found.
+    wait_leader_count consul_server1 "3"
+    check_leader_count consul_server2 "3"
+    log "OK: Leader election after node2 failure worked."
+}
+
+wait_leader_count() {
+    server="$1"
+    expected="$2"
+    cnt=0
+    while [ "$(current_leader_count $server)" -lt "$expected" ] && [ "$cnt" -lt 20 ]; do
+        sleep 1
+        : $((cnt+=1))
+    done
+    check_leader_count "$server" "$expected"
+}
+
+check_leader_count() {
+    server="$1"
+    expected="$2"
+    actual=$(current_leader_count $server)
+    [ "$actual" -eq "$expected" ] || { log "FAIL: Expected $expected 'leader elected' lines for $server, found $actual"; exit 1; }
+}
+
+current_leader_count() {
+    docker logs "$1" 2> /dev/null | grep -c "New leader elected"
+}
+
+test_teardown() {
+    collect_docker_logs "dc"
+    dc down
+}
+
+dc() {
+    COMPOSE_FILE="acceptance/consul_2node_failure_acceptance/consul-dc.yml" docker-compose -p acceptance_consul_2node --no-ansi "$@"
+}
+
+PROGRAM=`basename "$0"`
+COMMAND="$1"
+shift
+
+case "$COMMAND" in
+    name)
+        echo $TEST_NAME ;;
+    setup|run|teardown)
+        "test_$COMMAND" ;;
+    dc)
+        dc "$@" ;;
+    *) print_help; exit 1 ;;
+esac
