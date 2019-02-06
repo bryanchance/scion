@@ -13,9 +13,9 @@ COMMAND="$1"
 
 test_run() {
     set -e
-    ./bin/leader_acceptance -id 1 -agent "$(ip_of $AGENT_NAME1):8500" -key foo/bar -log.console trace &> logs/"$TEST_NAME"_1.log &
+    ./bin/leader_acceptance -id 1 -agent "$(container_ip $AGENT_NAME1):8500" -key foo/bar -log.console trace &> logs/"$TEST_NAME"_1.log &
     CLIENT1=$!
-    ./bin/leader_acceptance -id 2 -agent "$(ip_of $AGENT_NAME2):8500" -key foo/bar -log.console trace &> logs/"$TEST_NAME"_2.log &
+    ./bin/leader_acceptance -id 2 -agent "$(container_ip $AGENT_NAME2):8500" -key foo/bar -log.console trace &> logs/"$TEST_NAME"_2.log &
     CLIENT2=$!
     sleep 5
     if ! is_leader 1 && ! is_leader 2; then
@@ -41,7 +41,7 @@ test_run() {
 
 test_teardown() {
     pkill -f leader_acceptance
-    collect_consul_logs
+    collect_docker_logs "cmd_dc"
     kill_consul
 }
 

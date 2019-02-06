@@ -79,3 +79,26 @@ test_teardown() {
 log() {
     echo "$(date -u +"%F %T.%6N%z") $@"
 }
+
+#######################################
+# Return the ip of the container
+# Arguments:
+#   Name of the container
+#######################################
+container_ip() {
+    docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$1"
+}
+
+#######################################
+# Collect docker compose logs into logs/docker
+# Arguments:
+#   The docker compose bash method to call.
+#######################################
+collect_docker_logs() {
+    local cmd="${1:?"Missing cmd argument"}"
+    local out_dir=logs/docker
+    mkdir -p "$out_dir"
+    for svc in $("$cmd" config --services); do
+        "$cmd" logs $svc &> $out_dir/$svc.log
+    done
+}

@@ -2,6 +2,8 @@
 
 # Common functionality for leader elcection tests.
 
+. acceptance/common.sh
+
 SERVER_NAME1=consul_server1
 SERVER_NAME2=consul_server2
 AGENT_NAME1=consul_agent1
@@ -15,24 +17,8 @@ lost_leader() {
     grep -q "LOSTLEADER id=$1" logs/*.log
 }
 
-ip_of() {
-    echo `docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$1"`
-}
-
-log() {
-    echo "$(date -u --rfc-3339=seconds) $@"
-}
-
 cmd_dc() {
     COMPOSE_FILE="acceptance/leaderutil/consul-dc.yml" docker-compose -p acceptance_consul --no-ansi "$@"
-}
-
-collect_consul_logs() {
-    local out_dir=logs/docker
-    mkdir -p "$out_dir"
-    for svc in $(cmd_dc config --services); do
-        $(cmd_dc logs $svc &> $out_dir/$svc.log)
-    done
 }
 
 test_setup() {
