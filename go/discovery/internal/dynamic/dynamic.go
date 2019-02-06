@@ -25,15 +25,16 @@ var TopoFull *util.AtomicTopo
 var TopoLimited *util.AtomicTopo
 
 const (
-	ErrConn           = "connect-error"
-	ErrParseBaseTopo  = "basetopo-parse-error"
-	ErrServiceUpdate  = "service-update-error"
-	ErrMarshalFull    = "marshall-full-error"
-	ErrMarshalReduced = "marshall-reduced-error"
-	ErrFetch          = "fetch-failure"
-	ErrServiceEmpty   = "service-empty"
-	PartialUpdate     = "partial-update"
-	Success           = "success"
+	ErrConn              = "connect-error"
+	ErrParseBaseTopo     = "basetopo-parse-error"
+	ErrServiceUpdate     = "service-update-error"
+	ErrMarshalFull       = "marshall-full-error"
+	ErrMarshalReduced    = "marshall-reduced-error"
+	ErrFetch             = "fetch-failure"
+	ErrServiceEmpty      = "service-empty"
+	ErrOwnServiceMissing = "own-service-missing"
+	PartialUpdate        = "partial-update"
+	Success              = "success"
 )
 
 func init() {
@@ -46,6 +47,7 @@ func init() {
 var _ periodic.Task = (*Updater)(nil)
 
 type Updater struct {
+	ID        string
 	SvcPrefix string
 	Client    *consulapi.Client
 }
@@ -127,7 +129,33 @@ func (u *Updater) updateServices(ctx context.Context, rt *topology.RawTopo) bool
 	rt.PathService, ok = u.fillService(ctx, consul.PS, rt.PathService)
 	allOk = allOk && ok
 	rt.SIG, ok = u.fillService(ctx, consul.SIG, rt.SIG)
+	allOk = allOk && ok
+	rt.DiscoveryService, ok = u.fillDiscoveryService(ctx, rt.DiscoveryService)
 	return allOk && ok
+}
+
+func (u *Updater) fillDiscoveryService(ctx context.Context,
+	fallback map[string]*topology.RawSrvInfo) (map[string]*topology.RawSrvInfo, bool) {
+
+	labels := prometheus.Labels{"result": Success, "service": string(consul.DS)}
+	defer incCounterVec(labels, metrics.TotalConsulServiceUpdates)
+
+	service, err := u.getService(ctx, consul.DS)
+	if err != nil {
+		log.Warn("Could not fetch service entries from Consul, using fallback",
+			"servicetype", consul.DS, "err", err)
+		labels["result"] = ErrFetch
+		return fallback, false
+	}
+	succ := true
+	if _, ok := service[u.ID]; !ok {
+		log.Warn("Own service not passing on Consul, using fallback")
+		labels["result"] = ErrOwnServiceMissing
+		succ = false
+	}
+	// Ensure that the local entry is consistent with the static topology.
+	service[u.ID] = fallback[u.ID]
+	return service, succ
 }
 
 // fillService fetches the service info from consul and returns it. If consul is not

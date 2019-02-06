@@ -124,6 +124,9 @@ func validateConfig(cfg *config.Config) error {
 		return common.NewBasicError("IA changed", nil,
 			"newIA", cfg.General.Topology.ISD_AS, "currIA", ia)
 	}
+	if _, ok := cfg.General.Topology.DS[cfg.General.ID]; !ok {
+		return common.NewBasicError("Topology does not contain DS", nil, "id", cfg.General.ID)
+	}
 	return nil
 }
 
@@ -146,6 +149,7 @@ func startDynUpdater(cfg *config.Config) {
 	}
 	dynUpdater = periodic.StartPeriodicTask(
 		&dynamic.Updater{
+			ID:        cfg.General.ID,
 			SvcPrefix: cfg.DS.Dynamic.ServicePrefix,
 			Client:    consulClient,
 		},
