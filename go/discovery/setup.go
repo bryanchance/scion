@@ -3,6 +3,8 @@
 package main
 
 import (
+	"io"
+
 	"github.com/BurntSushi/toml"
 
 	"github.com/scionproto/scion/go/discovery/internal/acl"
@@ -29,23 +31,29 @@ func setupBasic() (*config.Config, error) {
 	return cfg, nil
 }
 
-func setup(cfg *config.Config) error {
+type closerFunc func() error
+
+func (cf closerFunc) Close() error {
+	return cf()
+}
+
+func setup(cfg *config.Config) (io.Closer, error) {
 	if err := env.InitGeneral(&cfg.General); err != nil {
-		return err
+		return nil, err
 	}
 	cfg.DS.InitDefaults()
 	if err := validateConfig(cfg); err != nil {
-		return common.NewBasicError("Unable to validate config", err)
+		return nil, common.NewBasicError("Unable to validate config", err)
 	}
 	ia = cfg.General.Topology.ISD_AS
 	// metrics must be initialized before the files are loaded.
 	metrics.Init(cfg.General.ID)
 	if err := loadFiles(cfg); err != nil {
-		return err
+		return nil, err
 	}
-	cfg.Consul.InitDefaults()
-	if err := setupConsul(cfg); err != nil {
-		return err
+	c, err := setupConsul(cfg)
+	if err != nil {
+		return nil, err
 	}
 	startDynUpdater(cfg)
 	environment = env.SetupEnv(func() {
@@ -53,34 +61,39 @@ func setup(cfg *config.Config) error {
 			log.Error("Unable to reload config", "err", err)
 		}
 	})
-	return nil
+	return c, nil
 }
 
-func setupConsul(cfg *config.Config) error {
+func setupConsul(cfg *config.Config) (io.Closer, error) {
+	cfg.Consul.InitDefaults()
 	var err error
 	if consulClient, err = cfg.Consul.Client(); err != nil {
-		return err
+		return nil, err
 	}
-	if _, err = startUpdateTTL(cfg); err != nil {
-		return err
+	topoAddr := cfg.General.Topology.DS.GetById(cfg.General.ID)
+	svc := &consul.Service{
+		Agent:  consulClient.Agent(),
+		ID:     cfg.General.ID,
+		Prefix: cfg.Consul.Prefix,
+		Addr:   topoAddr.PublicAddr(topoAddr.Overlay),
+		Type:   consul.DS,
 	}
-	return nil
+	ttlUpdater, err := svc.Register(cfg.Consul.InitConnPeriod.Duration, checkHealth,
+		cfg.Consul.Health)
+	if err != nil {
+		return nil, common.NewBasicError("Unable to register service with consul", err)
+	}
+	return closerFunc(func() error {
+		ttlUpdater.Stop()
+		svc.Deregister()
+		return nil
+	}), nil
 }
 
-func startUpdateTTL(cfg *config.Config) (*periodic.Runner, error) {
-	svc := &consul.Service{
-		Type:        consul.DS,
-		Agent:       consulClient.Agent(),
-		Logger:      log.New("part", "UpdateTTL"),
-		CheckParams: cfg.Consul.Health,
-		Check: func() consul.CheckInfo {
-			return consul.CheckInfo{
-				Id:     cfg.General.ID,
-				Status: consul.StatusPass,
-			}
-		},
+func checkHealth() consul.CheckInfo {
+	return consul.CheckInfo{
+		Status: consul.StatusPass,
 	}
-	return svc.StartUpdateTTL(cfg.Consul.InitConnPeriod.Duration)
 }
 
 func reload(configName string) error {

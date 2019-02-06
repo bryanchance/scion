@@ -70,15 +70,34 @@ const Sample = `[general]
 
 
 [consul]
-  # The consul agent to connect to. (default: 127.0.0.1:8500)
+  # Enables consul. (default false)
+  Enabled = false
+
+  # The consul agent to connect to. (default 127.0.0.1:8500)
   Agent = "127.0.0.1:8500"
+
+  # The prefix to use in front of the service name. (format prefix/ServiceType)
+  # (e.g. 1-ff00:0:110/DiscoveryService) (default "")
+  Prefix = ""
 
   # The maximum time the initial connection to consul can take. (default 5s)
   InitialConnectPeriod = "5s"
 
   [consul.Health]
+    # Optional name of the health check. The empty string is replace by
+    # "Health Check: ID", where ID is general.ID. (default "")
+    Name = ""
+
+    # TTL is the TTL of the health check. (default 10s)
+    TTL = "10s"
+
     # The interval at which the health status should be reported to consul. (default 5s)
     Interval = "5s"
+
     # The timeout for setting the health status. (default 1s)
     Timeout = "1s"
+
+    # Deregister the service if the check is in critical state
+    # for more than this time. (default 1h)
+    DeregisterCriticalServiceAfter = "1h"
 `

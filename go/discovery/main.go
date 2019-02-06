@@ -56,10 +56,12 @@ func realMain() int {
 	defer log.Flush()
 	defer env.LogAppStopped(common.DS, config.General.ID)
 	defer log.LogPanicAndExit()
-	if err := setup(config); err != nil {
+	c, err := setup(config)
+	if err != nil {
 		log.Crit("Setup failed", "err", err)
 		return 1
 	}
+	defer c.Close()
 	http.DefaultServeMux.Handle("/metrics", promhttp.Handler())
 
 	pubMux := http.NewServeMux()

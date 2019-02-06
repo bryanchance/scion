@@ -44,6 +44,9 @@ func TestSample(t *testing.T) {
 		// Set to wrong string to make sure value from file is taken.
 		cfg.Sig.Dispatcher = "wrong one"
 		cfg.Sig.Quagga.ExportRoutes = true
+		cfg.Consul.Enabled = true
+		cfg.Consul.Prefix = "1-ff00:0:111"
+		cfg.Consul.Health.Name = "Health check"
 		_, err := toml.Decode(Sample, &cfg)
 		SoMsg("err", err, ShouldBeNil)
 
@@ -78,11 +81,19 @@ func TestSample(t *testing.T) {
 		// Consul specific
 		SoMsg("Consul.Enabled correct", cfg.Consul.Enabled, ShouldBeFalse)
 		SoMsg("Consul.Agent correct", cfg.Consul.Agent, ShouldEqual, consulconfig.DefaultAgent)
+		SoMsg("Consul.Prefix correct", cfg.Consul.Prefix, ShouldBeBlank)
+		SoMsg("Consul.InitConnPeriod correct", cfg.Consul.InitConnPeriod.Duration,
+			ShouldEqual, consulconfig.DefaultInitConnPeriod)
+
+		SoMsg("Consul.Health.Name correct", cfg.Consul.Health.Name, ShouldBeBlank)
+		SoMsg("Consul.Health.TTL correct", cfg.Consul.Health.TTL.Duration,
+			ShouldEqual, consulconfig.DefaultHealthTTL)
 		SoMsg("Consul.Health.Interval correct", cfg.Consul.Health.Interval.Duration,
 			ShouldEqual, consulconfig.DefaultHealthInterval)
 		SoMsg("Consul.Health.Timeout correct", cfg.Consul.Health.Timeout.Duration,
 			ShouldEqual, consulconfig.DefaultHealthTimeout)
-		SoMsg("Consul.InitConnPeriod correct", cfg.Consul.InitConnPeriod.Duration,
-			ShouldEqual, consulconfig.DefaultInitConnPeriod)
+		SoMsg("Consul.Health.DeregisterCriticalServiceAfter correct",
+			cfg.Consul.Health.DeregisterCriticalServiceAfter.Duration,
+			ShouldEqual, consulconfig.DefaultHealthDeregister)
 	})
 }

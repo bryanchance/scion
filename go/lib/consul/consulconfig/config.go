@@ -16,31 +16,47 @@ const (
 )
 
 var (
-	DefaultAgent          = "127.0.0.1:8500"
-	DefaultHealthInterval = 5 * time.Second
-	DefaultHealthTimeout  = 1 * time.Second
-	DefaultInitConnPeriod = 5 * time.Second
+	DefaultAgent            = "127.0.0.1:8500"
+	DefaultHealthTTL        = 10 * time.Second
+	DefaultHealthInterval   = 5 * time.Second
+	DefaultHealthTimeout    = 1 * time.Second
+	DefaultHealthDeregister = 1 * time.Hour
+	DefaultInitConnPeriod   = 5 * time.Second
 )
 
 type HealthCheck struct {
+	// Name is the name of the health check.
+	Name string
+	// TTL is the TTL of the health check.
+	TTL util.DurWrap
 	// Interval is the time between setting check status.
 	Interval util.DurWrap
 	// Timeout is the timeout for setting check status.
 	Timeout util.DurWrap
+	// DeregisterCriticalServiceAfter specifies the time after which the service
+	// associated with this check is deregistered.
+	DeregisterCriticalServiceAfter util.DurWrap
 }
 
 func (h *HealthCheck) InitDefaults() {
+	if h.TTL.Duration == 0 {
+		h.TTL.Duration = DefaultHealthTTL
+	}
 	if h.Interval.Duration == 0 {
 		h.Interval.Duration = DefaultHealthInterval
 	}
 	if h.Timeout.Duration == 0 {
 		h.Timeout.Duration = DefaultHealthTimeout
 	}
+	if h.DeregisterCriticalServiceAfter.Duration == 0 {
+		h.DeregisterCriticalServiceAfter.Duration = DefaultHealthDeregister
+	}
 }
 
 type Config struct {
 	Enabled        bool
 	Agent          string
+	Prefix         string
 	Health         HealthCheck
 	InitConnPeriod util.DurWrap `toml:"InitialConnectPeriod"`
 }

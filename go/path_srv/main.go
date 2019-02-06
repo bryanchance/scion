@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
-	consulapi "github.com/hashicorp/consul/api"
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
@@ -287,9 +286,18 @@ func setupConsul() (io.Closer, error) {
 	if err != nil {
 		return nil, err
 	}
-	ttlUpdater, err := startUpdateTTL(c)
+	topoAddr := itopo.Get().PS.GetById(cfg.General.ID)
+	svc := &consul.Service{
+		Agent:  c.Agent(),
+		ID:     cfg.General.ID,
+		Prefix: cfg.Consul.Prefix,
+		Addr:   topoAddr.PublicAddr(topoAddr.Overlay),
+		Type:   consul.PS,
+	}
+	ttlUpdater, err := svc.Register(cfg.Consul.InitConnPeriod.Duration, checkHealth,
+		cfg.Consul.Health)
 	if err != nil {
-		return nil, err
+		return nil, common.NewBasicError("Unable to register service with consul", err)
 	}
 	leaderKey := fmt.Sprintf("path_srv/leader/%s", cfg.General.Topology.ISD_AS.FileFmt(false))
 	le, err := consul.StartLeaderElector(c, leaderKey, consulconfig.LeaderElectorConf{
@@ -298,28 +306,20 @@ func setupConsul() (io.Closer, error) {
 		LostLeader:     tasks.Kill,
 	})
 	if err != nil {
+		svc.Deregister()
 		ttlUpdater.Kill()
 		return nil, err
 	}
 	return closerFunc(func() error {
 		le.Stop()
 		ttlUpdater.Stop()
+		svc.Deregister()
 		return nil
 	}), nil
 }
 
-func startUpdateTTL(c *consulapi.Client) (*periodic.Runner, error) {
-	svc := &consul.Service{
-		Type:        consul.PS,
-		Agent:       c.Agent(),
-		Logger:      log.New("part", "UpdateTTL"),
-		CheckParams: cfg.Consul.Health,
-		Check: func() consul.CheckInfo {
-			return consul.CheckInfo{
-				Id:     cfg.General.ID,
-				Status: consul.StatusPass,
-			}
-		},
+func checkHealth() consul.CheckInfo {
+	return consul.CheckInfo{
+		Status: consul.StatusPass,
 	}
-	return svc.StartUpdateTTL(cfg.Consul.InitConnPeriod.Duration)
 }

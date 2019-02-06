@@ -8,9 +8,11 @@ import yaml
 
 from lib.util import write_file
 from topology.ana.common import DS_CONFIG_NAME
-from topology.common import docker_host, get_l4_port, get_pub_ip, ArgsTopoDicts
 from topology.common import (
+    ArgsTopoDicts,
     CS_CONFIG_NAME,
+    docker_host,
+    get_pub_ip,
     PS_CONFIG_NAME,
     SIG_CONFIG_NAME,
 )
@@ -145,39 +147,19 @@ class ConsulGenerator(object):
             services['SIG'] = SIG_CONFIG_NAME
         for svc, conf in services.items():
             for elem_id, v in topo.get(svc, {}).items():
-                self._generate_client_svc(topo_id, topo, base, svc, elem_id, v)
-                self._add_consul_to_conf(base, elem_id, conf, port)
+                self._add_consul_to_conf(topo_id, base, elem_id, conf, port)
 
-    def _generate_client_svc(self, topo_id, topo, base, svc, elem_id, v):
-        checks = [{
-            'id': elem_id,
-            'name': 'Health Check: %s' % elem_id,
-            'ttl': '10s',
-        }]
-        # FIXME(roosd): BeaconService does not support consul health check yet.
-        if svc == 'BeaconService':
-            checks = []
-        svc = {
-            'services': [{
-                'name': '%s/%s' % (topo_id, svc),
-                'id': elem_id,
-                'address': str(get_pub_ip(v['Addrs'])),
-                'port': get_l4_port(v['Addrs']),
-                'checks': checks,
-            }]
-        }
-        write_file(os.path.join(base, CLIENT_DIR, '%s.json' % elem_id),
-                   json.dumps(svc, indent=4))
-
-    def _add_consul_to_conf(self, base, elem_id, conf, port):
+    def _add_consul_to_conf(self, topo_id, base, elem_id, conf, port):
         file = os.path.join(base, elem_id, conf)
         if not Path(file).is_file():
             return
         with open(file, 'a') as f:
+            f.write('\n')
             consul_entry = {
                 'consul': {
                     'Enabled': True,
-                    'Agent': '%s:%s' % (self.docker_ip, port)
+                    'Prefix': str(topo_id),
+                    'Agent': '%s:%s' % (self.docker_ip, port),
                 },
             }
             f.write(toml.dumps(consul_entry))

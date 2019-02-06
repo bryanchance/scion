@@ -32,6 +32,7 @@ import (
 	"github.com/scionproto/scion/go/lib/consul/consulconfig"
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/fatal"
+	"github.com/scionproto/scion/go/lib/infra/modules/itopo"
 	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/sig/anaconfig"
 	"github.com/scionproto/scion/go/sig/base"
@@ -263,24 +264,28 @@ func setupConsul() (io.Closer, error) {
 	if err != nil {
 		return nil, err
 	}
+	topoAddr := itopo.Get().SIG.GetById(cfg.Sig.ID)
 	svc := &consul.Service{
-		Type:        consul.SIG,
-		Agent:       c.Agent(),
-		Logger:      log.New("part", "UpdateTTL"),
-		CheckParams: cfg.Consul.Health,
-		Check: func() consul.CheckInfo {
-			return consul.CheckInfo{
-				Id:     cfg.Sig.ID,
-				Status: consul.StatusPass,
-			}
-		},
+		Agent:  c.Agent(),
+		ID:     cfg.Sig.ID,
+		Prefix: cfg.Consul.Prefix,
+		Addr:   topoAddr.PublicAddr(topoAddr.Overlay),
+		Type:   consul.SIG,
 	}
-	ttlUpdater, err := svc.StartUpdateTTL(cfg.Consul.InitConnPeriod.Duration)
+	ttlUpdater, err := svc.Register(cfg.Consul.InitConnPeriod.Duration, checkHealth,
+		cfg.Consul.Health)
 	if err != nil {
-		return nil, err
+		return nil, common.NewBasicError("Unable to register service with consul", err)
 	}
 	return closerFunc(func() error {
 		ttlUpdater.Stop()
+		svc.Deregister()
 		return nil
 	}), nil
+}
+
+func checkHealth() consul.CheckInfo {
+	return consul.CheckInfo{
+		Status: consul.StatusPass,
+	}
 }
