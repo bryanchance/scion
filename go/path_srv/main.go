@@ -215,7 +215,8 @@ func (t *periodicTasks) Start() {
 			fatal.Fatal(common.NewBasicError("Unable to start seg syncer", err))
 		}
 	}
-	t.discovery, err = idiscovery.StartRunners(cfg.Discovery, discovery.Full, nil)
+	t.discovery, err = idiscovery.StartRunners(cfg.Discovery, discovery.Full,
+		idiscovery.TopoHandlers{}, nil)
 	if err != nil {
 		fatal.Fatal(common.NewBasicError("Unable to start dynamic topology fetcher", err))
 	}
