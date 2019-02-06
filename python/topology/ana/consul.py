@@ -158,7 +158,7 @@ class ConsulGenerator(object):
             consul_entry = {
                 'consul': {
                     'Enabled': True,
-                    'Prefix': str(topo_id),
+                    'Prefix': "%s/" % str(topo_id),
                     'Agent': '%s:%s' % (self.docker_ip, port),
                 },
             }

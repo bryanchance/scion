@@ -116,7 +116,7 @@ func (s *Service) Name() string {
 	if s.Prefix == "" {
 		return string(s.Type)
 	}
-	return fmt.Sprintf("%s/%s", s.Prefix, s.Type)
+	return fmt.Sprintf("%s%s", s.Prefix, s.Type)
 }
 
 var _ (periodic.Task) = (*TTLSetter)(nil)

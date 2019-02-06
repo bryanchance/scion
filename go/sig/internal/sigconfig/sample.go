@@ -93,8 +93,8 @@ const Sample = `
   # The consul agent to connect to. (default 127.0.0.1:8500)
   Agent = "127.0.0.1:8500"
 
-  # The prefix to use in front of the service name. (format prefix/ServiceType)
-  # (e.g. 1-ff00:0:110/SIG) (default "")
+  # The prefix to use in front of the service name.
+  # (e.g. "1-ff00:0:110/" in "1-ff00:0:110/SIG") (default "")
   Prefix = ""
 
   # The maximum time the initial connection to consul can take. (default 5s)
