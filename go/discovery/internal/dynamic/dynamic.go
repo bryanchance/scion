@@ -50,6 +50,7 @@ type Updater struct {
 	ID        string
 	SvcPrefix string
 	Client    *consulapi.Client
+	TTL       time.Duration
 }
 
 // Run fetches all available services from consul and updates the dynamic topology.
@@ -114,6 +115,7 @@ func (u *Updater) updateTimestamps(rt *topology.RawTopo) {
 	ts := time.Now()
 	rt.Timestamp = ts.Unix()
 	rt.TimestampHuman = ts.Format(time.RFC3339)
+	rt.TTL = uint32(u.TTL / time.Second)
 }
 
 // updateServices updates the services in the raw topology. If a service cannot

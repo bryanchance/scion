@@ -17,9 +17,9 @@ const (
 
 var (
 	DefaultAgent            = "127.0.0.1:8500"
-	DefaultHealthTTL        = 10 * time.Second
-	DefaultHealthInterval   = 5 * time.Second
-	DefaultHealthTimeout    = 1 * time.Second
+	DefaultHealthTTL        = 2 * time.Second
+	DefaultHealthInterval   = 500 * time.Millisecond
+	DefaultHealthTimeout    = 500 * time.Millisecond
 	DefaultHealthDeregister = 1 * time.Hour
 	DefaultInitConnPeriod   = 5 * time.Second
 )

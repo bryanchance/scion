@@ -13,9 +13,11 @@ import (
 
 const (
 	// DefaultDynamicQueryInterval is the default interval between querying consul.
-	DefaultDynamicQueryInterval = 5 * time.Second
+	DefaultDynamicQueryInterval = 1 * time.Second
 	// DefaultDynamicTimeout is the default timeout for querying consul.
-	DefaultDynamicTimeout = 2 * time.Second
+	DefaultDynamicTimeout = 1 * time.Second
+	// DefaultDynamicTTL is the default TTL of the dynamic topology.
+	DefaultDynamicTTL = 1 * time.Minute
 )
 
 type Config struct {
@@ -73,6 +75,8 @@ type DynConfig struct {
 	Timeout util.DurWrap
 	// ServicePrefix is the service prefix.
 	ServicePrefix string
+	// TTL is the TTL of the dynamic topology.
+	TTL util.DurWrap
 }
 
 func (d *DynConfig) InitDefaults() {
@@ -81,5 +85,8 @@ func (d *DynConfig) InitDefaults() {
 	}
 	if d.Timeout.Duration == 0 {
 		d.Timeout.Duration = DefaultDynamicTimeout
+	}
+	if d.TTL.Duration == 0 {
+		d.TTL.Duration = DefaultDynamicTTL
 	}
 }

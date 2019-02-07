@@ -152,6 +152,7 @@ func startDynUpdater(cfg *config.Config) {
 			ID:        cfg.General.ID,
 			SvcPrefix: cfg.DS.Dynamic.ServicePrefix,
 			Client:    consulClient,
+			TTL:       cfg.DS.Dynamic.TTL.Duration,
 		},
 		periodic.NewTicker(cfg.DS.Dynamic.QueryInterval.Duration),
 		cfg.DS.Dynamic.Timeout.Duration,

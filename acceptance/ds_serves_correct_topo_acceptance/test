@@ -29,7 +29,6 @@ test_setup() {
     for ds in gen/ISD1/*/ds*; do
         # Add privileged to the ACL.
         printf "\n$PRIVILEGED/32" >> $ds/acl
-        sed -i '/\[ds\.dynamic\]/a QueryInterval = "1s"' "$ds/dsconfig.toml"
     done
     ./scion.sh run nobuild
     sleep 5
@@ -54,6 +53,8 @@ check_static() {
 # the dynamic topology.
 check_dynamic() {
     printf "[dynamic] Starting tests\n"
+    # Check that TTL is set.
+    check_all_ttl
     # Check dynamic is initially same as on disk.
     check_all_disc $DYNAMIC "check_dynamic start"
     # Get address of discovery service in AS with multiple service instances.
@@ -76,6 +77,15 @@ check_dynamic() {
     # Check dynamic is served with all instances.
     check_all_disc $DYNAMIC "check_dynamic end"
     printf "[dynamic] All tests passed\n"
+}
+
+# Check that all discovery services serve dynamic topology with TTL set to default.
+check_all_ttl() {
+    for ds in gen/ISD1/*/ds*; do
+        addr=$( get_laddr $ds )
+        query_topo $REGULAR $addr $DYNAMIC $REDUCED | jq '.TTL == 60' -e || { echo "TTL invalid for reduced topo"; return 1; }
+        query_topo $PRIVILEGED $addr $DYNAMIC $FULL | jq '.TTL == 60' -e || { echo "TTL invalid for full topo"; return 1; }
+    done
 }
 
 # Check that all discovery services serve same topology as on the disk.

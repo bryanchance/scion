@@ -123,14 +123,14 @@ const Sample = `[general]
     # "Health Check: ID", where ID is general.ID. (default "")
     Name = ""
 
-    # TTL is the TTL of the health check. (default 10s)
-    TTL = "10s"
+    # TTL is the TTL of the health check. (default 2s)
+    TTL = "2s"
 
-    # The interval at which the health status should be reported to consul. (default 5s)
-    Interval = "5s"
+    # The interval at which the health status should be reported to consul. (default 500ms)
+    Interval = "500ms"
 
-    # The timeout for setting the health status. (default 1s)
-    Timeout = "1s"
+    # The timeout for setting the health status. (default 500ms)
+    Timeout = "500ms"
 
     # Deregister the service if the check is in critical state
     # for more than this time. (default 1h)
