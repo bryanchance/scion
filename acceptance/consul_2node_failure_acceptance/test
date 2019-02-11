@@ -14,8 +14,9 @@ test_setup() {
 
 test_run() {
     # Check consul internal leader election worked.
-    wait_leader_count consul_server1 "1"
-    check_leader_count consul_server2 "1"
+    wait_leader_count 20 consul_server1 "1"
+    # sometimes there is a slight delay before it appears on the other log as well.
+    wait_leader_count 1 consul_server2 "1"
     log "OK: Initial leader election worked."
     # Kill node1
     log "Killing consul_server1"
@@ -25,8 +26,8 @@ test_run() {
     log "Restart consul_server1"
     dc up -d consul_server1
     # Check leader is found.
-    wait_leader_count consul_server1 "2"
-    check_leader_count consul_server2 "2"
+    wait_leader_count 20 consul_server1 "2"
+    wait_leader_count 1 consul_server2 "2"
     log "OK: Leader election after node1 failure worked."
     # Give some time to be in sync again
     sleep 10
@@ -38,27 +39,22 @@ test_run() {
     log "Restart consul_server2"
     dc up -d consul_server2
     # Check leader is found.
-    wait_leader_count consul_server1 "3"
-    check_leader_count consul_server2 "3"
+    wait_leader_count 20 consul_server1 "3"
+    wait_leader_count 1 consul_server2 "3"
     log "OK: Leader election after node2 failure worked."
 }
 
 wait_leader_count() {
-    server="$1"
-    expected="$2"
-    cnt=0
-    while [ "$(current_leader_count $server)" -lt "$expected" ] && [ "$cnt" -lt 20 ]; do
+    loops="$1"
+    server="$2"
+    expected="$3"
+    for i in $(seq "$loops"); do
+        [ "$(current_leader_count $server)" -eq "$expected" ] && return
         sleep 1
-        : $((cnt+=1))
     done
-    check_leader_count "$server" "$expected"
-}
-
-check_leader_count() {
-    server="$1"
-    expected="$2"
-    actual=$(current_leader_count $server)
-    [ "$actual" -eq "$expected" ] || { log "FAIL: Expected $expected 'leader elected' lines for $server, found $actual"; exit 1; }
+    [ "$(current_leader_count $server)" -eq "$expected" ] && return
+    log "FAIL: Expected $expected 'leader elected' lines for $server, found $actual"
+    exit 1
 }
 
 current_leader_count() {
