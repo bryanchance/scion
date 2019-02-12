@@ -35,8 +35,8 @@ RUN apt-get purge -y libpython2.7-stdlib libpython2.7-minimal python3-pip \
     && rm -rf /var/lib/apt/lists/* /root/.cache \
     && rm -rf /patronisrc
 
-RUN sed -i 's/env python/&3/' patroni*.py && ln -s /patronictl.py /usr/local/bin/patronictl && mkdir /data/ /cfg/ \
-    && touch /pgpass /patroni.yml && chown postgres:postgres -R /patroni/ /cfg/ /data/ /pgpass /patroni.yml /var/run/ /var/lib/ /var/log/
+RUN sed -i 's/env python/&3/' patroni*.py && ln -s /patronictl.py /usr/local/bin/patronictl && mkdir /data/ /cfg/ /initsql/ \
+    && touch /pgpass /patroni.yml && chown postgres:postgres -R /patroni/ /cfg/ /data/ /initsql/ /pgpass /patroni.yml /var/run/ /var/lib/ /var/log/
 
 EXPOSE 2379 5432 8008
 

@@ -1,0 +1,149 @@
+#!/bin/bash
+
+# Test that we can kill the patroni leader node and the cluster will fail over to the second node.
+
+TEST_NAME="patroni_leader_failure"
+PROGRAM=$(basename "$0")
+COMMAND="$1"
+
+. acceptance/patroni/common.sh
+
+test_run() {
+    set -e
+    consul1_ip=$(container_ip $CONSUL1)
+    log "Find leader in consul ($consul1_ip)"
+    li=$(leader_info)
+    leader_name=$(leader_name $li)
+    # We cheat and use docker to get the IP. In an actual lib you would use the service registry
+    # from consul to find all IPs.
+    leader_ip=$(container_ip $leader_name)
+
+    # Test writing to leader works
+    test_write_to_leader "1"
+
+    replica_name=$(replica_node $leader_name)
+    replica_ip=$(container_ip $replica_name)
+
+    # Test replica sees write
+    sleep 0.5 # some time to propagate
+    test_replica_sees_data "1"
+
+    # Test replica is not writable
+    log "Test replica ($replica_name $replica_ip) is not writable"
+    cmd_dc exec psql psql -q -c 'INSERT INTO test (val) VALUES (2);' "$(postgres_url $replica_ip)" \
+        && { echo "Could write to replica db"; exit 1; }
+
+    # First switch to replica
+    test_switch_leader "2"
+    # Now switch back to original leader
+    test_switch_leader "3"
+}
+
+# Returns information in the leader key in consul.
+# Takes an optional modify index as argument to run this in blocking mode.
+leader_info() {
+    local idx=${1:-0}
+    curl -sS "http://$consul1_ip:8500/v1/kv/service/ptest/leader?index=$idx"
+}
+
+# Extracts the name from the leader_info json block.
+leader_name() {
+    echo $1 | jq -r '.[0].Value' | base64 --decode
+}
+
+# Determines the current replica node depending on the given leader.
+replica_node() {
+    case "$1" in
+        $PATRONI1)
+            echo "$PATRONI2" ;;
+        $PATRONI2)
+            echo "$PATRONI1" ;;
+        *)
+            echo "Invalid leader: '$1'"; return 1 ;;
+    esac
+}
+
+test_switch_leader() {
+    expected_value="$1"
+    # Kill the new leader
+    modify_index=$(curl -sS "http://$consul1_ip:8500/v1/kv/service/ptest/leader" | jq -r '.[0].ModifyIndex')
+    old_leader="$leader_name"
+    log "killing $old_leader"
+    ./tools/quiet docker kill $old_leader
+
+    # Wait for leader to switch
+    leader_name=$(wait_for_new_leader $modify_index)
+    [ "$old_leader" != "$leader_name" ] || { echo "Leader didn't change it is still $old_leader"; exit 1; }
+    leader_ip=$(container_ip $leader_name)
+
+    # Test new leader is writable
+    test_write_to_leader "$expected_value"
+
+    # Restart killed node
+    cmd_dc up -d "$old_leader"
+
+    # Wait for replica to be ready again
+    replica_ip=$(wait_for_replica)
+
+    # Test replica sees data from leader
+    test_replica_sees_data "$expected_value"
+}
+
+wait_for_new_leader() {
+    local modify_index="$1"
+    local consul1_ip=$(container_ip $CONSUL1)
+    # Wait until we have a new leader:
+    local json=$(leader_info "$modify_index")
+    local leader_name=$(leader_name $json)
+    local cnt=0
+    while [ -z "$leader_name" ] && [ "$cnt" -lt 20 ]; do
+        modify_index=$(echo "$json" | jq -r '.[0].ModifyIndex')
+        json=$(leader_info "$modify_index")
+        leader_name=$(leader_name "$json")
+        sleep 1
+        : $((cnt+=1))
+    done
+    [ -z "$leader_name" ] && { echo "Didn't find new leader in time"; exit 1; }
+    echo "$leader_name"
+}
+
+test_write_to_leader() {
+    log "Test leader ($leader_name $leader_ip) is writable"
+    cmd_dc exec psql psql -c "INSERT INTO test (val) VALUES ($1);" "$(postgres_url $leader_ip)" \
+        || { echo "Failed to write to leader db"; exit 1; }
+}
+
+test_replica_sees_data() {
+    log "Test replica ($replica_ip) sees data from leader"
+    local result=$(cmd_dc exec psql psql -t -c 'SELECT MAX(val) FROM test;' "$(postgres_url $replica_ip)") \
+        || { echo "Failed to read from replica"; exit 1; }
+    result=$(echo "$result" | tr -d '[:space:]')
+    [ "$result" == "$1" ] || { echo "Wrong result: '$result', expected $1"; exit 1; }
+}
+
+wait_for_replica() {
+    local consul1_ip=$(container_ip $CONSUL1)
+    local url="http://$consul1_ip:8500/v1/catalog/service/ptest?tag=replica"
+    local json=$(curl -sS "$url")
+    local ip=$(service_addr $json)
+    local cnt=0
+    while [ "$cnt" -lt 20 ] && [ -z "$json" -o "$json" == "[]" -o "$ip" == "null" ]; do
+        sleep 1
+        json=$(curl -s "$url")
+        ip=$(service_addr $json)
+        : $((cnt+=1))
+    done
+    [ "$ip" != "null" ] && [ -z "$ip" ] && { echo "Didn't find replica IP in time"; exit 1; }
+    echo "$ip"
+}
+
+# Get the url for postgres for the given IP.
+postgres_url() {
+    echo "postgres://postgres:password@$1:5432/postgres"
+}
+
+service_addr() {
+    echo $1 | jq -r '.[0].ServiceAddress'
+}
+
+do_command $PROGRAM $COMMAND $TEST_NAME ${@:2}
