@@ -14,6 +14,7 @@ var (
 	TotalRequests             *prometheus.CounterVec
 	TotalBytes                *prometheus.CounterVec
 	TotalDenials              *prometheus.CounterVec
+	TotalServerErrors         *prometheus.CounterVec
 	RequestProcessTime        *prometheus.CounterVec
 	TotalACLLoads             *prometheus.CounterVec
 	TotalACLChecks            *prometheus.CounterVec
@@ -45,6 +46,8 @@ func Init(elem string) {
 	TotalBytes = newCVec("total_bytes_sent", "Number of bytes served", reqLabels)
 	TotalDenials = newCVec("total_denied_topo_requests",
 		"Number of denials for full topology requests", reqLabels)
+	TotalServerErrors = newCVec("total_server_errors_served",
+		"Number of server error served", reqLabels)
 	RequestProcessTime = newCVec("request_process_seconds",
 		"Time spent processing requests", reqLabels)
 

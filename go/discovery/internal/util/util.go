@@ -39,14 +39,19 @@ func MakeHandler(topo *AtomicTopo, promLabels prometheus.Labels) func(http.Respo
 	reqProcessTime := metrics.RequestProcessTime.With(promLabels)
 	totalReqs := metrics.TotalRequests.With(promLabels)
 	totalBytes := metrics.TotalBytes.With(promLabels)
+	totalErrors := metrics.TotalServerErrors.With(promLabels)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		body := topo.Load()
-		w.Write(body)
+		if body := topo.Load(); len(body) > 0 {
+			w.Write(body)
+			totalBytes.Add(float64(len(body)))
+		} else {
+			http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+			totalErrors.Inc()
+		}
 		reqProcessTime.Add(time.Since(start).Seconds())
 		totalReqs.Inc()
-		totalBytes.Add(float64(len(body)))
 	}
 }
 
@@ -57,17 +62,22 @@ func MakeACLHandler(topo *AtomicTopo, promLabels prometheus.Labels) func(http.Re
 	totalReqs := metrics.TotalRequests.With(promLabels)
 	deniedReqs := metrics.TotalDenials.With(promLabels)
 	totalBytes := metrics.TotalBytes.With(promLabels)
+	totalErrors := metrics.TotalServerErrors.With(promLabels)
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 		if !acl.IsAllowed(net.ParseIP(ip)) {
 			deniedReqs.Inc()
-			http.Error(w, "Access denied to full topology", 403)
+			http.Error(w, "Access denied to full topology", http.StatusForbidden)
 		} else {
-			body := topo.Load()
-			w.Write(body)
-			totalBytes.Add(float64(len(body)))
+			if body := topo.Load(); len(body) > 0 {
+				w.Write(body)
+				totalBytes.Add(float64(len(body)))
+			} else {
+				http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+				totalErrors.Inc()
+			}
 		}
 		reqProcessTime.Add(time.Since(start).Seconds())
 		totalReqs.Inc()

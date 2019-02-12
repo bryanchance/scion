@@ -3,56 +3,47 @@
 # The discovery service serves the static and dynamic topology file.
 # The reduced topology is served to anyone, the full topology is only
 # served to hosts allowed by the ACL.
-#
+
+. acceptance/dsutil/common.sh
 
 TEST_NAME="ds_serves_correct_topo"
-
-BASE="discovery/v1"
-STATIC="static"
-DYNAMIC="dynamic"
-REDUCED="reduced.json"
-FULL="full.json"
-
-PRIVILEGED=${PRIVILEGED:-"172.220.0.2"}
-REGULAR=${REGULAR:-"172.220.0.1"}
 TEST_TOPOLOGY="./acceptance/ds_serves_correct_topo_acceptance/Test.topo"
+
 MULTI_SVC_AS_DIR="gen/ISD1/ASff00_0_111"
 
 
 test_setup() {
     set -e
-    sudo -p "Setup virtual interfaces - [sudo] password for %p: " true
-    sudo ip addr add "$PRIVILEGED/32" dev lo
-    sudo ip addr add "$REGULAR/32" dev lo
+    # Add regular and privileged interface.
+    base_add_addrs
 
     ./scion.sh topology -c $TEST_TOPOLOGY -ds -d
     for ds in gen/ISD1/*/ds*; do
         # Add privileged to the ACL.
         printf "\n$PRIVILEGED/32" >> $ds/acl
     done
-    ./scion.sh run nobuild
-    sleep 5
+
+    # Run scion topology.
+    base_scion_run
 }
 
 test_run() {
     set -e
-    # Allow slow services to register with zookeeper.
-    sleep 10
     check_static
     check_dynamic
-    printf "All tests passed\n"
+    log "All tests passed"
 }
 
 check_static() {
-    printf "[static] Starting test\n"
+    log "[static] Starting test"
     check_all_disc $STATIC "check_static"
-    printf "[static] All tests passed\n"
+    log "[static] All tests passed"
 }
 
 # Check that the discovery service removes unavailable instances from
 # the dynamic topology.
 check_dynamic() {
-    printf "[dynamic] Starting tests\n"
+    log "[dynamic] Starting tests"
     # Check that TTL is set.
     check_all_ttl
     # Check dynamic is initially same as on disk.
@@ -61,30 +52,30 @@ check_dynamic() {
     addr="$( get_laddr $MULTI_SVC_AS_DIR/ds1-ff00_0_111-1 )"
     # Kill services instances and check that the dynamic is updated.
     # FIXME(roosd): Beacon service does not implement health checks yet.
-    # printf "[dynamic] Killing beacon service\n"
+    # log "[dynamic] Killing beacon service"
     # kill_and_check "bs1-ff00_0_111-2" $addr 1 2 2
-    printf "[dynamic] Killing certificate service\n"
+    log "[dynamic] Killing certificate service"
     kill_and_check "cs1-ff00_0_111-2" $addr 2 1 2 2
-    printf "[dynamic] Killing discovery service\n"
+    log "[dynamic] Killing discovery service"
     kill_and_check "ds1-ff00_0_111-2" $addr 2 1 1 2
-    printf "[dynamic] Killing path service\n"
+    log "[dynamic] Killing path service"
     kill_and_check "ps1-ff00_0_111-2" $addr 2 1 1 1
     # Restart instances
-    printf "[dynamic] Restarting killed services\n"
+    log "[dynamic] Restarting killed services"
     ./scion.sh run nobuild
     # Make sure that the instances have registered with service discovery.
     sleep 10
     # Check dynamic is served with all instances.
     check_all_disc $DYNAMIC "check_dynamic end"
-    printf "[dynamic] All tests passed\n"
+    log "[dynamic] All tests passed"
 }
 
 # Check that all discovery services serve dynamic topology with TTL set to default.
 check_all_ttl() {
     for ds in gen/ISD1/*/ds*; do
         addr=$( get_laddr $ds )
-        query_topo $REGULAR $addr $DYNAMIC $REDUCED | jq '.TTL == 60' -e || { echo "TTL invalid for reduced topo"; return 1; }
-        query_topo $PRIVILEGED $addr $DYNAMIC $FULL | jq '.TTL == 60' -e || { echo "TTL invalid for full topo"; return 1; }
+        query_topo $REGULAR $addr $DYNAMIC $REDUCED | jq '.TTL == 60' -e || fail "TTL invalid for reduced topo"
+        query_topo $PRIVILEGED $addr $DYNAMIC $FULL | jq '.TTL == 60' -e || fail "TTL invalid for full topo"
     done
 }
 
@@ -96,17 +87,14 @@ check_all_disc() {
     for ds in gen/ISD1/*/ds*; do
         addr=$( get_laddr $ds )
         # Check reduced topo
-        compare_topo_reduced $ds "$( query_topo $PRIVILEGED $addr $1 $REDUCED )" "$2: privileged" 
+        compare_topo_reduced $ds "$( query_topo $PRIVILEGED $addr $1 $REDUCED )" "$2: privileged"
         compare_topo_reduced $ds "$( query_topo $REGULAR $addr $1 $REDUCED )" "$2: regular"
         # Check full topo
         topo=$( query_topo $PRIVILEGED $addr $1 $FULL )
         local d=$( diff <(jq 'del(.Timestamp, .TimestampHuman, .TTL)' -S <(echo "$topo")) <(jq '.' -S <(cat "$ds/topology.json")) ) || \
-            { echo "$d"; echo "Full topology differs from disk. ds=$ds stage=$2"; return 1; }
-        sc=$( query_status_code $REGULAR $addr $1 $FULL )
-        if [[ $sc != "403" ]]; then
-            printf "Error: $( full=$FULL mode=$1 host=$REGULAR )\nerr=Unexpected status code: $sc\n"
-            exit 1
-        fi
+            { echo "$d"; fail "Full topology differs from disk. ds=$ds stage=$2"; }
+        sc="$( query_status_code $REGULAR $addr $1 $FULL )"
+        [ "$sc" == "403" ] || fail "Error: full=$FULL mode=$1 host=$REGULAR err=Unexpected status code: $sc"
     done
 }
 
@@ -128,26 +116,7 @@ get_laddr() {
 compare_topo_reduced() {
     filter="del(.ZookeeperService, .BeaconService) | del( .BorderRouters[].Interfaces[] | (.Overlay, .BindOverlay, .PublicOverlay, .RemoteOverlay))"
     local d=$( diff <(jq 'del(.Timestamp, .TimestampHuman, .TTL)' -S <(echo $2)) <(jq "$filter" -S <(cat "$1/topology.json")) ) || \
-            { echo "$d"; echo "Reduced topology differs from disk. ds=$ds stage=$3"; return 1; }
-}
-
-# Get status code when querying topology from discovery service.
-#
-# Arguments:
-#   Local host info
-#   Host info of discovery service
-#   Static or dynamic
-#   Full or reduced topology
-query_status_code() {
-    url="$2/$BASE/$3/$4"
-    set +e
-    curl -s --interface $1 $url -w "%{http_code}" -o /dev/null
-    ret=$?
-    set -e
-    if [[ $? != 0 ]]; then
-        printf "Error: Unable to fetch status code. addr=$url\n" >&2
-        exit 1
-    fi
+            { echo "$d"; fail "Reduced topology differs from disk. ds=$ds stage=$3"; }
 }
 
 # Kill the service instance and check the number of service instances in
@@ -169,55 +138,5 @@ kill_and_check() {
     jq "[(.BeaconService | length == 0),(.CertificateService | length == $4),(.DiscoveryService | length == $5),(.PathService | length == $6)] | all" -e <(echo $topo) > /dev/null
 }
 
-# Query topology from discovery service.
-#
-# Arguments:
-#   Local host info
-#   Host info of discovery service
-#   Static or dynamic
-#   Full or reduced topology
-query_topo() {
-    url="$2/$BASE/$3/$4"
-    set +e
-    curl -s --interface $1 $url
-    ret=$?
-    set -e
-    if [[ $ret != 0 ]]; then
-        printf "Error: Unable to fetch topology. addr=$url\n" >&2
-        exit 1
-    fi
-}
-
-test_teardown() {
-    ./tools/dc collect_logs consul logs/docker
-    ./tools/dc down
-    sudo -p "Teardown virtual interfaces - [sudo] password for %p: " true
-    sudo ip addr del "$PRIVILEGED/32" dev lo
-    sudo ip addr del "$REGULAR/32" dev lo
-}
-
-print_help() {
-    echo
-	cat <<-_EOF
-	    $PROGRAM name
-	        return the name of this test
-	    $PROGRAM setup
-	        execute only the setup phase.
-	    $PROGRAM run
-	        execute only the run phase.
-	    $PROGRAM teardown
-	        execute only the teardown phase.
-	_EOF
-}
-
-PROGRAM=`basename "$0"`
-COMMAND="$1"
-
-case "$COMMAND" in
-    name)
-        echo $TEST_NAME ;;
-    setup|run|teardown)
-        "test_$COMMAND" ;;
-    *) print_help; exit 1 ;;
-esac
-
+shift
+do_command $PROGRAM $COMMAND $TEST_NAME "$@"

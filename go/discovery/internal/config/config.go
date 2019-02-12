@@ -3,6 +3,7 @@
 package config
 
 import (
+	"strings"
 	"time"
 
 	"github.com/scionproto/scion/go/lib/common"
@@ -77,6 +78,9 @@ type DynConfig struct {
 	ServicePrefix string
 	// TTL is the TTL of the dynamic topology.
 	TTL util.DurWrap
+	// NoConsulConnAction indicates what action shall be taken if there is no
+	// connection to the local consul agent when building the dynamic topology.
+	NoConsulConnAction NoConsulConnAction
 }
 
 func (d *DynConfig) InitDefaults() {
@@ -89,4 +93,32 @@ func (d *DynConfig) InitDefaults() {
 	if d.TTL.Duration == 0 {
 		d.TTL.Duration = DefaultDynamicTTL
 	}
+	if d.NoConsulConnAction != NoConsulConnError {
+		d.NoConsulConnAction = NoConsulConnFallback
+	}
+}
+
+// NoConsulConnAction indicates the action that shall be taken if there is
+// no connection to the consul agent when building the dynamic topology.
+type NoConsulConnAction string
+
+const (
+	// NoConsulConnError indicates that an error is served, instead of the dynamic
+	// topology, when no connection to the consul agent is possible.
+	NoConsulConnError NoConsulConnAction = "Error"
+	// NoConsulConnFallback indicates that the static topology is served as the
+	// dynamic topology when no connection to the consul agent is possible.
+	NoConsulConnFallback NoConsulConnAction = "Fallback"
+)
+
+func (f *NoConsulConnAction) UnmarshalText(text []byte) error {
+	switch strings.ToLower(string(text)) {
+	case strings.ToLower(string(NoConsulConnError)):
+		*f = NoConsulConnError
+	case strings.ToLower(string(NoConsulConnFallback)):
+		*f = NoConsulConnFallback
+	default:
+		return common.NewBasicError("Unknown FailAction", nil, "input", string(text))
+	}
+	return nil
 }

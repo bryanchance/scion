@@ -11,6 +11,7 @@ import (
 	consulapi "github.com/hashicorp/consul/api"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/scionproto/scion/go/discovery/internal/config"
 	"github.com/scionproto/scion/go/discovery/internal/metrics"
 	"github.com/scionproto/scion/go/discovery/internal/static"
 	"github.com/scionproto/scion/go/discovery/internal/util"
@@ -30,6 +31,7 @@ const (
 	ErrServiceUpdate     = "service-update-error"
 	ErrMarshalFull       = "marshall-full-error"
 	ErrMarshalReduced    = "marshall-reduced-error"
+	ErrNoConsulConn      = "consul-connection-error"
 	ErrFetch             = "fetch-failure"
 	ErrServiceEmpty      = "service-empty"
 	ErrOwnServiceMissing = "own-service-missing"
@@ -47,10 +49,11 @@ func init() {
 var _ periodic.Task = (*Updater)(nil)
 
 type Updater struct {
-	ID        string
-	SvcPrefix string
-	Client    *consulapi.Client
-	TTL       time.Duration
+	ID             string
+	SvcPrefix      string
+	Client         *consulapi.Client
+	TTL            time.Duration
+	NoConsulAction config.NoConsulConnAction
 }
 
 // Run fetches all available services from consul and updates the dynamic topology.
@@ -74,6 +77,15 @@ func (u *Updater) update(ctx context.Context) error {
 		return metrics.NewError(ErrParseBaseTopo,
 			common.NewBasicError("Unable to re-parse topology", err))
 	}
+	// Check whether the consul agent is reachable. The action taken on error is configurable.
+	if err := u.checkConsulConn(); err != nil {
+		if u.NoConsulAction == config.NoConsulConnError {
+			u.storeEmpty()
+			return metrics.NewError(ErrNoConsulConn,
+				common.NewBasicError("Unable to connect to consul agent", err))
+		}
+		log.Warn("No connection to consul agent", "action", u.NoConsulAction, "err", err)
+	}
 	// Update topology from consul service.
 	ok := u.updateServices(ctx, rt)
 	// Finalize topology and store it. We want to store it even if not
@@ -89,6 +101,19 @@ func (u *Updater) update(ctx context.Context) error {
 	log.Trace("Successfully updated dynamic topology from consul")
 	metrics.ConsulLastUpdate.SetToCurrentTime()
 	return nil
+}
+
+// checkConsulConn checks whether the consul agent is reachable.
+func (u *Updater) checkConsulConn() error {
+	_, err := u.Client.Agent().Self()
+	return err
+}
+
+// storeEmpty stores empty dynamic topologies. This causes the discovery
+// service to serve an error instead of the dynamic topology.
+func (u *Updater) storeEmpty() {
+	TopoFull.Store([]byte{})
+	TopoLimited.Store([]byte{})
 }
 
 // store updates the timestamps and stores the topology as the full and reduced version.

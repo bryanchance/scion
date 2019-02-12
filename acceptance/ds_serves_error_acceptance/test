@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# The discovery service serves the fallback topology if the consul server
+# is broken, and serves an error if the local consul agent is not reachable.
+
+. acceptance/dsutil/common.sh
+
+TEST_NAME="ds_serves_error"
+TEST_TOPOLOGY="topology/Tiny.topo"
+
+IA=${IA:-1-ff00:0:111}
+IA_FILE="$(ia_file $IA)"
+AS_FILE="$(as_file $IA)"
+
+test_setup() {
+    set -e
+    # Add regular and privileged interface.
+    base_add_addrs
+
+    ./scion.sh topology -c $TEST_TOPOLOGY -ds -d
+    sed -i -e "/\[ds.dynamic]/a NoConsulConnAction = \"Error\"" "gen/ISD1/AS$AS_FILE/ds$IA_FILE-1/dsconfig.toml"
+    printf "\n$PRIVILEGED/32" >> "gen/ISD1/AS$AS_FILE/ds$IA_FILE-1/acl"
+
+    # Run scion topology.
+    base_scion_run
+}
+
+test_run() {
+    set -e
+    # Get the discovery service address.
+    local ds="$( jq -r ".DiscoveryService.\"ds$IA_FILE-1\".Addrs[].Public | \"\(.Addr):\(.L4Port)\"" "gen/ISD1/AS$AS_FILE/endhost/topology.json" )"
+
+    # Check that all dynamic topologies are served
+    check_all_status_codes "200"
+
+    # Check that killing the consul server does cause served errors.
+    ./tools/dc consul kill consul_server
+    sleep 2
+    check_all_status_codes "200"
+    # Check that the served topology is the fallback.
+    topo="$( query_topo $PRIVILEGED $ds $DYNAMIC $FULL )"
+    local d="$( diff <(jq 'del(.Timestamp, .TimestampHuman, .TTL)' -S <(echo "$topo")) <(jq '.' -S <(cat "gen/ISD1/AS$AS_FILE/endhost/topology.json")) )" || \
+        { echo "$d"; fail "Served fallback topology differs from static"; }
+
+    # Check that killing the local consul agent forces the discovery service to serve errors.
+    ./tools/dc consul kill "consul_agent-$IA_FILE"
+    sleep 2
+    check_all_status_codes "503"
+    log "All tests passed"
+}
+
+check_all_status_codes() {
+    check_status_code "$( query_status_code $REGULAR $ds $DYNAMIC $REDUCED)" "$1"
+    check_status_code "$( query_status_code $PRIVILEGED $ds $DYNAMIC $REDUCED)" "$1"
+    check_status_code "$( query_status_code $PRIVILEGED $ds $DYNAMIC $FULL)" "$1"
+}
+
+check_status_code() {
+    [ "$1" == "$2" ] || fail "Error: Unexpected status code expected=$1 actual=$2"
+}
+
+shift
+do_command $PROGRAM $COMMAND $TEST_NAME "$@"

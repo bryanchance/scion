@@ -149,10 +149,11 @@ func startDynUpdater(cfg *config.Config) {
 	}
 	dynUpdater = periodic.StartPeriodicTask(
 		&dynamic.Updater{
-			ID:        cfg.General.ID,
-			SvcPrefix: cfg.DS.Dynamic.ServicePrefix,
-			Client:    consulClient,
-			TTL:       cfg.DS.Dynamic.TTL.Duration,
+			ID:             cfg.General.ID,
+			SvcPrefix:      cfg.DS.Dynamic.ServicePrefix,
+			Client:         consulClient,
+			TTL:            cfg.DS.Dynamic.TTL.Duration,
+			NoConsulAction: cfg.DS.Dynamic.NoConsulConnAction,
 		},
 		periodic.NewTicker(cfg.DS.Dynamic.QueryInterval.Duration),
 		cfg.DS.Dynamic.Timeout.Duration,

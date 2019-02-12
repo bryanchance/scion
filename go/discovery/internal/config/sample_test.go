@@ -56,6 +56,8 @@ func TestSampleCorrect(t *testing.T) {
 			DefaultDynamicTimeout)
 		SoMsg("Dynamic.Service prefix correct", cfg.DS.Dynamic.ServicePrefix, ShouldBeEmpty)
 		SoMsg("Dynamic.TTL correct", cfg.DS.Dynamic.TTL.Duration, ShouldEqual, DefaultDynamicTTL)
+		SoMsg("Dynamic.NoConsulConnAction correct", cfg.DS.Dynamic.NoConsulConnAction, ShouldEqual,
+			NoConsulConnFallback)
 
 		// Consul specific
 		SoMsg("Consul.Enabled correct", cfg.Consul.Enabled, ShouldBeFalse)

@@ -71,6 +71,13 @@ const Sample = `[general]
     # The TTL of the served dynamic topology. (default "60s") (reloadable)
     TTL = "60s"
 
+    # Action that shall be taken when no connection to the local consul agent
+    # is possible when building the dynamic topology.
+    # - Error: Serve service unavailable error until connection is available again.
+    # - Fallback: Serve steady topology.
+    # (Error | Fallback) (default Fallback) (reloadable)
+    NoConsulConnAction = "Fallback"
+
 [consul]
   # Enables consul. (default false)
   Enabled = false
