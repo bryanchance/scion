@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# Test for the two node setup, where we want that in case of a consul server failure:
+# The client connected to the failing node is not leader.
+# The client connected to the node still working is leader.
+#
+# This test tests what happens when the consul node of the follower fails:
+# -> the leader node should stay leader, with a short interruption.
+
+# NOTE: currently this file assumes that ACCEPTANCE_ARTIFACTS is set.
+
+TEST_NAME="leader_2node_follower_failure"
+PROGRAM=$(basename "${0:?}")
+COMMAND="${1:?}"
+shift
+
+. acceptance/leader_2node_common/common.sh
+
+test_run() {
+    set -e
+    # Wait for initial leader
+    for i in $(seq 5); do
+        [ "$(current_leader_count)" -eq 1 ] && break
+        sleep 1
+    done
+    [ "$(current_leader_count)" -eq 1 ] || fail "Error: No leader found in time."
+    leader=$(leader_id)
+    log "OK: $leader is initial leader"
+    # Kill node of follower
+    follower=$(follower_id $leader)
+    kill_consul_server "$follower"
+    # Wait for leader to become leader again
+    for i in $(seq 20); do
+        lost_leader "$leader" && break
+        sleep 1
+    done
+    lost_leader $leader || fail "FAIL: Expected $leader to lose leader, because cluster leadership lost"
+    log "OK: $leader lost leader because no cluster leader."
+    # Check that the leader switches again to an elected leader.
+    for i in $(seq 20); do
+        [ "$(current_leader_count $leader)" -eq 2 ] && break
+        sleep 1
+    done
+    [ "$(current_leader_count $leader)" -eq 2 ] || fail "FAIL: Expected $leader to become leader again"
+    log "OK: $leader is leader again (in no cluster leader mode)"
+    # Restore consul node
+    log "Restarting consul_server$follower"
+    cmd_dc up -d "consul_server$follower"
+    # Check that the leader switches again to an elected leader.
+    for i in $(seq 20); do
+        [ "$(current_leader_count)" -eq 3 ] && break
+        sleep 1
+    done
+    [ "$(current_leader_count)" -eq 3 ] || fail "FAIL: Expected 3 leader changes, but was $(current_leader_count)"
+    log "OK: Found 3 leader changes"
+    check_no_overlapping_leader
+}
+
+lost_leader() {
+   grep -q "LOSTLEADER id=$1" logs/"$TEST_NAME"*.log 
+}
+
+do_command $PROGRAM $COMMAND $TEST_NAME "$@"

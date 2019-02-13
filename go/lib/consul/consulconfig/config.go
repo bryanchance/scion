@@ -90,6 +90,12 @@ type LeaderElectorConf struct {
 	// SessionTTL is the TTL of the session. By default this should be 10s.
 	// See https://www.consul.io/api/session.html#ttl
 	SessionTTL string
+	// LeaderIfNoClusterLeader can be set if this node should become leader if the consul cluster
+	// replies with "500 No cluster leader".
+	//
+	// This is helpful for a 2 node setup where we want to tolerate a single failure
+	// under the assumption that no split-brain can happen.
+	LeaderIfNoClusterLeader bool
 	// AcquiredLeader is called if leadership is acquired.
 	// AcquiredLeader should be non-blocking/short-running
 	AcquiredLeader func()

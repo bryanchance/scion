@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Test for the two node setup, where we want that in case of a consul server failure:
+# The client connected to the failing node is not leader.
+# The client connected to the node still working is leader.
+#
+# This test tests what happens when the consul node of the leader fails:
+# -> The other node should becomed leader.
+
+# NOTE: currently this file assumes that ACCEPTANCE_ARTIFACTS is set.
+
+TEST_NAME="leader_2node_leader_failure"
+PROGRAM=$(basename "${0:?}")
+COMMAND="${1:?}"
+shift
+
+. acceptance/leader_2node_common/common.sh
+
+test_run() {
+    # Wait for initial leader
+    for i in $(seq 5); do
+        [ "$(current_leader_count)" -eq 1 ] && break
+        sleep 1
+    done
+    [ "$(current_leader_count)" -eq 1 ] || fail "Error: No leader found in time."
+    local leader=$(leader_id)
+    log "OK: $leader is initial leader"
+    # Kill node of leader -> follower gets promoted to leader
+    kill_consul_server "$leader"
+    local follower=$(follower_id $leader)
+    # Wait for follower to be leader
+    for i in $(seq 20); do
+        is_leader $follower && break
+        sleep 1
+    done
+    is_leader "$follower" || fail "FAIL: Expected $follower to be leader"
+    log "OK: $follower took over leader as expected."
+    sleep 1
+    # Restore consul node
+    log "Restarting consul_server$leader"
+    cmd_dc up -d "consul_server$leader"
+    # Check that the leader switches again to an elected leader.
+    for i in $(seq 20); do
+        [ "$(current_leader_count)" -eq 3 ] && break
+        sleep 1
+    done
+    [ "$(current_leader_count)" -eq 3 ] || fail "FAIL: Expected 3 leader changes, but was $lcount"
+    log "OK: Found 3 leader changes"
+    check_no_overlapping_leader
+}
+
+do_command $PROGRAM $COMMAND $TEST_NAME "$@"

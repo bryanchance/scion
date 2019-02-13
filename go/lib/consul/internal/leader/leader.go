@@ -133,9 +133,8 @@ func (l *leaderMon) waitForChanges() (string, error) {
 			return "", common.NewBasicError("Error while waiting on changes", err)
 		}
 		if newSessId != sessId {
-			return sessId, nil
+			return newSessId, nil
 		}
-		sessId = newSessId
 	}
 }
 

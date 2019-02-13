@@ -20,6 +20,8 @@ var (
 	id    = flag.String("id", "", "Id to use")
 	key   = flag.String("key", "", "Key to use in leader election")
 	agent = flag.String("agent", "", "Consul agent")
+
+	noClusterLeader = flag.Bool("noClusterLeader", false, "If no cluster leader become leader.")
 )
 
 func main() {
@@ -42,8 +44,9 @@ func realMain() int {
 		Name:    fmt.Sprintf("leader_acceptance_%s", *id),
 		Timeout: 5 * time.Second,
 		// Use a low lock delay for tests to have a faster handover.
-		LockDelay:  1 * time.Second,
-		SessionTTL: "1s",
+		LockDelay:               1 * time.Second,
+		SessionTTL:              "1s",
+		LeaderIfNoClusterLeader: *noClusterLeader,
 		AcquiredLeader: func() {
 			log.Info("ISLEADER", "id", *id)
 		},

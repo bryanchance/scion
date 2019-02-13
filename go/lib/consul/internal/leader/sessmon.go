@@ -20,13 +20,12 @@ type sessMon struct {
 	// key is the kv key we use to lock on, this is constant.
 	key string
 	// c is the consul client, this is constant.
-	c                *consulapi.Client
-	sessRefreshClose chan struct{}
-	ctx              context.Context
-	cancelF          context.CancelFunc
-	logger           log.Logger
-	cfg              consulconfig.LeaderElectorConf
-	ln               *notifier
+	c       *consulapi.Client
+	ctx     context.Context
+	cancelF context.CancelFunc
+	logger  log.Logger
+	cfg     consulconfig.LeaderElectorConf
+	ln      *notifier
 }
 
 func StartSessMon(key string, c *consulapi.Client, cfg consulconfig.LeaderElectorConf) *sessMon {
@@ -59,17 +58,27 @@ func (s *sessMon) Key() string {
 
 func (s *sessMon) run() {
 	for {
-		sessId, rClose, err := s.createSession()
+		// First create the session and in case of an error retry after a sleep,
+		// a context error means that we have been cancelled and should quit.
+		sessId, rClose, refreshErrC, err := s.createSession()
 		if err != nil {
 			if isContextErr(s.ctx, s.logger) {
 				return
+			}
+			if s.cfg.LeaderIfNoClusterLeader && isNoClusterLeader(err, s.logger) {
+				s.runWithoutClusterLeader()
+				continue
 			}
 			s.logger.Error("[LeaderElector] Error during create session", "err", err)
 			sleep(s.ctx, time.Second)
 			continue
 		}
+		// Now that we have a session start the leader monitor for this session.
 		lm := startLeaderMon(s.key, s.c, sessId, s.ln)
-		if err := s.checkSessionValid(sessId); err != nil {
+		// After starting the leader monitor we have to make sure our session is still valid.
+		// Once this function returns we should stop being leader
+		// since the session is no longer valid.
+		if err := s.checkSessionValid(sessId, refreshErrC); err != nil {
 			if isContextErr(s.ctx, s.logger) {
 				lm.Cancel()
 				close(rClose)
@@ -82,7 +91,7 @@ func (s *sessMon) run() {
 	}
 }
 
-func (s *sessMon) createSession() (string, chan struct{}, error) {
+func (s *sessMon) createSession() (string, chan struct{}, chan error, error) {
 	se := &consulapi.SessionEntry{
 		Name:      s.cfg.Name,
 		TTL:       s.cfg.SessionTTL,
@@ -93,15 +102,18 @@ func (s *sessMon) createSession() (string, chan struct{}, error) {
 		// TODO(lukedirtwalker): We need a way to notify
 		// the parent if the error happens too many times.
 		// Is it possible to recover here (e.g. rpc error making call: Missing node registration)?
-		return "", nil, common.NewBasicError("Failed to create session", err)
+		return "", nil, nil, common.NewBasicError("Failed to create session", err)
 	}
 	s.logger.Info("[LeaderElector] Consul session created", "sessId", sessId)
 	sessRefreshClose := make(chan struct{})
-	s.startPeriodicSessRefresh(sessId, s.cfg.SessionTTL, sessRefreshClose)
-	return sessId, sessRefreshClose, nil
+	errChan := make(chan error)
+	s.startPeriodicSessRefresh(sessId, s.cfg.SessionTTL, sessRefreshClose, errChan)
+	return sessId, sessRefreshClose, errChan, nil
 }
 
-func (s *sessMon) startPeriodicSessRefresh(sessId, initialTTL string, closeC chan struct{}) {
+func (s *sessMon) startPeriodicSessRefresh(sessId, initialTTL string, closeC chan struct{},
+	errorC chan error) {
+
 	go func() {
 		defer log.LogPanicAndExit()
 		err := s.c.Session().RenewPeriodic(initialTTL, sessId, nil, closeC)
@@ -111,38 +123,78 @@ func (s *sessMon) startPeriodicSessRefresh(sessId, initialTTL string, closeC cha
 			return
 		}
 		if err != nil {
-			s.logger.Error("[LeaderElector] Session renewal failed", "err", err)
+			errorC <- err
 		}
 	}()
 }
 
-func (s *sessMon) checkSessionValid(sessId string) error {
-	var ok bool
-	var modIdx uint64
-	var err error
+// runWithoutClusterLeader runs the leadership acquired callback and waits until consul has
+// a cluster leader again. Once consul has a cluster leader again the local leadership is droppped.
+func (s *sessMon) runWithoutClusterLeader() {
+	s.ln.acquired()
+	defer s.ln.lost()
 	for {
-		ok, modIdx, err = s.checkSessionBlock(sessId, modIdx)
+		// This API doesn't return an error even if there is no cluster leader,
+		// in this case it will just return an empty string.
+		consulLeader, err := s.c.Status().Leader()
 		if err != nil {
-			return common.NewBasicError("Failed to check session", err)
+			log.Error("[LeaderElector] Error during status/leader lookup", "err", err)
+			return
 		}
-		if !ok {
-			return nil
+		if consulLeader != "" {
+			return
+		}
+		time.Sleep(time.Second)
+	}
+}
+
+// checkSessionValid blockingly checks that the session with the given sessId
+// is valid and still exists in consul.
+// In case it no longer exists or in case of an error (either refresh, or from fetching info)
+// this method returns.
+func (s *sessMon) checkSessionValid(sessId string, refreshErrC chan error) error {
+	var modIdx uint64
+	for {
+		select {
+		case err := <-refreshErrC:
+			return common.NewBasicError("Failed to refresh session", err)
+		case si := <-s.querySessionInfo(sessId, modIdx):
+			if si.err != nil {
+				return common.NewBasicError("Failed to check session", si.err)
+			}
+			if !si.sessionOk {
+				return nil
+			}
+			modIdx = si.modIdx
 		}
 	}
 }
 
-func (s *sessMon) checkSessionBlock(sessId string, modIdx uint64) (bool, uint64, error) {
+type sessionInfo struct {
+	sessionOk bool
+	modIdx    uint64
+	err       error
+}
+
+// querySessionInfo starts a go routine that blockingly waits for session info changes
+// using the given sessId and modify index.
+// Once the blocking call returns the result is put in the channel.
+func (s *sessMon) querySessionInfo(sessId string, modIdx uint64) chan sessionInfo {
 	s.logger.Trace("[LeaderElector] Checking session")
 	qo := &consulapi.QueryOptions{
 		WaitIndex: modIdx,
 	}
 	qo = qo.WithContext(s.ctx)
-	sess, qm, err := s.c.Session().Info(sessId, qo)
-	if err != nil {
-		return false, 0, common.NewBasicError("Failed to check session state", err)
-	}
-	if sess == nil {
-		return false, 0, nil
-	}
-	return true, qm.LastIndex, nil
+	retChan := make(chan sessionInfo)
+	go func() {
+		sess, qm, err := s.c.Session().Info(sessId, qo)
+		if err != nil {
+			retChan <- sessionInfo{err: common.NewBasicError("Failed to check session state", err)}
+		} else if sess == nil {
+			retChan <- sessionInfo{}
+		} else {
+			retChan <- sessionInfo{sessionOk: true, modIdx: qm.LastIndex}
+		}
+	}()
+	return retChan
 }
