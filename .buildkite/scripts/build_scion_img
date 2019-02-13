@@ -8,5 +8,6 @@ echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USER" --password-stdin
 
 BASE_IMG=${BASE_IMG:-c5a50375f06a49860eb7984d9e84dd51ca2ba25ccc4fc715b8b40960493c705f}
 
-./tools/ci/prepare_image "$BASE_IMG"
+docker pull anapaya/scion_base@sha256:$BASE_IMG
+docker tag anapaya/scion_base@sha256:$BASE_IMG scion_base:latest
 ./docker.sh build

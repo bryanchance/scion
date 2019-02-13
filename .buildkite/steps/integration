@@ -8,7 +8,7 @@ run_test() {
     echo "- label: Integration - ${1:?}"
     echo "  command:"
     echo "  - $BASE/run_step integration $1"
-    echo "  timeout_in_minutes: 10"
+    echo "  timeout_in_minutes: 15"
     echo "  artifact_paths:"
     echo "  - \"artifacts.out/**/*\""
 }
