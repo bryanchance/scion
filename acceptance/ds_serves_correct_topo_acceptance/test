@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # The discovery service serves the static and dynamic topology file.
-# The reduced topology is served to anyone, the full topology is only
+# The endhost topology is served to anyone, the full topology is only
 # served to hosts allowed by the ACL.
 
 . acceptance/dsutil/common.sh
@@ -37,6 +37,7 @@ test_run() {
 check_static() {
     log "[static] Starting test"
     check_all_disc $STATIC "check_static"
+    check_all_default $STATIC "check_defaults"
     log "[static] All tests passed"
 }
 
@@ -48,6 +49,8 @@ check_dynamic() {
     check_all_ttl
     # Check dynamic is initially same as on disk.
     check_all_disc $DYNAMIC "check_dynamic start"
+    # Check that the served topology is based on privilege.
+    check_all_default $DYNAMIC "check_defaults"
     # Get address of discovery service in AS with multiple service instances.
     addr="$( get_laddr $MULTI_SVC_AS_DIR/ds1-ff00_0_111-1 )"
     # Kill services instances and check that the dynamic is updated.
@@ -74,8 +77,21 @@ check_dynamic() {
 check_all_ttl() {
     for ds in gen/ISD1/*/ds*; do
         addr=$( get_laddr $ds )
-        query_topo $REGULAR $addr $DYNAMIC $REDUCED | jq '.TTL == 60' -e || fail "TTL invalid for reduced topo"
+        query_topo $REGULAR $addr $DYNAMIC $ENDHOST | jq '.TTL == 60' -e || fail "TTL invalid for endhost topo"
         query_topo $PRIVILEGED $addr $DYNAMIC $FULL | jq '.TTL == 60' -e || fail "TTL invalid for full topo"
+    done
+}
+
+# Check that all discovery services serve topology based on privilege.
+check_all_default() {
+    for ds in gen/ISD1/*/ds*; do
+        addr=$( get_laddr $ds )
+        # Check endhost topo
+        compare_topo_endhost $ds "$( query_topo $REGULAR $addr $1 $DEFAULT )" "$2: regular"
+        # Check full topo
+        topo=$( query_topo $PRIVILEGED $addr $1 $DEFAULT )
+        local d=$( diff <(jq 'del(.Timestamp, .TimestampHuman, .TTL)' -S <(echo "$topo")) <(jq '.' -S <(cat "$ds/topology.json")) ) || \
+            { echo "$d"; echo "Full topology differs from disk. ds=$ds stage=$2"; return 1; }
     done
 }
 
@@ -86,9 +102,9 @@ check_all_ttl() {
 check_all_disc() {
     for ds in gen/ISD1/*/ds*; do
         addr=$( get_laddr $ds )
-        # Check reduced topo
-        compare_topo_reduced $ds "$( query_topo $PRIVILEGED $addr $1 $REDUCED )" "$2: privileged"
-        compare_topo_reduced $ds "$( query_topo $REGULAR $addr $1 $REDUCED )" "$2: regular"
+        # Check endhost topo
+        compare_topo_endhost $ds "$( query_topo $PRIVILEGED $addr $1 $ENDHOST )" "$2: privileged"
+        compare_topo_endhost $ds "$( query_topo $REGULAR $addr $1 $ENDHOST )" "$2: regular"
         # Check full topo
         topo=$( query_topo $PRIVILEGED $addr $1 $FULL )
         local d=$( diff <(jq 'del(.Timestamp, .TimestampHuman, .TTL)' -S <(echo "$topo")) <(jq '.' -S <(cat "$ds/topology.json")) ) || \
@@ -113,10 +129,10 @@ get_laddr() {
 # Arguments:
 #   Discovery service config dir
 #   Raw topology recieved from discovery service
-compare_topo_reduced() {
+compare_topo_endhost() {
     filter="del(.ZookeeperService, .BeaconService) | del( .BorderRouters[].Interfaces[] | (.Overlay, .BindOverlay, .PublicOverlay, .RemoteOverlay))"
     local d=$( diff <(jq 'del(.Timestamp, .TimestampHuman, .TTL)' -S <(echo $2)) <(jq "$filter" -S <(cat "$1/topology.json")) ) || \
-            { echo "$d"; fail "Reduced topology differs from disk. ds=$ds stage=$3"; }
+            { echo "$d"; fail "Endhost topology differs from disk. ds=$ds stage=$3"; }
 }
 
 # Kill the service instance and check the number of service instances in
@@ -134,7 +150,7 @@ kill_and_check() {
     topo=$( query_topo $PRIVILEGED $2 $DYNAMIC $FULL )
     jq "[(.BeaconService | length == $3),(.CertificateService | length == $4),(.DiscoveryService | length == $5),(.PathService | length == $6)] | all" -e <(echo $topo) > /dev/null
     # BS is not exposed to regular hosts
-    topo=$( query_topo $REGULAR $2 $DYNAMIC $REDUCED )
+    topo=$( query_topo $REGULAR $2 $DYNAMIC $ENDHOST )
     jq "[(.BeaconService | length == 0),(.CertificateService | length == $4),(.DiscoveryService | length == $5),(.PathService | length == $6)] | all" -e <(echo $topo) > /dev/null
 }
 

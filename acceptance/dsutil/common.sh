@@ -5,7 +5,8 @@
 BASE="discovery/v1"
 STATIC="static"
 DYNAMIC="dynamic"
-REDUCED="reduced.json"
+DEFAULT="default.json"
+ENDHOST="endhost.json"
 FULL="full.json"
 
 PRIVILEGED=${PRIVILEGED:-"172.220.0.2"}
@@ -30,7 +31,7 @@ base_scion_run() {
 #   Local host info
 #   Host info of discovery service
 #   Static or dynamic
-#   Full or reduced topology
+#   Full, endhost or default topology
 query_status_code() {
     url="$2/$BASE/$3/$4"
     curl -sS --interface $1 $url -w "%{http_code}" -o /dev/null || fail "Error: Unable to fetch status code. addr=$url"
@@ -42,7 +43,7 @@ query_status_code() {
 #   Local host info
 #   Host info of discovery service
 #   Static or dynamic
-#   Full or reduced topology
+#   Full, endhost or default topology
 query_topo() {
     url="$2/$BASE/$3/$4"
     curl -sS --interface $1 $url || fail "Error: Unable to fetch topology. addr=$url"

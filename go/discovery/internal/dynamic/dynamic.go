@@ -30,7 +30,7 @@ const (
 	ErrParseBaseTopo     = "basetopo-parse-error"
 	ErrServiceUpdate     = "service-update-error"
 	ErrMarshalFull       = "marshall-full-error"
-	ErrMarshalReduced    = "marshall-reduced-error"
+	ErrMarshalEndhost    = "marshall-endhost-error"
 	ErrNoConsulConn      = "consul-connection-error"
 	ErrFetch             = "fetch-failure"
 	ErrServiceEmpty      = "service-empty"
@@ -116,7 +116,7 @@ func (u *Updater) storeEmpty() {
 	TopoLimited.Store([]byte{})
 }
 
-// store updates the timestamps and stores the topology as the full and reduced version.
+// store updates the timestamps and stores the topology as the full and endhost version.
 func (u *Updater) store(rt *topology.RawTopo) error {
 	u.updateTimestamps(rt)
 	// Set the full topology.
@@ -127,10 +127,10 @@ func (u *Updater) store(rt *topology.RawTopo) error {
 	// Bind address and and non-public services are stripped.
 	topology.StripBind(rt)
 	topology.StripServices(rt)
-	// Set the reduced topology.
+	// Set the endhost topology.
 	if err := marshallAndUpdate(rt, TopoLimited); err != nil {
 		return metrics.NewError(ErrMarshalFull,
-			common.NewBasicError("Unable to marshal reduced topology", err))
+			common.NewBasicError("Unable to marshal endhost topology", err))
 	}
 	return nil
 }

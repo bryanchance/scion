@@ -50,8 +50,10 @@ test_run() {
 }
 
 check_all_status_codes() {
-    check_status_code "$( query_status_code $REGULAR $ds $DYNAMIC $REDUCED)" "$1"
-    check_status_code "$( query_status_code $PRIVILEGED $ds $DYNAMIC $REDUCED)" "$1"
+    check_status_code "$( query_status_code $REGULAR $ds $DYNAMIC $ENDHOST)" "$1"
+    check_status_code "$( query_status_code $PRIVILEGED $ds $DYNAMIC $ENDHOST)" "$1"
+    check_status_code "$( query_status_code $REGULAR $ds $DYNAMIC $DEFAULT)" "$1"
+    check_status_code "$( query_status_code $PRIVILEGED $ds $DYNAMIC $DEFAULT)" "$1"
     check_status_code "$( query_status_code $PRIVILEGED $ds $DYNAMIC $FULL)" "$1"
 }
 

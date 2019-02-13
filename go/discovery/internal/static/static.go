@@ -25,7 +25,7 @@ const (
 	ErrFileRead       = "file-read-error"
 	ErrFileStat       = "stat-error"
 	ErrMarshalFull    = "marshal-full-error"
-	ErrMarshalReduced = "marshal-reduced-error"
+	ErrMarshalEndhost = "marshal-endhost-error"
 	Success           = "success"
 )
 
@@ -76,7 +76,7 @@ func Load(filename string, usefmod bool) error {
 	topology.StripServices(rt)
 	b, err = util.MarshalToJSON(rt)
 	if err != nil {
-		l["result"] = ErrMarshalReduced
+		l["result"] = ErrMarshalEndhost
 		metrics.TotalTopoLoads.With(l).Inc()
 		return err
 	}

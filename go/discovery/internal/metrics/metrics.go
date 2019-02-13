@@ -27,9 +27,32 @@ var (
 	TotalDynamicUpdateTime    prometheus.Counter
 )
 
+type ReqSrc string
+
+const (
+	Static  ReqSrc = "static"
+	Dynamic ReqSrc = "dynamic"
+)
+
+type ReqScope string
+
+const (
+	Endhost ReqScope = "endhost"
+	Full    ReqScope = "full"
+	Default ReqScope = "default"
+)
+
+func CreateReqLabels(src ReqSrc, scope, served ReqScope) prometheus.Labels {
+	return prometheus.Labels{
+		"src":    string(src),
+		"scope":  string(scope),
+		"served": string(served),
+	}
+}
+
 func Init(elem string) {
 	namespace := "discovery"
-	reqLabels := []string{"src", "scope"}
+	reqLabels := []string{"src", "scope", "served"}
 	loadLabels := []string{"result"}
 
 	newC := func(name, help string) prometheus.Counter {

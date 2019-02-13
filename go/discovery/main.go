@@ -10,7 +10,6 @@ import (
 	"os"
 
 	consulapi "github.com/hashicorp/consul/api"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/scionproto/scion/go/discovery/internal/config"
@@ -20,6 +19,7 @@ import (
 	"github.com/scionproto/scion/go/discovery/internal/util"
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
+	"github.com/scionproto/scion/go/lib/discovery"
 	"github.com/scionproto/scion/go/lib/env"
 	"github.com/scionproto/scion/go/lib/fatal"
 	"github.com/scionproto/scion/go/lib/log"
@@ -66,21 +66,31 @@ func realMain() int {
 
 	pubMux := http.NewServeMux()
 
-	l := prometheus.Labels{"src": "static", "scope": "endhost"}
+	l := metrics.CreateReqLabels(metrics.Static, metrics.Endhost, metrics.Endhost)
 	f := util.MakeHandler(static.TopoLimited, l)
-	pubMux.HandleFunc("/discovery/v1/static/reduced.json", f)
+	pubMux.HandleFunc(fmt.Sprintf("/%s", discovery.Path(discovery.Static, discovery.Endhost)), f)
 
-	l = prometheus.Labels{"src": "static", "scope": "infrastructure"}
+	l = metrics.CreateReqLabels(metrics.Static, metrics.Full, metrics.Full)
 	f = util.MakeACLHandler(static.TopoFull, l)
-	pubMux.HandleFunc("/discovery/v1/static/full.json", f)
+	pubMux.HandleFunc(fmt.Sprintf("/%s", discovery.Path(discovery.Static, discovery.Full)), f)
 
-	l = prometheus.Labels{"src": "dynamic", "scope": "endhost"}
+	l = metrics.CreateReqLabels(metrics.Dynamic, metrics.Endhost, metrics.Endhost)
 	f = util.MakeHandler(dynamic.TopoLimited, l)
-	pubMux.HandleFunc("/discovery/v1/dynamic/reduced.json", f)
+	pubMux.HandleFunc(fmt.Sprintf("/%s", discovery.Path(discovery.Dynamic, discovery.Endhost)), f)
 
-	l = prometheus.Labels{"src": "dynamic", "scope": "infrastructure"}
+	l = metrics.CreateReqLabels(metrics.Dynamic, metrics.Full, metrics.Full)
 	f = util.MakeACLHandler(dynamic.TopoFull, l)
-	pubMux.HandleFunc("/discovery/v1/dynamic/full.json", f)
+	pubMux.HandleFunc(fmt.Sprintf("/%s", discovery.Path(discovery.Dynamic, discovery.Full)), f)
+
+	lInfra := metrics.CreateReqLabels(metrics.Static, metrics.Default, metrics.Full)
+	lEndhost := metrics.CreateReqLabels(metrics.Static, metrics.Default, metrics.Endhost)
+	f = util.MakeDefaultHandler(static.TopoFull, static.TopoLimited, lInfra, lEndhost)
+	pubMux.HandleFunc(fmt.Sprintf("/%s", discovery.Path(discovery.Static, discovery.Default)), f)
+
+	lInfra = metrics.CreateReqLabels(metrics.Dynamic, metrics.Default, metrics.Full)
+	lEndhost = metrics.CreateReqLabels(metrics.Dynamic, metrics.Default, metrics.Endhost)
+	f = util.MakeDefaultHandler(dynamic.TopoFull, dynamic.TopoLimited, lInfra, lEndhost)
+	pubMux.HandleFunc(fmt.Sprintf("/%s", discovery.Path(discovery.Dynamic, discovery.Default)), f)
 
 	fatalC := make(chan error, 2)
 	if config.Metrics.Prometheus != "" {
