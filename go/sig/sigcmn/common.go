@@ -27,6 +27,7 @@ import (
 	"github.com/scionproto/scion/go/lib/pathmgr"
 	"github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/snet"
+	"github.com/scionproto/scion/go/lib/sock/reliable"
 	"github.com/scionproto/scion/go/sig/internal/sigconfig"
 	"github.com/scionproto/scion/go/sig/mgmt"
 )
@@ -73,7 +74,7 @@ func Init(cfg sigconfig.Conf, sdCfg env.SciondClient) error {
 		return common.NewBasicError("Error connecting to SCIOND", err)
 	}
 	PathMgr = pathmgr.New(connector, timers, log.Root())
-	network := snet.NewNetworkWithPR(cfg.IA, cfg.Dispatcher, PathMgr)
+	network := snet.NewNetworkWithPR(cfg.IA, reliable.NewDispatcherService(cfg.Dispatcher), PathMgr)
 	// Initialize SCION local networking module
 	err = initSNET(network, sdCfg)
 	if err != nil {

@@ -41,6 +41,7 @@ import (
 	sd "github.com/scionproto/scion/go/lib/sciond"
 	"github.com/scionproto/scion/go/lib/snet"
 	"github.com/scionproto/scion/go/lib/snet/squic"
+	"github.com/scionproto/scion/go/lib/sock/reliable"
 	"github.com/scionproto/scion/go/lib/spath"
 )
 
@@ -153,7 +154,7 @@ func LogFatal(msg string, a ...interface{}) {
 
 func initNetwork() {
 	// Initialize default SCION networking context
-	if err := snet.Init(local.IA, *sciond, *dispatcher); err != nil {
+	if err := snet.Init(local.IA, *sciond, reliable.NewDispatcherService(*dispatcher)); err != nil {
 		LogFatal("Unable to initialize SCION network", "err", err)
 	}
 	log.Debug("SCION network successfully initialized")

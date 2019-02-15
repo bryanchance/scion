@@ -18,7 +18,6 @@ libffi-dev
 libjs-jquery-hotkeys
 libjs-jquery-isonscreen
 libjs-jquery-tablesorter
-libpcap-dev
 libssl-dev
 make
 moreutils
@@ -48,5 +47,6 @@ python3-yaml
 screen
 sqlite3
 sudo
+tzdata
 uthash-dev
 vim-common

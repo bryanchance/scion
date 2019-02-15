@@ -97,7 +97,7 @@ func realMain() int {
 
 func initSCIONConnection() (*snet.SCIONConn, error) {
 	if err := snet.Init(cfg.IPProvider.LocalIA, cfg.Sciond.Path,
-		reliable.DefaultDispPath); err != nil {
+		reliable.NewDispatcherService(reliable.DefaultDispPath)); err != nil {
 
 		return nil, err
 	}
