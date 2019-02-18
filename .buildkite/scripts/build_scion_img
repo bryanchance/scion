@@ -6,7 +6,7 @@ set -e
 echo "Login to docker hub with user $DOCKERHUB_USER"
 echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USER" --password-stdin
 
-BASE_IMG=${BASE_IMG:-604c0f68df675f2093806489bd97fd939c19e951a62b28caada3e275aa1db608}
+BASE_IMG=${BASE_IMG:-0b64d02f0a02a1908bb1d06f506d75d363dad63137cb5b0906a412c349e6a534}
 
 docker pull anapaya/scion_base@sha256:$BASE_IMG
 docker tag anapaya/scion_base@sha256:$BASE_IMG scion_base:latest

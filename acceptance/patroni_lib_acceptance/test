@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# Copyright Anapaya Systems 2019
+
+# Tests the connection pool of the patroni library. The test sets up a 2 node patroni cluster. First
+# it makes sure that the test client can successfully write to the cluster. Then the patroni leader
+# node is killed, which should make the connection fail and the client to report the connection as
+# failed. From this point on the failing connection should no longer be returned and we should land
+# in read only mode. After we re-enable the patroni node, we should be able to write again. Once
+# that works the test is done.
+
+TEST_NAME="patroni_lib"
+PROGRAM=$(basename "$0")
+COMMAND="$1"
+
+. acceptance/patroni/common.sh
+
+PID_FILE="$TEST_ARTIFACTS_DIR/patroni_lib_acceptance.pid"
+CTRL_FILE="$TEST_ARTIFACTS_DIR/ctrl"
+LOG_FILE="logs/$TEST_NAME.log"
+
+test_run() {
+    set -e
+    consul1_ip=$(container_ip $CONSUL1)
+    ./bin/patroni_lib_acceptance -key=ptest -agent="http://${consul1_ip:?}:8500" -ctrlFile="$CTRL_FILE" -log.console=TRACE &> "$LOG_FILE" &
+    echo $! > "$PID_FILE"
+    # wait until we have write conn
+    for i in $(seq 3); do
+        [ "$(write_ok_cnt)" -gt 0 ] && break
+        sleep 1
+    done
+    [ "$(write_ok_cnt)" -gt 0 ] || fail "FAIL: didn't get a write connection."
+    log "OK: Initial write worked."
+    # Touch the control file so that we can kill the patroni leader:
+    touch "$CTRL_FILE"
+    # Now kill the leader node and check that we switch to read only mode.
+    patroni_leader="$(leader_name $(leader_info))"
+    log "Killing $patroni_leader"
+    cmd_dc kill "$patroni_leader"
+    for i in $(seq 2); do
+        [ "$(no_write_conn_cnt)" -gt 0 ] && break
+        sleep 0.5
+    done
+    [ "$(no_write_conn_cnt)" -gt 0 ] || fail "FAIL: didn't lose write connection in time."
+    log "OK: Detected that write failed."
+    writes_until_failure="$(write_ok_cnt)"
+    [ "$(read_ok_cnt)" -gt 0 ] || fail "FAIL: didn't get a usable read connection."
+    cmd_dc up -d "$patroni_leader"
+    # wait until we have write conn again
+    for i in $(seq 10); do
+        [ "$(write_ok_cnt)" -gt "$writes_until_failure" ] && break
+        sleep 1
+    done
+    [ "$(write_ok_cnt)" -gt "$writes_until_failure" ] || fail "FAIL: didn't get a new write connection."
+    log "OK: Test successful"
+}
+
+write_ok_cnt() {
+    grep -c "OK: Write conn is ok." "$LOG_FILE" 
+}
+
+read_ok_cnt() {
+    grep -c "OK: Read conn is ok." "$LOG_FILE"
+}
+
+no_write_conn_cnt() {
+    grep -c "No write conn returned." "$LOG_FILE"
+}
+
+is_alive() {
+    kill -0 $(cat "$PID_FILE")
+}
+
+test_teardown() {
+    kill $(cat "$PID_FILE")
+    base_teardown
+}
+
+do_command $PROGRAM $COMMAND $TEST_NAME ${@:2}

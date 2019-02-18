@@ -320,6 +320,48 @@
 			"revisionTime": "2014-10-17T20:07:13Z"
 		},
 		{
+			"checksumSHA1": "HzhJ420sXxDkht4IxQPDZLWtfhA=",
+			"path": "github.com/jackc/pgx",
+			"revision": "6067cfab4f674940e745d14579632430c2c33b32",
+			"revisionTime": "2019-01-29T04:45:44Z"
+		},
+		{
+			"checksumSHA1": "rsDmBQ/jGFUN2t6G4c3ohkKGKdQ=",
+			"path": "github.com/jackc/pgx/chunkreader",
+			"revision": "6067cfab4f674940e745d14579632430c2c33b32",
+			"revisionTime": "2019-01-29T04:45:44Z"
+		},
+		{
+			"checksumSHA1": "wArf/u0cmHsLafG2tOcjVUUXQBw=",
+			"path": "github.com/jackc/pgx/internal/sanitize",
+			"revision": "6067cfab4f674940e745d14579632430c2c33b32",
+			"revisionTime": "2019-01-29T04:45:44Z"
+		},
+		{
+			"checksumSHA1": "OCtOmvS8BLHQAyQXJ/Ub8QxKz0s=",
+			"path": "github.com/jackc/pgx/pgio",
+			"revision": "6067cfab4f674940e745d14579632430c2c33b32",
+			"revisionTime": "2019-01-29T04:45:44Z"
+		},
+		{
+			"checksumSHA1": "w6Hghi30r0tT0EJMpcBa0xE6S8Y=",
+			"path": "github.com/jackc/pgx/pgproto3",
+			"revision": "6067cfab4f674940e745d14579632430c2c33b32",
+			"revisionTime": "2019-01-29T04:45:44Z"
+		},
+		{
+			"checksumSHA1": "5RzrME9V3/F5WsJPRCXtWo0Fah4=",
+			"path": "github.com/jackc/pgx/pgtype",
+			"revision": "6067cfab4f674940e745d14579632430c2c33b32",
+			"revisionTime": "2019-01-29T04:45:44Z"
+		},
+		{
+			"checksumSHA1": "tGw3YHVNQv2d0/gpD6I7vbC75BY=",
+			"path": "github.com/jackc/pgx/stdlib",
+			"revision": "6067cfab4f674940e745d14579632430c2c33b32",
+			"revisionTime": "2019-01-29T04:45:44Z"
+		},
+		{
 			"checksumSHA1": "nlEiwqdbwY1eclAGG1xcC+XPV9M=",
 			"path": "github.com/jinzhu/gorm",
 			"revision": "82eb9f8a5bbb5e6b929d2f0ae5b934e6a253f94e",
@@ -541,6 +583,12 @@
 			"path": "github.com/pierrec/xxHash/xxHash32",
 			"revision": "a0006b13c722f7f12368c00a3d3c2ae8a999a0c6",
 			"revisionTime": "2017-07-14T08:24:55Z"
+		},
+		{
+			"checksumSHA1": "0H/VjT8w1CB702qWpbYMqr65Mf0=",
+			"path": "github.com/pkg/errors",
+			"revision": "ffb6e22f01932bf7ac35e0bad9be11f01d1c8685",
+			"revisionTime": "2019-01-09T06:16:28Z"
 		},
 		{
 			"checksumSHA1": "JKm/LRfEg6/MwrN6bdjRSHnWazM=",

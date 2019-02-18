@@ -39,16 +39,8 @@ test_run() {
     test_switch_leader "3"
 }
 
-# Returns information in the leader key in consul.
-# Takes an optional modify index as argument to run this in blocking mode.
-leader_info() {
-    local idx=${1:-0}
-    curl -sS "http://$consul1_ip:8500/v1/kv/service/ptest/leader?index=$idx"
-}
-
-# Extracts the name from the leader_info json block.
-leader_name() {
-    echo $1 | jq -r '.[0].Value' | base64 --decode
+test_teardown() {
+    base_teardown
 }
 
 # Determines the current replica node depending on the given leader.
