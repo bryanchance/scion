@@ -9,7 +9,8 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/lib/pq"
+	// pgx postgres driver
+	_ "github.com/jackc/pgx/stdlib"
 
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/ctrl/path_mgmt"
@@ -23,7 +24,7 @@ type pgRevCache struct {
 }
 
 func New(connection string) (*pgRevCache, error) {
-	db, err := sql.Open("postgres", connection)
+	db, err := sql.Open("pgx", connection)
 	if err != nil {
 		return nil, err
 	}

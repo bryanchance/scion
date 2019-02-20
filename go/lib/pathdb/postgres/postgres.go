@@ -11,7 +11,8 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/lib/pq"
+	// pgx postgres driver
+	_ "github.com/jackc/pgx/stdlib"
 
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
@@ -28,7 +29,7 @@ type Backend struct {
 }
 
 func New(connection string) (*Backend, error) {
-	db, err := sql.Open("postgres", connection)
+	db, err := sql.Open("pgx", connection)
 	if err != nil {
 		return nil, err
 	}

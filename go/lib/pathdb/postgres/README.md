@@ -7,5 +7,4 @@ To stop it use `./tools/dc postgres down`.
 
 ## Go Implementation
 
-Currently we work against [lib/pq](https://godoc.org/github.com/lib/pq)
-We might also want to check [jackc/pgx](https://github.com/jackc/pgx), they claim it is faster.
+Currently we work against [jackc/pgx](https://github.com/jackc/pgx).
