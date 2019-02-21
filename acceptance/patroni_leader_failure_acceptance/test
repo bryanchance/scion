@@ -31,7 +31,7 @@ test_run() {
     # Test replica is not writable
     log "Test replica ($replica_name $replica_ip) is not writable"
     cmd_dc exec psql psql -q -c 'INSERT INTO test (val) VALUES (2);' "$(postgres_url $replica_ip)" \
-        && { echo "Could write to replica db"; exit 1; }
+        && fail "Could write to replica db"
 
     # First switch to replica
     test_switch_leader "2"
@@ -65,7 +65,7 @@ test_switch_leader() {
 
     # Wait for leader to switch
     leader_name=$(wait_for_new_leader $modify_index)
-    [ "$old_leader" != "$leader_name" ] || { echo "Leader didn't change it is still $old_leader"; exit 1; }
+    [ "$old_leader" != "$leader_name" ] || fail "Leader didn't change it is still $old_leader"
     leader_ip=$(container_ip $leader_name)
 
     # Test new leader is writable
@@ -95,22 +95,22 @@ wait_for_new_leader() {
         sleep 1
         : $((cnt+=1))
     done
-    [ -z "$leader_name" ] && { echo "Didn't find new leader in time"; exit 1; }
+    [ -z "$leader_name" ] && fail "Didn't find new leader in time"
     echo "$leader_name"
 }
 
 test_write_to_leader() {
     log "Test leader ($leader_name $leader_ip) is writable"
     cmd_dc exec psql psql -c "INSERT INTO test (val) VALUES ($1);" "$(postgres_url $leader_ip)" \
-        || { echo "Failed to write to leader db"; exit 1; }
+        || fail "Failed to write to leader db"
 }
 
 test_replica_sees_data() {
     log "Test replica ($replica_ip) sees data from leader"
     local result=$(cmd_dc exec psql psql -t -c 'SELECT MAX(val) FROM test;' "$(postgres_url $replica_ip)") \
-        || { echo "Failed to read from replica"; exit 1; }
+        || fail "Failed to read from replica"
     result=$(echo "$result" | tr -d '[:space:]')
-    [ "$result" == "$1" ] || { echo "Wrong result: '$result', expected $1"; exit 1; }
+    [ "$result" == "$1" ] || fail "Wrong result: '$result', expected $1"
 }
 
 wait_for_replica() {
@@ -125,7 +125,7 @@ wait_for_replica() {
         ip=$(service_addr $json)
         : $((cnt+=1))
     done
-    [ "$ip" != "null" ] && [ -z "$ip" ] && { echo "Didn't find replica IP in time"; exit 1; }
+    [ "$ip" != "null" ] && [ -z "$ip" ] && fail "Didn't find replica IP in time"
     echo "$ip"
 }
 

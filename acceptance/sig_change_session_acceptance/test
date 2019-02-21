@@ -32,9 +32,9 @@ test_run() {
     ./bin/sig_ping_acceptance -d -log.console info -src $SRC_IA -dst $DST_IA
     sleep 1
     grep -q "PktPolicies: New policy ia=1-ff00:0:110 class=default sessIds=\[0x01\]" "logs/sig$SRC_IA_FILE.log" || \
-        { echo "Could not find PktClass with session 1!"; return 1; }
+        fail "Could not find PktClass with session 1!"
     grep -q ".*sessMonitor: updating remote Info.*Hops: \[1-ff00:0:113 1>2 1-ff00:0:111 1>1 1-ff00:0:110\].*" "logs/sig$SRC_IA_FILE.log" || \
-        { echo "Could not find remote with path through 1-ff00:0:111!"; return 1; }
+        fail "Could not find remote with path through 1-ff00:0:111!"
 
     # Change to session 2
     jq ".ASes.\"$DST_IA\".PktPolicies = [{\"ClassName\": \"default\", \"SessIds\": [2]}]" $SIG_JSON | sponge $SIG_JSON
@@ -42,9 +42,9 @@ test_run() {
     ./bin/sig_ping_acceptance -d -log.console info -src $SRC_IA -dst $DST_IA
     sleep 1
     grep -q "PktPolicies: New policy ia=1-ff00:0:110 class=default sessIds=\[0x02\]" "logs/sig$SRC_IA_FILE.log" || \
-        { echo "Could not find PktClass with session 2!"; return 1; }
+        fail "Could not find PktClass with session 2!"
     grep -q ".*sessMonitor: New remote.*Hops: \[1-ff00:0:113 2>2 1-ff00:0:112 1>2 1-ff00:0:110\].*" "logs/sig$SRC_IA_FILE.log" || \
-        { echo "Could not find remote with path through 1-ff00:0:112!"; return 1; }
+        fail "Could not find remote with path through 1-ff00:0:112!"
 }
 
 reload_sig() {

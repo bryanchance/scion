@@ -38,8 +38,8 @@ test_run() {
     # leader switch can take some time. 
     # around ~2s to detect leader gone + 1s lock release + 2s additional safety.
     sleep 5
-    is_leader 1 || { echo "Client 1 should have been leader, but wasn't"; return 1; }
-    is_leader 2 || { echo "Client 2 should have been leader, but wasn't"; return 1; }
+    is_leader 1 || fail "Client 1 should have been leader, but wasn't"
+    is_leader 2 || fail "Client 2 should have been leader, but wasn't"
 }
 
 test_teardown() {
