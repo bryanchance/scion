@@ -25,7 +25,6 @@ test_run() {
     replica_ip=$(container_ip $replica_name)
 
     # Test replica sees write
-    sleep 0.5 # some time to propagate
     test_replica_sees_data "1"
 
     # Test replica is not writable
@@ -35,6 +34,8 @@ test_run() {
 
     # First switch to replica
     test_switch_leader "2"
+    # Give some time to let the cluster stabilize ( > ttl of patroni)
+    sleep 20
     # Now switch back to original leader
     test_switch_leader "3"
 }
