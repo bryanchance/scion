@@ -19,6 +19,11 @@ PID_FILE="$TEST_ARTIFACTS_DIR/patroni_lib_acceptance.pid"
 CTRL_FILE="$TEST_ARTIFACTS_DIR/ctrl"
 LOG_FILE="logs/$TEST_NAME.log"
 
+test_setup() {
+    set -e
+    base_setup
+}
+
 test_run() {
     set -e
     consul1_ip=$(container_ip $CONSUL1)

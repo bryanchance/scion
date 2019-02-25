@@ -20,6 +20,7 @@ import (
 
 var (
 	connection string
+	sqlSchema  string
 )
 
 func init() {
@@ -28,45 +29,46 @@ func init() {
 		xtest.PostgresHost())
 }
 
-func (db *trustDB) dropSchema(ctx context.Context) error {
+func loadSchema(t *testing.T) {
+	sql, err := ioutil.ReadFile("../../../../../../cert_srv/postgres/schema.sql")
+	xtest.FailOnErr(t, err)
+	sqlSchema = string(sql)
+}
+
+func (db *TrustDB) dropSchema(ctx context.Context) error {
 	_, err := db.db.ExecContext(ctx, "DROP SCHEMA IF EXISTS csdb CASCADE;")
 	return err
 }
 
-func (db *trustDB) initSchema(ctx context.Context) error {
+func (db *TrustDB) initSchema(ctx context.Context) error {
 	if err := db.dropSchema(ctx); err != nil {
 		return err
 	}
 	if _, err := db.db.ExecContext(ctx, "CREATE SCHEMA csdb;"); err != nil {
 		return err
 	}
-	sql, err := ioutil.ReadFile("../../../../../../cert_srv/postgres/schema.sql")
-	if err != nil {
-		return err
-	}
-	_, err = db.db.ExecContext(ctx, string(sql))
+	_, err := db.db.ExecContext(ctx, sqlSchema)
 	return err
 }
 
 func TestTrustDBSuite(t *testing.T) {
+	loadSchema(t)
+	db := setupDB(t)
 	Convey("TrustDBSuite", t, func() {
-		db := setupDB(t)
 		setup := func() trustdb.TrustDB {
-			db.initSchema(context.Background())
+			xtest.FailOnErr(t, db.initSchema(context.Background()))
 			return db
 		}
 		cleanup := func(_ trustdb.TrustDB) {
-			db.dropSchema(context.Background())
+			xtest.FailOnErr(t, db.dropSchema(context.Background()))
 		}
 		trustdbtest.TestTrustDB(t, setup, cleanup)
-
-		db.dropSchema(context.Background())
 	})
 }
 
 func TestConcurrentInsertion(t *testing.T) {
+	db := setupDB(t)
 	Convey("Concurrent Insert", t, func() {
-		db := setupDB(t)
 		ctx, cancelF := context.WithTimeout(context.Background(), trustdbtest.Timeout)
 		defer cancelF()
 		defer db.dropSchema(context.Background())
@@ -96,7 +98,7 @@ func TestConcurrentInsertion(t *testing.T) {
 	})
 }
 
-func setupDB(t *testing.T) *trustDB {
+func setupDB(t *testing.T) *TrustDB {
 	db, err := New(connection)
 	xtest.FailOnErr(t, err)
 	err = db.initSchema(context.Background())

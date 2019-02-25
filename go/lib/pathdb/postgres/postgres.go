@@ -1,5 +1,6 @@
 // Copyright 2018 Anapaya Systems.
 
+// Package postgres contains an implementation of the path DB interface for postgres databases.
 package postgres
 
 import (
@@ -24,10 +25,14 @@ import (
 
 var _ pathdb.PathDB = (*Backend)(nil)
 
+// Backend implements that path DB interface for postgres connections.
 type Backend struct {
 	db *sql.DB
 }
 
+// New creates a new postgres path DB backend using the given connection string.
+// The connection string can be anything that is supported by pgx.
+// (https://godoc.org/github.com/jackc/pgx/stdlib)
 func New(connection string) (*Backend, error) {
 	db, err := sql.Open("pgx", connection)
 	if err != nil {
@@ -37,6 +42,14 @@ func New(connection string) (*Backend, error) {
 		db: db,
 	}
 	return b, err
+}
+
+// NewFromDB creates a new postgres path DB backend from the given db handle.
+// The db handle must be a connection to a postgres database.
+func NewFromDB(db *sql.DB) *Backend {
+	return &Backend{
+		db: db,
+	}
 }
 
 func (b *Backend) Insert(ctx context.Context, segMeta *seg.Meta) (int, error) {

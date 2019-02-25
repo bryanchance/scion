@@ -26,6 +26,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -47,6 +48,12 @@ const (
 	DefaultPatroniPort    = 8008
 	DefaultUpdateInterval = 2 * time.Second
 	DefaultUpdateTimeout  = 5 * time.Second
+)
+
+var (
+	// DBErrors is the list of errors that should be considered as an issue with the DB.
+	// If one of these errors is reported the connection is considered as unhealthy.
+	DBErrors = []error{io.EOF}
 )
 
 // Conf contains configuration for patroni.
@@ -100,13 +107,26 @@ func (r *ConnRef) String() string {
 
 // ReportErr should be called after using this connection reference.
 // The err should be the one that was returned when using the connection, it can also be nil.
-func (r *ConnRef) ReportErr(err error) {
-	if err == nil {
-		return
+// The return value indicates whether the error was recognized as a connection error, in which case
+// it would make sense for the caller to get a new connection and retry.
+func (r *ConnRef) ReportErr(err error) bool {
+	connErr := isConnErr(err)
+	if connErr {
+		r.pool.reportErr(r, err)
 	}
-	// TODO(lukedirtwalker): check if the error is really a connection error and not a user error.
-	// currently I'm not sure yet how to distinguish the cases.
-	r.pool.reportErr(r, err)
+	return connErr
+}
+
+func isConnErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	for _, dbErr := range DBErrors {
+		if common.ContainsErr(err, dbErr) {
+			return true
+		}
+	}
+	return false
 }
 
 // clientConn represents a connection to a specific database host.
@@ -216,6 +236,7 @@ func (c *ConnPool) reportErr(r *ConnRef, err error) {
 	if r.version < c.version {
 		return
 	}
+	log.Debug("[patroni] Reporting connection", "ip", r.ip, "err", err)
 	if conn, ok := c.healthyConns[r.ip]; ok {
 		delete(c.healthyConns, r.ip)
 		c.unhealthyConns[r.ip] = conn

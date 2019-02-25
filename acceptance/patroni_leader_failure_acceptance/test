@@ -8,6 +8,11 @@ COMMAND="$1"
 
 . acceptance/patroni/common.sh
 
+test_setup() {
+    set -e
+    base_setup
+}
+
 test_run() {
     set -e
     consul1_ip=$(container_ip $CONSUL1)

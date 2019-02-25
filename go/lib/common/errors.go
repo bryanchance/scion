@@ -1,4 +1,5 @@
 // Copyright 2016 ETH Zurich
+// Copyright 2019 ETH Zurich, Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -58,6 +59,17 @@ func GetNestedError(e error) error {
 		return n.GetErr()
 	}
 	return nil
+}
+
+// ContainsErr returns whether e == expected or e contains expected as a nested error.
+func ContainsErr(e, expected error) bool {
+	if e == expected {
+		return true
+	}
+	if n := GetNestedError(e); n != nil {
+		return ContainsErr(n, expected)
+	}
+	return false
 }
 
 // Temporary allows signalling of a temporary error. Based on https://golang.org/pkg/net/#Error

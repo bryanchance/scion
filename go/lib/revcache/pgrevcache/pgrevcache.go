@@ -1,5 +1,6 @@
 // Copyright 2018 Anapaya Systems.
 
+// Package pgrevcache contains a revcache implementation fro postgres databases.
 package pgrevcache
 
 import (
@@ -17,23 +18,35 @@ import (
 	"github.com/scionproto/scion/go/lib/revcache"
 )
 
-var _ revcache.RevCache = (*pgRevCache)(nil)
+var _ revcache.RevCache = (*PgRevCache)(nil)
 
-type pgRevCache struct {
+// PgRevCache implements the revocation cache interface.
+type PgRevCache struct {
 	db *sql.DB
 }
 
-func New(connection string) (*pgRevCache, error) {
+// New creates a new postgres revocation cache backend using the given connection string.
+// The connection string can be anything that is supported by pgx
+// (https://godoc.org/github.com/jackc/pgx/stdlib)
+func New(connection string) (*PgRevCache, error) {
 	db, err := sql.Open("pgx", connection)
 	if err != nil {
 		return nil, err
 	}
-	return &pgRevCache{
+	return &PgRevCache{
 		db: db,
 	}, nil
 }
 
-func (c *pgRevCache) Get(ctx context.Context,
+// NewFromDB creates a new postgres revocation backend using the given db handle.
+// The db handle must be a connection to a postgres database.
+func NewFromDB(db *sql.DB) *PgRevCache {
+	return &PgRevCache{
+		db: db,
+	}
+}
+
+func (c *PgRevCache) Get(ctx context.Context,
 	k *revcache.Key) (*path_mgmt.SignedRevInfo, bool, error) {
 
 	query := `
@@ -54,7 +67,7 @@ func (c *pgRevCache) Get(ctx context.Context,
 	return sr, true, err
 }
 
-func (c *pgRevCache) GetAll(ctx context.Context,
+func (c *PgRevCache) GetAll(ctx context.Context,
 	keys map[revcache.Key]struct{}) ([]*path_mgmt.SignedRevInfo, error) {
 
 	var ingroups []string
@@ -89,7 +102,7 @@ func (c *pgRevCache) GetAll(ctx context.Context,
 	return revs, nil
 }
 
-func (c *pgRevCache) Insert(ctx context.Context, rev *path_mgmt.SignedRevInfo) (bool, error) {
+func (c *PgRevCache) Insert(ctx context.Context, rev *path_mgmt.SignedRevInfo) (bool, error) {
 	newInfo, err := rev.RevInfo()
 	if err != nil {
 		panic(err)
@@ -136,7 +149,7 @@ func (c *pgRevCache) Insert(ctx context.Context, rev *path_mgmt.SignedRevInfo) (
 	return true, nil
 }
 
-func (c *pgRevCache) DeleteExpired(ctx context.Context) (int64, error) {
+func (c *PgRevCache) DeleteExpired(ctx context.Context) (int64, error) {
 	tx, err := c.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err

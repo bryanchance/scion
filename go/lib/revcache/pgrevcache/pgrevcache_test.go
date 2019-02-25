@@ -30,7 +30,7 @@ func init() {
 var _ (revcachetest.TestableRevCache) = (*testRevCache)(nil)
 
 type testRevCache struct {
-	*pgRevCache
+	*PgRevCache
 }
 
 func (c *testRevCache) dropSchema(ctx context.Context) error {
@@ -79,7 +79,7 @@ func TestRevcacheSuite(t *testing.T) {
 		db, err := New(connection)
 		xtest.FailOnErr(t, err)
 		c := &testRevCache{
-			pgRevCache: db,
+			PgRevCache: db,
 		}
 		err = c.initSchema(context.Background())
 		xtest.FailOnErr(t, err)

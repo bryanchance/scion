@@ -15,19 +15,32 @@ cmd_dc() {
     COMPOSE_FILE="acceptance/patroni/patroni-dc.yml" docker-compose -p acceptance_patroni --no-ansi "$@"
 }
 
-test_setup() {
-    set -e
+base_setup() {
     # First build the patroni_dev image
     ./tools/quiet ./docker.sh patroni_dev
     # Copy files to output dir
     mkdir -p "$PATRONI_FILES_DIR/initsql"
     cp acceptance/patroni/patroni*.yml "$PATRONI_FILES_DIR"
     cp acceptance/patroni/setup_cluster "$PATRONI_FILES_DIR"
-    cp acceptance/patroni/initsql/*.sql "$PATRONI_FILES_DIR/initsql/"
+    cp "${1:-acceptance/patroni/initsql/}"*.sql "$PATRONI_FILES_DIR/initsql/"
+    log "Start containers"
     # start containers
     cmd_dc up -d
     # make sure they are ready
-    sleep 30
+    log "Wait patroni"
+    wait_patroni_ready
+    log "Ready"
+}
+
+wait_patroni_ready() {
+    for i in $(seq 30); do
+        docker logs "$PATRONI1" 2>&1 | grep -q "Register service.*replica" && return
+        docker logs "$PATRONI2" 2>&1 | grep -q "Register service.*replica" && return
+        sleep 1
+    done
+    docker logs "$PATRONI1" 2>&1 | grep -q "Register service.*replica" && return
+    docker logs "$PATRONI2" 2>&1 | grep -q "Register service.*replica" && return
+    fail "FAIL: Patroni setup didn't finish in time."
 }
 
 base_teardown() {

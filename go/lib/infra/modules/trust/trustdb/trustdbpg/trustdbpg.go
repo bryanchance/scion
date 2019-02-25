@@ -1,5 +1,6 @@
 // Copyright 2018 Anapaya Systems
 
+// Package trustdbpg contains a trust DB implementation for postgres databases.
 package trustdbpg
 
 import (
@@ -23,14 +24,18 @@ type sqler interface {
 	QueryRowContext(context.Context, string, ...interface{}) *sql.Row
 }
 
-var _ trustdb.TrustDB = (*trustDB)(nil)
+var _ trustdb.TrustDB = (*TrustDB)(nil)
 
-type trustDB struct {
+// TrustDB implements the trust DB interface.
+type TrustDB struct {
 	db *sql.DB
 	*executor
 }
 
-func New(connection string) (*trustDB, error) {
+// New creates a new postgres trust DB backend using the given connection string.
+// The connection string can be anything that is supported by pgx.
+// (https://godoc.org/github.com/jackc/pgx/stdlib)
+func New(connection string) (*TrustDB, error) {
 	db, err := sql.Open("pgx", connection)
 	if err != nil {
 		return nil, err
@@ -39,7 +44,7 @@ func New(connection string) (*trustDB, error) {
 		db.Close()
 		return nil, common.NewBasicError("Initial DB ping failed, connection broken?", err)
 	}
-	return &trustDB{
+	return &TrustDB{
 		db: db,
 		executor: &executor{
 			db: db,
@@ -47,11 +52,22 @@ func New(connection string) (*trustDB, error) {
 	}, nil
 }
 
-func (db *trustDB) Close() error {
+// NewFromDB creates a new postgres trust DB backend from the given db handle.
+// The db handle must be a connection to a postgres database.
+func NewFromDB(db *sql.DB) *TrustDB {
+	return &TrustDB{
+		db: db,
+		executor: &executor{
+			db: db,
+		},
+	}
+}
+
+func (db *TrustDB) Close() error {
 	return db.db.Close()
 }
 
-func (db *trustDB) BeginTransaction(ctx context.Context,
+func (db *TrustDB) BeginTransaction(ctx context.Context,
 	opts *sql.TxOptions) (trustdb.Transaction, error) {
 
 	tx, err := db.db.BeginTx(ctx, opts)

@@ -1,0 +1,2 @@
+CREATE USER csdb WITH PASSWORD 'password';
+GRANT CREATE ON DATABASE postgres TO csdb;
