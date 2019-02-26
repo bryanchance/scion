@@ -33,29 +33,24 @@ func New(c *consulapi.Client, cfg patroni.Conf) (*Backend, error) {
 	}, nil
 }
 
-func (b *Backend) Get(ctx context.Context,
-	k *revcache.Key) (*path_mgmt.SignedRevInfo, bool, error) {
-
-	var rev *path_mgmt.SignedRevInfo
-	var ok bool
+func (b *Backend) Get(ctx context.Context, keys revcache.KeySet) (revcache.Revocations, error) {
+	var revs revcache.Revocations
 	rErr := b.retry.DoRead(ctx, func(ctx context.Context, db *sql.DB) error {
 		var err error
-		rev, ok, err = pgrevcache.NewFromDB(db).Get(ctx, k)
-		return err
-	})
-	return rev, ok, rErr
-}
-
-func (b *Backend) GetAll(ctx context.Context,
-	keys map[revcache.Key]struct{}) ([]*path_mgmt.SignedRevInfo, error) {
-
-	var revs []*path_mgmt.SignedRevInfo
-	rErr := b.retry.DoRead(ctx, func(ctx context.Context, db *sql.DB) error {
-		var err error
-		revs, err = pgrevcache.NewFromDB(db).GetAll(ctx, keys)
+		revs, err = pgrevcache.NewFromDB(db).Get(ctx, keys)
 		return err
 	})
 	return revs, rErr
+}
+
+func (b *Backend) GetAll(ctx context.Context) (revcache.ResultChan, error) {
+	var resCh revcache.ResultChan
+	rErr := b.retry.DoRead(ctx, func(ctx context.Context, db *sql.DB) error {
+		var err error
+		resCh, err = pgrevcache.NewFromDB(db).GetAll(ctx)
+		return err
+	})
+	return resCh, rErr
 }
 
 func (b *Backend) Insert(ctx context.Context,

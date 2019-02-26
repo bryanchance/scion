@@ -19,6 +19,8 @@ import (
 
 var (
 	connection string
+
+	sqlSchema string
 )
 
 func init() {
@@ -27,30 +29,16 @@ func init() {
 		xtest.PostgresHost())
 }
 
+func loadSchema(t *testing.T) {
+	sql, err := ioutil.ReadFile("../../../path_srv/postgres/schema.sql")
+	xtest.FailOnErr(t, err)
+	sqlSchema = string(sql)
+}
+
 var _ (revcachetest.TestableRevCache) = (*testRevCache)(nil)
 
 type testRevCache struct {
 	*PgRevCache
-}
-
-func (c *testRevCache) dropSchema(ctx context.Context) error {
-	_, err := c.db.ExecContext(ctx, "DROP SCHEMA IF EXISTS psdb CASCADE;")
-	return err
-}
-
-func (c *testRevCache) initSchema(ctx context.Context) error {
-	if err := c.dropSchema(ctx); err != nil {
-		return err
-	}
-	if _, err := c.db.ExecContext(ctx, "CREATE SCHEMA psdb;"); err != nil {
-		return err
-	}
-	sql, err := ioutil.ReadFile("../../../path_srv/postgres/schema.sql")
-	if err != nil {
-		return err
-	}
-	_, err = c.db.ExecContext(ctx, string(sql))
-	return err
 }
 
 func (c *testRevCache) InsertExpired(t *testing.T, ctx context.Context,
@@ -64,7 +52,7 @@ func (c *testRevCache) InsertExpired(t *testing.T, ctx context.Context,
 	tx, err := c.db.BeginTx(ctx, nil)
 	xtest.FailOnErr(t, err)
 	query := `
-		INSERT INTO Revocations 
+		INSERT INTO Revocations
 			(IsdID, AsID, IfID, LinkType, RawTimeStamp, RawTTL, RawSignedRev, Expiration)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`
 	_, err = tx.ExecContext(ctx, query, k.IA.I, k.IA.A, k.IfId, newInfo.LinkType,
@@ -74,25 +62,22 @@ func (c *testRevCache) InsertExpired(t *testing.T, ctx context.Context,
 	xtest.FailOnErr(t, err)
 }
 
+func (c *testRevCache) Prepare(t *testing.T, ctx context.Context) {
+	schemaResetSql := "DROP SCHEMA IF EXISTS psdb CASCADE;\nCREATE SCHEMA psdb;"
+	_, err := c.db.ExecContext(ctx, schemaResetSql)
+	xtest.FailOnErr(t, err)
+	_, err = c.db.ExecContext(ctx, sqlSchema)
+	xtest.FailOnErr(t, err)
+}
+
 func TestRevcacheSuite(t *testing.T) {
+	loadSchema(t)
+	db, err := New(connection)
+	xtest.FailOnErr(t, err)
+	c := &testRevCache{
+		PgRevCache: db,
+	}
 	Convey("RevCache Suite", t, func() {
-		db, err := New(connection)
-		xtest.FailOnErr(t, err)
-		c := &testRevCache{
-			PgRevCache: db,
-		}
-		err = c.initSchema(context.Background())
-		xtest.FailOnErr(t, err)
-		revcachetest.TestRevCache(t,
-			func() revcachetest.TestableRevCache {
-				_, err = c.db.Exec("DELETE FROM Revocations")
-				xtest.FailOnErr(t, err)
-				return c
-			},
-			func() {
-				_, err = c.db.Exec("DELETE FROM Revocations")
-				xtest.FailOnErr(t, err)
-			},
-		)
+		revcachetest.TestRevCache(t, c)
 	})
 }

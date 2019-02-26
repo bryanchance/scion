@@ -15,6 +15,7 @@ import (
 
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/ctrl/path_mgmt"
+	"github.com/scionproto/scion/go/lib/log"
 	"github.com/scionproto/scion/go/lib/revcache"
 )
 
@@ -46,30 +47,7 @@ func NewFromDB(db *sql.DB) *PgRevCache {
 	}
 }
 
-func (c *PgRevCache) Get(ctx context.Context,
-	k *revcache.Key) (*path_mgmt.SignedRevInfo, bool, error) {
-
-	query := `
-		SELECT RawSignedRev FROM Revocations 
-		WHERE IsdID=$1 AND AsID=$2 AND IfID=$3
-		AND Expiration > NOW()`
-	rows, err := c.db.QueryContext(ctx, query, k.IA.I, k.IA.A, k.IfId)
-	if err != nil {
-		return nil, false, err
-	}
-	defer rows.Close()
-	if !rows.Next() {
-		return nil, false, nil
-	}
-	var raw common.RawBytes
-	rows.Scan(&raw)
-	sr, err := path_mgmt.NewSignedRevInfoFromRaw(raw)
-	return sr, true, err
-}
-
-func (c *PgRevCache) GetAll(ctx context.Context,
-	keys map[revcache.Key]struct{}) ([]*path_mgmt.SignedRevInfo, error) {
-
+func (c *PgRevCache) Get(ctx context.Context, keys revcache.KeySet) (revcache.Revocations, error) {
 	var ingroups []string
 	var args []interface{}
 	i := 1
@@ -89,7 +67,7 @@ func (c *PgRevCache) GetAll(ctx context.Context,
 		return nil, err
 	}
 	defer rows.Close()
-	var revs []*path_mgmt.SignedRevInfo
+	revs := make(revcache.Revocations)
 	for rows.Next() {
 		var raw common.RawBytes
 		rows.Scan(&raw)
@@ -97,9 +75,38 @@ func (c *PgRevCache) GetAll(ctx context.Context,
 		if err != nil {
 			return nil, err
 		}
-		revs = append(revs, sr)
+		info, err := sr.RevInfo()
+		if err != nil {
+			return nil, err
+		}
+		revs[*revcache.NewKey(info.IA(), info.IfID)] = sr
 	}
 	return revs, nil
+}
+
+func (c *PgRevCache) GetAll(ctx context.Context) (revcache.ResultChan, error) {
+	resCh := make(chan revcache.RevOrErr, 50)
+	query := `SELECT RawSignedRev FROM Revocations
+			  WHERE Expiration > NOW()`
+	rows, err := c.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		defer log.LogPanicAndExit()
+		defer rows.Close()
+		for rows.Next() {
+			var raw common.RawBytes
+			rows.Scan(&raw)
+			sr, err := path_mgmt.NewSignedRevInfoFromRaw(raw)
+			resCh <- revcache.RevOrErr{
+				Rev: sr,
+				Err: err,
+			}
+		}
+		close(resCh)
+	}()
+	return resCh, nil
 }
 
 func (c *PgRevCache) Insert(ctx context.Context, rev *path_mgmt.SignedRevInfo) (bool, error) {

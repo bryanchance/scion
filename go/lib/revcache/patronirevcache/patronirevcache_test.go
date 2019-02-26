@@ -52,27 +52,6 @@ func setupDB(t *testing.T) *Backend {
 	return db
 }
 
-func (b *Backend) dropSchema(ctx context.Context, t *testing.T) {
-	conn := b.retry.Pool.WriteConn()
-	if conn == nil {
-		t.Fatalf("No write connection to drop schema")
-	}
-	_, err := conn.DB().ExecContext(ctx, "DROP SCHEMA IF EXISTS psdb CASCADE;")
-	xtest.FailOnErr(t, err)
-}
-
-func (b *Backend) initSchema(ctx context.Context, t *testing.T) {
-	conn := b.retry.Pool.WriteConn()
-	if conn == nil {
-		t.Fatalf("No write connection to drop schema")
-	}
-	b.dropSchema(ctx, t)
-	_, err := conn.DB().ExecContext(ctx, "CREATE SCHEMA psdb;")
-	xtest.FailOnErr(t, err)
-	_, err = conn.DB().ExecContext(ctx, sqlSchema)
-	xtest.FailOnErr(t, err)
-}
-
 var _ (revcachetest.TestableRevCache) = (*testRevCache)(nil)
 
 type testRevCache struct {
@@ -104,18 +83,23 @@ func (c *testRevCache) InsertExpired(t *testing.T, ctx context.Context,
 	xtest.FailOnErr(t, rErr)
 }
 
+func (c *testRevCache) Prepare(t *testing.T, ctx context.Context) {
+	conn := c.retry.Pool.WriteConn()
+	if conn == nil {
+		t.Fatalf("No write connection to prepare db")
+	}
+	schemaResetSql := "DROP SCHEMA IF EXISTS psdb CASCADE;\nCREATE SCHEMA psdb;"
+	_, err := conn.DB().ExecContext(ctx, schemaResetSql)
+	xtest.FailOnErr(t, err)
+	_, err = conn.DB().ExecContext(ctx, sqlSchema)
+	xtest.FailOnErr(t, err)
+}
+
 func TestRevCacheSuite(t *testing.T) {
 	loadSchema(t)
 	db := setupDB(t)
 	rc := &testRevCache{Backend: db}
 	Convey("RevcacheSuite", t, func() {
-		revcachetest.TestRevCache(t,
-			func() revcachetest.TestableRevCache {
-				rc.initSchema(context.Background(), t)
-				return rc
-			},
-			func() {
-				rc.dropSchema(context.Background(), t)
-			})
+		revcachetest.TestRevCache(t, rc)
 	})
 }
