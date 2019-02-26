@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Copyright Anapaya Systems 2019
+
+# Tests the patroni db backend implementations (trustdb, pathdb, revcache).
+
+TEST_NAME="patroni_db_lib"
+PROGRAM=$(basename "$0")
+COMMAND="$1"
+
+. acceptance/patroni/common.sh
+
+test_setup() {
+    set -e
+    base_setup "acceptance/patroni_db_lib_acceptance/initsql/"
+}
+
+test_run() {
+    result=0
+    for i in ./go/lib/{pathdb/patronipathdb,revcache/patronirevcache,infra/modules/trust/trustdb/trustdbpatroni}; do
+        local test="Patroni DB backend test: $i"
+        log "$test"
+        CONSUL_ADDRESS="$(container_ip $CONSUL1):8500" go test -v -tags patronirunning "$i"
+        local test_res=$?
+        if [ $test_res -eq 0 ]; then
+            log "$test: SUCCESS"
+        else
+            log "$test: FAILURE"
+        fi
+        result=$((result+$test_res))
+    done
+    return $result
+}
+
+test_teardown() {
+    base_teardown
+}
+
+do_command $PROGRAM $COMMAND $TEST_NAME ${@:2}

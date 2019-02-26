@@ -1,5 +1,5 @@
 // Copyright 2018 Anapaya Systems
-// +build infrarunning
+// +build postgresrunning
 
 package trustdbpg
 
@@ -25,7 +25,7 @@ var (
 
 func init() {
 	// sslmode=disable is because dockerized postgres doesn't have SSL enabled.
-	connection = fmt.Sprintf("host=%s port=5433 user=csdb password=password sslmode=disable",
+	connection = fmt.Sprintf("postgresql://csdb:password@%s/postgres?sslmode=disable",
 		xtest.PostgresHost())
 }
 

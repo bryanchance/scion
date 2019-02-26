@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Copyright Anapaya Systems 2019
+
+# Tests the postgres db backend implementations (trustdb, pathdb, revcache).
+
+TEST_NAME="postgres_db_lib"
+PROGRAM=$(basename "$0")
+COMMAND="$1"
+
+. acceptance/common.sh
+
+TEST_ARTIFACTS_DIR="${ACCEPTANCE_ARTIFACTS:?}/${TEST_NAME}"
+
+cmd_dc() {
+    BASE_DIR="${SCION_OUTPUT_BASE:+$SCION_OUTPUT_BASE/}$TEST_ARTIFACTS_DIR"\
+    COMPOSE_FILE="acceptance/postgres_db_lib_acceptance/postgres-dc.yml" docker-compose -p acceptance_postgres --no-ansi "$@"
+}
+
+test_setup() {
+    set -e
+    mkdir -p "$TEST_ARTIFACTS_DIR/initsql"
+    cp acceptance/postgres_db_lib_acceptance/initsql/*.sql "$TEST_ARTIFACTS_DIR/initsql/"
+    log "Start postgres"
+    cmd_dc up -d
+    sleep 2
+}
+
+test_run() {
+    result=0
+    for i in ./go/lib/{pathdb/postgres,revcache/pgrevcache,infra/modules/trust/trustdb/trustdbpg}; do
+        local test="Postgres DB backend test: $i"
+        log "$test"
+        go test -v -tags postgresrunning "$i"
+        local test_res=$?
+        if [ $test_res -eq 0 ]; then
+            log "$test: SUCCESS"
+        else
+            log "$test: FAILURE"
+        fi
+        result=$((result+$test_res))
+    done
+    return $result
+}
+
+test_teardown() {
+    collect_docker_logs "cmd_dc"
+    cmd_dc down
+}
+
+print_help() {
+    echo
+	cat <<-_EOF
+	    $PROGRAM name
+	        return the name of this test
+	    $PROGRAM setup
+	        execute only the setup phase.
+	    $PROGRAM run
+	        execute only the run phase.
+	    $PROGRAM teardown
+	        execute only the teardown phase.
+	_EOF
+}
+
+case "$COMMAND" in
+    name)
+        echo $TEST_NAME ;;
+    setup|run|teardown)
+        "test_$COMMAND" ;;
+    *) print_help; exit 1 ;;
+esac
+
