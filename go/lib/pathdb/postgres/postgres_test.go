@@ -1,5 +1,4 @@
 // Copyright 2018 Anapaya Systems.
-// +build postgresrunning
 
 package postgres
 
@@ -7,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -19,6 +19,13 @@ import (
 var (
 	connection string
 )
+
+func checkPostgres(t *testing.T) {
+	_, ok := os.LookupEnv("POSTGRESRUNNING")
+	if !ok {
+		t.Skip("Postgres is not running")
+	}
+}
 
 func init() {
 	// sslmode=disable is because dockerized postgres doesn't have SSL enabled.
@@ -47,6 +54,7 @@ func (b *Backend) initSchema(ctx context.Context) error {
 }
 
 func TestPathDBSuite(t *testing.T) {
+	checkPostgres(t)
 	Convey("PathDBSuite", t, func() {
 		db, err := New(connection)
 		xtest.FailOnErr(t, err)

@@ -1,5 +1,4 @@
 // Copyright 2019 Anapaya Systems
-// +build patronirunning
 
 package patronirevcache
 
@@ -23,6 +22,13 @@ import (
 var (
 	sqlSchema string
 )
+
+func checkPatroni(t *testing.T) {
+	_, ok := os.LookupEnv("PATRONIRUNNING")
+	if !ok {
+		t.Skip("Patroni is not running")
+	}
+}
 
 func loadSchema(t *testing.T) {
 	sql, err := ioutil.ReadFile("../../../path_srv/postgres/schema.sql")
@@ -96,6 +102,7 @@ func (c *testRevCache) Prepare(t *testing.T, ctx context.Context) {
 }
 
 func TestRevCacheSuite(t *testing.T) {
+	checkPatroni(t)
 	loadSchema(t)
 	db := setupDB(t)
 	rc := &testRevCache{Backend: db}

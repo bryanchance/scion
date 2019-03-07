@@ -1,5 +1,4 @@
 // Copyright 2018 Anapaya Systems
-// +build postgresrunning
 
 package trustdbpg
 
@@ -7,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -27,6 +27,13 @@ func init() {
 	// sslmode=disable is because dockerized postgres doesn't have SSL enabled.
 	connection = fmt.Sprintf("postgresql://csdb:password@%s/postgres?sslmode=disable",
 		xtest.PostgresHost())
+}
+
+func checkPostgres(t *testing.T) {
+	_, ok := os.LookupEnv("POSTGRESRUNNING")
+	if !ok {
+		t.Skip("Postgres is not running")
+	}
 }
 
 func loadSchema(t *testing.T) {
@@ -52,6 +59,7 @@ func (db *TrustDB) initSchema(ctx context.Context) error {
 }
 
 func TestTrustDBSuite(t *testing.T) {
+	checkPostgres(t)
 	loadSchema(t)
 	db := setupDB(t)
 	Convey("TrustDBSuite", t, func() {
@@ -67,6 +75,7 @@ func TestTrustDBSuite(t *testing.T) {
 }
 
 func TestConcurrentInsertion(t *testing.T) {
+	checkPostgres(t)
 	db := setupDB(t)
 	Convey("Concurrent Insert", t, func() {
 		ctx, cancelF := context.WithTimeout(context.Background(), trustdbtest.Timeout)

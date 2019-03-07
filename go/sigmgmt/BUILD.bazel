@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/scionproto/scion/go/sigmgmt",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//go/lib/log:go_default_library",
+        "//go/sigmgmt/auth:go_default_library",
+        "//go/sigmgmt/config:go_default_library",
+        "//go/sigmgmt/ctrl:go_default_library",
+        "//go/sigmgmt/db:go_default_library",
+        "//go/sigmgmt/util:go_default_library",
+        "@com_github_gorilla_handlers//:go_default_library",
+        "@com_github_gorilla_mux//:go_default_library",
+        "@com_github_jinzhu_gorm//:go_default_library",
+        "@com_github_jinzhu_gorm//dialects/sqlite:go_default_library",
+        "@com_github_urfave_negroni//:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "sigmgmt",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

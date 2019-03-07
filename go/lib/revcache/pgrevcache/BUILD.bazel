@@ -1,0 +1,27 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["pgrevcache.go"],
+    importpath = "github.com/scionproto/scion/go/lib/revcache/pgrevcache",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//go/lib/common:go_default_library",
+        "//go/lib/ctrl/path_mgmt:go_default_library",
+        "//go/lib/log:go_default_library",
+        "//go/lib/revcache:go_default_library",
+        "@com_github_jackc_pgx//stdlib:go_default_library"
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["pgrevcache_test.go"],
+    embed = [":go_default_library"],
+    data = ["//go/path_srv/postgres:schema"],
+    deps = [
+        "//go/lib/revcache/revcachetest:go_default_library",
+        "//go/lib/xtest:go_default_library",
+        "@com_github_smartystreets_goconvey//convey:go_default_library",
+    ],
+)

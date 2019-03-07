@@ -17,11 +17,12 @@ test_setup() {
 
 test_run() {
     result=0
-    for i in ./go/lib/{pathdb/patronipathdb,revcache/patronirevcache,infra/modules/trust/trustdb/trustdbpatroni}; do
+    for i in go/lib/{pathdb/patronipathdb,revcache/patronirevcache,infra/modules/trust/trustdb/trustdbpatroni}; do
         local test="Patroni DB backend test: $i"
         log "$test"
-        CONSUL_ADDRESS="$(container_ip $CONSUL1):8500" go test -v -tags patronirunning "$i"
+        bazel test "//$i:go_default_test" --action_env=PATRONIRUNNING=1 --action_env=CONSUL_ADDRESS="$(container_ip $CONSUL1):8500" --action_env=DOCKER0=$DOCKER0
         local test_res=$?
+        cp -rL bazel-testlogs logs
         if [ $test_res -eq 0 ]; then
             log "$test: SUCCESS"
         else

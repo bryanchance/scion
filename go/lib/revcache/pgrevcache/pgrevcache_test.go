@@ -1,5 +1,4 @@
 // Copyright 2018 Anapaya Systems.
-// +build postgresrunning
 
 package pgrevcache
 
@@ -7,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -22,6 +22,13 @@ var (
 
 	sqlSchema string
 )
+
+func checkPostgres(t *testing.T) {
+	_, ok := os.LookupEnv("POSTGRESRUNNING")
+	if !ok {
+		t.Skip("Postgres is not running")
+	}
+}
 
 func init() {
 	// sslmode=disable is because dockerized postgres doesn't have SSL enabled.
@@ -71,6 +78,7 @@ func (c *testRevCache) Prepare(t *testing.T, ctx context.Context) {
 }
 
 func TestRevcacheSuite(t *testing.T) {
+	checkPostgres(t)
 	loadSchema(t)
 	db, err := New(connection)
 	xtest.FailOnErr(t, err)

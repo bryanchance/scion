@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/scionproto/scion/go/acceptance/patroni_lib_acceptance",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//go/lib/common:go_default_library",
+        "//go/lib/env:go_default_library",
+        "//go/lib/log:go_default_library",
+        "//go/lib/infra/modules/patroni:go_default_library",
+        "@com_github_hashicorp_consul//api:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "patroni_lib_acceptance",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

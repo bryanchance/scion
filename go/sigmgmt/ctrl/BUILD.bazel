@@ -1,0 +1,33 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "as.go",
+        "auth.go",
+        "common.go",
+        "policy.go",
+        "sites.go",
+        "svc.go",
+        "util.go",
+    ],
+    importpath = "github.com/scionproto/scion/go/sigmgmt/ctrl",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//go/lib/addr:go_default_library",
+        "//go/lib/common:go_default_library",
+        "//go/lib/log:go_default_library",
+        "//go/lib/pathpol:go_default_library",
+        "//go/lib/pktcls:go_default_library",
+        "//go/sig/anaconfig:go_default_library",
+        "//go/sigmgmt/auth:go_default_library",
+        "//go/sigmgmt/cfggen:go_default_library",
+        "//go/sigmgmt/config:go_default_library",
+        "//go/sigmgmt/db:go_default_library",
+        "//go/sigmgmt/netcopy:go_default_library",
+        "//go/sigmgmt/parser:go_default_library",
+        "//go/sigmgmt/util:go_default_library",
+        "@com_github_gorilla_mux//:go_default_library",
+        "@com_github_jinzhu_gorm//:go_default_library",
+    ],
+)

@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "common.go",
+        "migrate.go",
+        "schema.go",
+    ],
+    importpath = "github.com/scionproto/scion/go/sigmgmt/db",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//go/lib/addr:go_default_library",
+        "//go/lib/pathpol:go_default_library",
+        "//go/lib/pktcls:go_default_library",
+        "//go/sig/anaconfig:go_default_library",
+        "@com_github_jinzhu_gorm//:go_default_library",
+    ],
+)

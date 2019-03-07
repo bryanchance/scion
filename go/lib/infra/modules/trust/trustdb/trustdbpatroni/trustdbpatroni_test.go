@@ -1,5 +1,4 @@
 // Copyright 2019 Anapaya Systems
-// +build patronirunning
 
 package trustdbpatroni
 
@@ -21,6 +20,13 @@ import (
 var (
 	sqlSchema string
 )
+
+func checkPatroni(t *testing.T) {
+	_, ok := os.LookupEnv("PATRONIRUNNING")
+	if !ok {
+		t.Skip("Patroni is not running")
+	}
+}
 
 func loadSqlSchema(t *testing.T) {
 	sql, err := ioutil.ReadFile("../../../../../../cert_srv/postgres/schema.sql")
@@ -72,6 +78,7 @@ func (b *Backend) initSchema(ctx context.Context, t *testing.T) {
 }
 
 func TestTrustDBSuite(t *testing.T) {
+	checkPatroni(t)
 	loadSqlSchema(t)
 	db := setupDB(t)
 	Convey("TrustDBSuite", t, func() {

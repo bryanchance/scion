@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/scionproto/scion/go/ipprovider",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//go/ipprovider/internal/config:go_default_library",
+        "//go/lib/addr:go_default_library",
+        "//go/lib/allocations:go_default_library",
+        "//go/lib/common:go_default_library",
+        "//go/lib/env:go_default_library",
+        "//go/lib/log:go_default_library",
+        "//go/lib/snet:go_default_library",
+        "//go/lib/sock/reliable:go_default_library",
+        "//go/proto:go_default_library",
+        "//go/sigmgmt/db:go_default_library",
+        "@com_github_burntsushi_toml//:go_default_library",
+        "@com_github_jinzhu_gorm//:go_default_library",
+        "@com_github_jinzhu_gorm//dialects/sqlite:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "ipprovider",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

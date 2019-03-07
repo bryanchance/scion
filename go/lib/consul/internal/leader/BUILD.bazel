@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "helper.go",
+        "leader.go",
+        "notifier.go",
+        "sessmon.go",
+    ],
+    importpath = "github.com/scionproto/scion/go/lib/consul/internal/leader",
+    visibility = ["//go/lib/consul:__subpackages__"],
+    deps = [
+        "//go/lib/common:go_default_library",
+        "//go/lib/consul/consulconfig:go_default_library",
+        "//go/lib/log:go_default_library",
+        "@com_github_hashicorp_consul//api:go_default_library",
+    ],
+)

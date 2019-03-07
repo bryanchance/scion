@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = [
+        "main.go",
+        "setup.go",
+    ],
+    importpath = "github.com/scionproto/scion/go/discovery",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//go/discovery/internal/acl:go_default_library",
+        "//go/discovery/internal/config:go_default_library",
+        "//go/discovery/internal/dynamic:go_default_library",
+        "//go/discovery/internal/metrics:go_default_library",
+        "//go/discovery/internal/static:go_default_library",
+        "//go/discovery/internal/util:go_default_library",
+        "//go/lib/addr:go_default_library",
+        "//go/lib/common:go_default_library",
+        "//go/lib/consul:go_default_library",
+        "//go/lib/discovery:go_default_library",
+        "//go/lib/env:go_default_library",
+        "//go/lib/fatal:go_default_library",
+        "//go/lib/log:go_default_library",
+        "//go/lib/periodic:go_default_library",
+        "@com_github_burntsushi_toml//:go_default_library",
+        "@com_github_hashicorp_consul//api:go_default_library",
+        "@com_github_prometheus_client_golang//prometheus/promhttp:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "discovery",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

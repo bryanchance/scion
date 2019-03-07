@@ -1,0 +1,13 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["netcopy.go"],
+    importpath = "github.com/scionproto/scion/go/sigmgmt/netcopy",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//go/lib/common:go_default_library",
+        "//go/lib/log:go_default_library",
+        "//go/sigmgmt/db:go_default_library"
+    ],
+)

@@ -28,11 +28,12 @@ test_setup() {
 
 test_run() {
     result=0
-    for i in ./go/lib/{pathdb/postgres,revcache/pgrevcache,infra/modules/trust/trustdb/trustdbpg}; do
+    for i in go/lib/{pathdb/postgres,revcache/pgrevcache,infra/modules/trust/trustdb/trustdbpg}; do
         local test="Postgres DB backend test: $i"
         log "$test"
-        go test -v -tags postgresrunning "$i"
+        bazel test "//$i:go_default_test" --action_env=POSTGRESRUNNING=1 --action_env=DOCKER0=$DOCKER0
         local test_res=$?
+        cp -rL bazel-testlogs logs
         if [ $test_res -eq 0 ]; then
             log "$test: SUCCESS"
         else

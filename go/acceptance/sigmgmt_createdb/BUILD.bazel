@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["main.go"],
+    importpath = "github.com/scionproto/scion/go/acceptance/sigmgmt_createdb",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//go/lib/integration:go_default_library",
+        "//go/lib/log:go_default_library",
+        "//go/sigmgmt/db:go_default_library",
+        "@com_github_jinzhu_gorm//:go_default_library",
+        "@com_github_jinzhu_gorm//dialects/sqlite:go_default_library",
+    ],
+)
+
+go_binary(
+    name = "sigmgmt_createdb",
+    embed = [":go_default_library"],
+    visibility = ["//visibility:public"],
+)

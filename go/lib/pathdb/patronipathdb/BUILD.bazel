@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["patronipathdb.go"],
+    importpath = "github.com/scionproto/scion/go/lib/pathdb/patronipathdb",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//go/lib/addr:go_default_library",
+        "//go/lib/ctrl/seg:go_default_library",
+        "//go/lib/infra/modules/patroni:go_default_library",
+        "//go/lib/pathdb:go_default_library",
+        "//go/lib/pathdb/query:go_default_library",
+        "//go/lib/pathdb/postgres:go_default_library",
+        "@com_github_hashicorp_consul//api:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["patronipathdb_test.go"],
+    embed = [":go_default_library"],
+    data = ["//go/path_srv/postgres:schema"],
+    deps = [
+        "//go/lib/pathdb/pathdbtest:go_default_library",
+        "//go/lib/xtest:go_default_library",
+        "@com_github_smartystreets_goconvey//convey:go_default_library",
+    ],
+)

@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "go_default_library",
+    srcs = ["dynamic.go"],
+    importpath = "github.com/scionproto/scion/go/discovery/internal/dynamic",
+    visibility = ["//go/discovery:__subpackages__"],
+    deps = [
+        "//go/discovery/internal/config:go_default_library",
+        "//go/discovery/internal/metrics:go_default_library",
+        "//go/discovery/internal/static:go_default_library",
+        "//go/discovery/internal/util:go_default_library",
+        "//go/lib/common:go_default_library",
+        "//go/lib/consul:go_default_library",
+        "//go/lib/log:go_default_library",
+        "//go/lib/periodic:go_default_library",
+        "//go/lib/topology:go_default_library",
+        "@com_github_hashicorp_consul//api:go_default_library",
+        "@com_github_prometheus_client_golang//prometheus:go_default_library",
+    ],
+)
