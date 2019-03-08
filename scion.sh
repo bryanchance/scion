@@ -275,7 +275,7 @@ py_test() {
 }
 
 bazel_test() {
-    bazel test //go/... --print_relative_test_log_paths --action_env=DOCKER0=$DOCKER0
+    bazel test //go/... --print_relative_test_log_paths --color no --action_env=DOCKER0=$DOCKER0
 }
 
 cmd_coverage(){
