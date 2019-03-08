@@ -5,7 +5,7 @@
 // will prefer to always return the writable connection so that clients get the most consistent
 // data.
 //
-// Internally the lib uses consul to detect on which IPs patroni runs. Since consul might have an
+// Internally the lib uses consul to detect on which URLs patroni runs. Since consul might have an
 // outdated view on the state of the cluster, the lib uses the patroni API to verify the information
 // from consul.
 //
@@ -25,9 +25,11 @@ package patroni
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -43,9 +45,9 @@ import (
 )
 
 const (
-	LeaderTag = "master"
+	LeaderTag  = "master"
+	ReplicaTag = "replica"
 
-	DefaultPatroniPort    = 8008
 	DefaultUpdateInterval = 2 * time.Second
 	DefaultUpdateTimeout  = 5 * time.Second
 )
@@ -58,13 +60,12 @@ var (
 
 // Conf contains configuration for patroni.
 type Conf struct {
-	// PatroniPort the port on which the patroni API listens.
-	PatroniPort int
+	// DBUser the username for the database.
+	DBUser string
+	// DBPass the password for the database.
+	DBPass string
 	// ClusterKey the key under which the patroni services are in consul.
 	ClusterKey string
-	// ConnString in the form: postgresql://user:password@host:port
-	// "host" must always be contained literally, the library will insert the correct IP.
-	ConnString string
 	// UpdateInterval is the interval at which the cluster is periodically refreshed.
 	// In case of an error the cluster is immediately refreshed.
 	UpdateInterval time.Duration
@@ -74,9 +75,6 @@ type Conf struct {
 }
 
 func (cfg *Conf) InitDefaults() {
-	if cfg.PatroniPort == 0 {
-		cfg.PatroniPort = DefaultPatroniPort
-	}
 	if cfg.UpdateInterval == 0 {
 		cfg.UpdateInterval = DefaultUpdateInterval
 	}
@@ -102,7 +100,7 @@ func (r *ConnRef) String() string {
 	if r == nil {
 		return "ConnRef<nil>"
 	}
-	return fmt.Sprintf("ConnRef{IP: %s, v: %d}", r.ip, r.version)
+	return fmt.Sprintf("ConnRef{Node: %s, v: %d}", r.node, r.version)
 }
 
 // ReportErr should be called after using this connection reference.
@@ -131,7 +129,7 @@ func isConnErr(err error) bool {
 
 // clientConn represents a connection to a specific database host.
 type clientConn struct {
-	ip   string
+	node string
 	pool *ConnPool
 	db   *sql.DB
 }
@@ -148,7 +146,7 @@ type ConnPool struct {
 
 	refreshRunner *periodic.Runner
 	updating      bool
-	lastIPs       *ips
+	lastNodes     map[string]patroniNode
 }
 
 // NewConnPool creates a new patroni connection pool.
@@ -161,12 +159,12 @@ func NewConnPool(consulC *consulapi.Client, cfg Conf) (*ConnPool, error) {
 	}
 	ctx, cancelF := context.WithTimeout(context.Background(), time.Second)
 	defer cancelF()
-	ips, err := ipsFromConsul(ctx, cfg.ClusterKey, consulC)
+	nodes, err := nodesFromConsul(ctx, cfg.ClusterKey, consulC)
 	if err != nil {
 		return nil, common.NewBasicError("Failed to load patroni cluster from consul", err)
 	}
-	ips = ipsFromPatroni(ctx, ips, cfg)
-	p.updateFromIPs(ips)
+	nodes = selectReachableNodes(ctx, nodes)
+	p.updateFromNodes(nodes)
 	p.refreshRunner = periodic.StartPeriodicTask(&connPoolUpdater{ConnPool: p},
 		periodic.NewTicker(cfg.UpdateInterval), cfg.UpdateTimeout)
 	return p, nil
@@ -236,10 +234,10 @@ func (c *ConnPool) reportErr(r *ConnRef, err error) {
 	if r.version < c.version {
 		return
 	}
-	log.Debug("[patroni] Reporting connection", "ip", r.ip, "err", err)
-	if conn, ok := c.healthyConns[r.ip]; ok {
-		delete(c.healthyConns, r.ip)
-		c.unhealthyConns[r.ip] = conn
+	log.Debug("[patroni] Reporting connection", "node", r.node, "err", err)
+	if conn, ok := c.healthyConns[r.node]; ok {
+		delete(c.healthyConns, r.node)
+		c.unhealthyConns[r.node] = conn
 	}
 	// If we are already updating no need to trigger again.
 	if c.updating {
@@ -256,103 +254,87 @@ func (c *ConnPool) update(ctx context.Context) {
 		c.updating = true
 	}
 	c.dataMtx.Unlock()
-	ips, err := ipsFromConsul(ctx, c.cfg.ClusterKey, c.consulC)
+	nodes, err := nodesFromConsul(ctx, c.cfg.ClusterKey, c.consulC)
 	if err != nil {
-		log.Error("[patroni] Failed to fetch IPs from consul, using cached ones", "err", err)
-		ips = c.lastIPs
+		log.Error("[patroni] Failed to fetch nodes from consul, using cached ones", "err", err)
+		nodes = c.lastNodes
 	}
-	ips = ipsFromPatroni(ctx, ips, c.cfg)
-	c.updateFromIPs(ips)
+	nodes = selectReachableNodes(ctx, nodes)
+	c.updateFromNodes(nodes)
 }
 
-func hasLeaderTag(tags []string) bool {
-	for _, t := range tags {
-		if t == LeaderTag {
-			return true
-		}
-	}
-	return false
-}
-
-// updateFromIPs updates the connections in the pool with the given ips.
-// The ips should be verified beforehand.
-func (c *ConnPool) updateFromIPs(onlineIPs *ips) {
+// updateFromNodes updates the connections in the pool with the given nodes.
+// The API exposed by each node should be tested for reachability prior to calling this method.
+func (c *ConnPool) updateFromNodes(onlineNodes map[string]patroniNode) {
 	c.dataMtx.Lock()
 	defer c.dataMtx.Unlock()
 
 	healthyConns := make(map[string]*clientConn)
 	unhealthyConns := make(map[string]*clientConn)
-
 	// collect all existing connections, so that we can reuse them.
 	existingConns := make(map[string]*clientConn, len(c.healthyConns)+len(c.unhealthyConns))
-	for ip, conn := range c.healthyConns {
-		existingConns[ip] = conn
-	}
-	for ip, conn := range c.unhealthyConns {
-		existingConns[ip] = conn
-	}
-	// now mark ips we found again as healthy.
-	for _, ip := range append(onlineIPs.replicaIPs, onlineIPs.leaderIP) {
-		if ip == "" {
+	copyInto(existingConns, c.healthyConns)
+	copyInto(existingConns, c.unhealthyConns)
+	var leader string
+	for node, info := range onlineNodes {
+		if info.Role == LeaderTag {
+			leader = node
+		}
+		if conn, ok := existingConns[node]; ok {
+			if c.sqlUrlUnchanged(node, info) {
+				healthyConns[node] = conn
+				continue
+			} else {
+				log.Info("[patroni] ConnUrl changed", "node", node, "url", info.ConnUrl)
+				conn.db.Close()
+			}
+		}
+		log.Info("[patroni] New node, creating conn", "node", node, "url", info.ConnUrl)
+		db, err := c.createSqlDB(info)
+		if err != nil {
+			log.Warn("[patroni] Couldn't establish connection",
+				"node", node, "url", info.ConnUrl, "err", err)
 			continue
 		}
-		if conn, ok := existingConns[ip]; ok {
-			healthyConns[ip] = conn
-			continue
-		}
-		log.Info("[patroni] New IP, creating conn", "ip", ip)
-		db, err := createSqlDB(ip, c.cfg)
 		conn := &clientConn{
-			ip:   ip,
+			node: node,
 			db:   db,
 			pool: c,
 		}
-		if err != nil {
-			log.Warn("[patroni] Connection unhealthy", "ip", ip, "err", err)
-			unhealthyConns[ip] = conn
+		if err = db.Ping(); err != nil {
+			log.Warn("[patroni] Connection unhealthy", "node", node, "err", err)
+			unhealthyConns[node] = conn
 		} else {
-			healthyConns[ip] = conn
+			healthyConns[node] = conn
 		}
 	}
-	c.leader = onlineIPs.leaderIP
+	c.leader = leader
 	c.healthyConns = healthyConns
 	c.unhealthyConns = unhealthyConns
-	// close no longer referenced conns
-	for ip, conn := range existingConns {
-		_, healthy := healthyConns[ip]
-		_, unhealthy := unhealthyConns[ip]
-		if !healthy && !unhealthy {
-			log.Info("[patroni] Connection is gone", "ip", ip)
-			conn.db.Close()
-		}
-	}
+	closeUnreferencedConns(existingConns, healthyConns, unhealthyConns)
 	c.version++
-	c.lastIPs = onlineIPs
+	c.lastNodes = onlineNodes
 	c.updating = false
-	log.Trace("[patroni] Updated connections",
+	log.Trace("[patroni] Updated connections", "leader", c.leader,
 		"healthyCnt", len(c.healthyConns), "unhealthyCnt", len(c.unhealthyConns))
 }
 
-func createSqlDB(ip string, cfg Conf) (*sql.DB, error) {
-	if ip == "" {
-		return nil, nil
+func (c *ConnPool) createSqlDB(node patroniNode) (*sql.DB, error) {
+	u, err := url.Parse(node.ConnUrl)
+	if err != nil {
+		return nil, common.NewBasicError("Failed to parse url", err, "url", node.ConnUrl)
 	}
-	cs := connString(ip, cfg)
-	// TODO(lukedirtwalker): Remove password from output.
-	log.Info("[patroni] Connecting to postgres DB", "db", cs)
-	db, err := sql.Open("pgx", cs)
+	u.User = url.UserPassword(c.cfg.DBUser, c.cfg.DBPass)
+	db, err := sql.Open("pgx", u.String())
 	if err != nil {
 		return nil, err
-	}
-	if err := db.Ping(); err != nil {
-		db.Close()
-		return nil, common.NewBasicError("Initial DB ping failed, connection broken?", err)
 	}
 	return db, nil
 }
 
-func connString(ip string, cfg Conf) string {
-	return strings.Replace(cfg.ConnString, "host", ip, -1)
+func (c *ConnPool) sqlUrlUnchanged(node string, info patroniNode) bool {
+	oldInfo := c.lastNodes[node]
+	return oldInfo.ConnUrl == info.ConnUrl
 }
 
 var _ periodic.Task = (*connPoolUpdater)(nil)
@@ -366,78 +348,63 @@ func (c *connPoolUpdater) Run(ctx context.Context) {
 	c.update(ctx)
 }
 
-// ips is a group of patroni IP addresses returned from consul.
-type ips struct {
-	leaderIP   string
-	replicaIPs []string
+type patroniNode struct {
+	// ApiUrl is the patroni API url.
+	ApiUrl string `json:"api_url"`
+	// ConnUrl is the postgres connection url.
+	ConnUrl string `json:"conn_url"`
+	// Role is the role of the node.
+	Role string
 }
 
-// ipsFromConsul loads all known patroni IPs from consul.
-// Note that this will contain the view of consul which might be outdated.
-// Use ipsFromPatroni to get a more up to date view.
-func ipsFromConsul(ctx context.Context,
-	clusterKey string, consulC *consulapi.Client) (*ips, error) {
+func nodesFromConsul(ctx context.Context, clusterKey string,
+	consulC *consulapi.Client) (map[string]patroniNode, error) {
 
+	key := fmt.Sprintf("service/%s/members/", clusterKey)
 	qo := &consulapi.QueryOptions{}
 	qo = qo.WithContext(ctx)
-	svcList, _, err := consulC.Catalog().Service(clusterKey, "", qo)
+	kvPairs, _, err := consulC.KV().List(key, qo)
 	if err != nil {
 		return nil, common.NewBasicError("Failed to list members", err)
 	}
-	if len(svcList) == 0 {
-		return nil, common.NewBasicError("No members", nil)
-	}
-	conns := &ips{}
-	for _, svc := range svcList {
-		if hasLeaderTag(svc.ServiceTags) {
-			conns.leaderIP = svc.ServiceAddress
-		} else {
-			conns.replicaIPs = append(conns.replicaIPs, svc.ServiceAddress)
+	infos := make(map[string]patroniNode, len(kvPairs))
+	for _, kv := range kvPairs {
+		var info patroniNode
+		if err := json.Unmarshal(kv.Value, &info); err != nil {
+			return nil, common.NewBasicError("Failed to parse", err)
 		}
+		infos[strings.TrimPrefix(kv.Key, key)] = info
 	}
-	return conns, nil
+	return infos, nil
 }
 
-// ipsFromPatroni verifies the ips returned from consul. To do this it contacts the patroni server
-// on each ip and verifies that it actually has the status as claimed by consul.
-// This is needed because consul might have a slightly out of date view on the cluster.
-func ipsFromPatroni(ctx context.Context, consulIPs *ips, cfg Conf) *ips {
-	verifiedIPs := &ips{}
-	if consulIPs.leaderIP != "" {
+// selectReachableNodes checks the given nodes from consul against the patroni API. The result only
+// contains reachable nodes (as seen from the patroni API).
+func selectReachableNodes(ctx context.Context,
+	consulNodes map[string]patroniNode) map[string]patroniNode {
+
+	okNodes := make(map[string]patroniNode)
+	for node, info := range consulNodes {
 		subCtx, cancelF := context.WithTimeout(ctx, 500*time.Millisecond)
-		status := checkNodeStatus(subCtx, consulIPs.leaderIP, leaderNode, cfg, true)
+		status := checkNode(subCtx, node, info)
 		cancelF()
 		switch status {
 		case leader:
-			verifiedIPs.leaderIP = consulIPs.leaderIP
+			info.Role = LeaderTag
+			okNodes[node] = info
 		case replica:
-			verifiedIPs.replicaIPs = append(verifiedIPs.replicaIPs, consulIPs.leaderIP)
+			info.Role = ReplicaTag
+			okNodes[node] = info
 		}
 	}
-	for _, ip := range consulIPs.replicaIPs {
-		subCtx, cancelF := context.WithTimeout(ctx, 500*time.Millisecond)
-		status := checkNodeStatus(subCtx, ip, replicaNode, cfg, true)
-		cancelF()
-		switch status {
-		case leader:
-			if verifiedIPs.leaderIP != "" {
-				log.Error("[patroni] detected 2 leader nodes",
-					"ip1", verifiedIPs.leaderIP, "ip2", ip)
-				return nil
-			}
-			verifiedIPs.leaderIP = ip
-		case replica:
-			verifiedIPs.replicaIPs = append(verifiedIPs.replicaIPs, ip)
-		}
-	}
-	return verifiedIPs
+	return okNodes
 }
 
 type nodeType string
 
 const (
-	leaderNode  nodeType = "master"
-	replicaNode nodeType = "replica"
+	leaderNode  nodeType = LeaderTag
+	replicaNode nodeType = ReplicaTag
 )
 
 func (t nodeType) String() string {
@@ -466,14 +433,22 @@ const (
 	replica
 )
 
-func checkNodeStatus(ctx context.Context, ip string, expectedType nodeType,
-	cfg Conf, checkOtherType bool) nodeStatus {
+func checkNode(ctx context.Context, nodeName string, info patroniNode) nodeStatus {
+	if info.Role == LeaderTag || info.Role == ReplicaTag {
+		return checkNodeStatus(ctx, nodeName, nodeType(info.Role), info.ApiUrl, true)
+	}
+	log.Debug("[patroni] Node role not handled, marking unhealthy",
+		"role", info.Role, "node", nodeName)
+	return unhealthy
+}
 
-	url := fmt.Sprintf("http://%s:%d/%s", ip, cfg.PatroniPort, expectedType)
+func checkNodeStatus(ctx context.Context, nodeName string, expectedType nodeType,
+	apiUrl string, checkOtherType bool) nodeStatus {
+
+	url := strings.Replace(apiUrl, "patroni", expectedType.String(), -1)
 	resp, err := ctxhttp.Get(ctx, nil, url)
 	if err != nil {
-		log.Warn("[patroni] Failed to check ip",
-			"ip", ip, "expectedType", expectedType, "err", err)
+		log.Warn("[patroni] Failed to check node", "url", url, "err", err)
 		return unhealthy
 	}
 	if resp.StatusCode == http.StatusOK {
@@ -481,13 +456,33 @@ func checkNodeStatus(ctx context.Context, ip string, expectedType nodeType,
 	}
 	if resp.StatusCode == http.StatusServiceUnavailable {
 		if checkOtherType {
-			return checkNodeStatus(ctx, ip, expectedType.other(), cfg, false)
+			return checkNodeStatus(ctx, nodeName, expectedType.other(), apiUrl, false)
 		}
-		log.Warn("[patroni] Got ServiceUnavailable(503) for both master and replica endpoint",
-			"ip", ip)
+		log.Debug("[patroni] Got ServiceUnavailable(503) for both master and replica endpoint",
+			"node", nodeName)
 		// consider this one unhealthy.
 		return unhealthy
 	}
-	log.Warn("[patroni] Unknown status code", "ip", ip, "statusCode", resp.StatusCode)
+	log.Warn("[patroni] Unknown status code", "node", nodeName, "statusCode", resp.StatusCode)
 	return unhealthy
+}
+
+// closeUnreferencedConns closes DB connections that are in allConns but neither in healthy nor in
+// unhealthy conns.
+func closeUnreferencedConns(allCons, healthyConns, unhealthyConns map[string]*clientConn) {
+	for key, conn := range allCons {
+		_, healthy := healthyConns[key]
+		_, unhealthy := unhealthyConns[key]
+		if !healthy && !unhealthy {
+			log.Info("[patroni] Connection is gone", "key", key)
+			conn.db.Close()
+		}
+	}
+}
+
+// copyInto copies the values from src into dst.
+func copyInto(dst, src map[string]*clientConn) {
+	for key, conn := range src {
+		dst[key] = conn
+	}
 }

@@ -51,7 +51,8 @@ func setupDB(t *testing.T) *Backend {
 	xtest.FailOnErr(t, err)
 	cfg := patroni.Conf{
 		ClusterKey: "ptest",
-		ConnString: "postgresql://psdb:password@host/postgres?sslmode=disable",
+		DBUser:     "psdb",
+		DBPass:     "password",
 	}
 	db, err := New(c, cfg)
 	xtest.FailOnErr(t, err)

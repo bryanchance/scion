@@ -50,7 +50,8 @@ func realMain() int {
 
 	pool, err := patroni.NewConnPool(c, patroni.Conf{
 		ClusterKey: "ptest",
-		ConnString: "postgresql://postgres:password@host:5432?sslmode=disable",
+		DBUser:     "postgres",
+		DBPass:     "password",
 	})
 	if err != nil {
 		log.Crit("Failed to setup conn pool", "err", err)
@@ -91,7 +92,7 @@ type test struct {
 	readErr int
 }
 
-func (t test) checkPool() error {
+func (t *test) checkPool() error {
 	if err := t.checkWriteConn(); err != nil {
 		return err
 	}
@@ -99,7 +100,7 @@ func (t test) checkPool() error {
 	return t.checkReadConn()
 }
 
-func (t test) checkWriteConn() error {
+func (t *test) checkWriteConn() error {
 	wConn := t.pool.WriteConn()
 	if wConn == nil {
 		if crtlFileMissing() {
@@ -125,14 +126,14 @@ func (t test) checkWriteConn() error {
 			return common.NewBasicError("Write Failed to create a schema", err)
 		}
 		wConn.ReportErr(err)
-		log.Trace("Reportedfailed write")
+		log.Trace("Reported failed write")
 		return nil
 	}
 	log.Trace("OK: Write conn is ok.")
 	return nil
 }
 
-func (t test) checkReadConn() error {
+func (t *test) checkReadConn() error {
 	rConn := t.pool.ReadConn()
 	if rConn == nil {
 		// We might not get read connections for a short time
