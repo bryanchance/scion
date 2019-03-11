@@ -48,6 +48,9 @@ func NewFromDB(db *sql.DB) *PgRevCache {
 }
 
 func (c *PgRevCache) Get(ctx context.Context, keys revcache.KeySet) (revcache.Revocations, error) {
+	if len(keys) == 0 {
+		return nil, nil
+	}
 	var ingroups []string
 	var args []interface{}
 	i := 1
