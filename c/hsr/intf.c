@@ -32,8 +32,8 @@ format_scion_name (u8 * s, va_list * args)
     return format (s, "scion%d%s", t->ifid, ip46_address_is_ip4 (&t->local) ? "v4" : "v6");
 }
 
-/* TODO investigate effect of interface up/down on processin.
- * It is likely that the current behavior has no effect
+/* TODO investigate effect of interface up/down on processing.
+ * Likely it has no effect.
  */
 static clib_error_t *
 scion_interface_admin_up_down (vnet_main_t * vnm, u32 hw_if_index, u32 flags)
@@ -121,9 +121,9 @@ format_scion_intf (u8 * s, va_list * args)
     return s;
 }
 
-always_inline u32
+static_always_inline u32
 find_scion_intf_by_key (scion_main_t * scm, ip46_address_t * ip, u16 port,
-                        scion_intf_key4_t * key4, scion_intf_key6_t * key6, u8 is_ip4)
+                        clib_bihash_kv_8_8_t * key4, clib_bihash_kv_24_8_t * key6, u8 is_ip4)
 {
     u32 found_by_key;
 
@@ -141,7 +141,7 @@ find_scion_intf_by_key (scion_main_t * scm, ip46_address_t * ip, u16 port,
     return found_by_key;
 }
 
-always_inline u32
+static_always_inline u32
 find_scion_intf_by_ifid (scion_main_t * scm, scion_ifid_t ifid, u8 is_ip4)
 {
     u32 intf_index = ~0;
@@ -163,8 +163,8 @@ scion_add_intf (scion_add_intf_args_t * a, u32 * sw_if_indexp)
     scion_main_t *scm = &scion_main;
     vnet_main_t *vnm = scm->vnet_main;
     scion_intf_t *t = 0;
-    scion_intf_key4_t key4;
-    scion_intf_key6_t key6;
+    clib_bihash_kv_8_8_t key4;
+    clib_bihash_kv_24_8_t key6;
     u32 intf_index = ~0, sw_if_index;
     u32 is_ip4 = ip46_address_is_ip4 (&a->local);
 
@@ -243,8 +243,8 @@ scion_del_intf (scion_del_intf_args_t * a)
     scion_main_t *scm = &scion_main;
     vnet_main_t *vnm = scm->vnet_main;
     scion_intf_t *t = 0;
-    scion_intf_key4_t key4;
-    scion_intf_key6_t key6;
+    clib_bihash_kv_8_8_t key4;
+    clib_bihash_kv_24_8_t key6;
     u32 intf_index = ~0, sw_if_index;
     u32 is_ip4 = ip46_address_is_ip4 (&a->local);
 
@@ -291,6 +291,7 @@ scion_add_intf_command_fn (vlib_main_t * vm, unformat_input_t * input, vlib_cli_
     unformat_input_t _line_input, *line_input = &_line_input;
     ip46_address_t local = ip46_address_initializer;
     ip46_address_t remote = ip46_address_initializer;
+    clib_error_t *error = 0;
     u32 local_port = 0, remote_port = 0;
     scion_ifid_t ifid = 0;
     scion_linkto_t linkto;
@@ -320,10 +321,14 @@ scion_add_intf_command_fn (vlib_main_t * vm, unformat_input_t * input, vlib_cli_
         } else if (unformat (line_input, "isd-as %U", unformat_scion_isdas, &isdas)) {
             isdas_set = 1;
         } else {
-            return clib_error_return (0, "parse error: '%U'", format_unformat_error, line_input);
+            error = unformat_parse_error (line_input);
+            break;
         }
     }
     unformat_free (line_input);
+    if (error) {
+        return error;
+    }
 
     if (!ifid_set) {
         return clib_error_return (0, "id not specified");
@@ -409,6 +414,7 @@ scion_del_intf_command_fn (vlib_main_t * vm, unformat_input_t * input, vlib_cli_
 {
     unformat_input_t _line_input, *line_input = &_line_input;
     ip46_address_t local = ip46_address_initializer;
+    clib_error_t *error = 0;
     u32 local_port = 0;
     scion_ifid_t ifid = 0;
     u8 ifid_set = 0, local_set = 0, local_port_set = 0;
@@ -426,10 +432,14 @@ scion_del_intf_command_fn (vlib_main_t * vm, unformat_input_t * input, vlib_cli_
         } else if (unformat (line_input, "local-port %u", &local_port)) {
             local_port_set = 1;
         } else {
-            return clib_error_return (0, "parse error: '%U'", format_unformat_error, line_input);
+            error = unformat_parse_error (line_input);
+            break;
         }
     }
     unformat_free (line_input);
+    if (error) {
+        return error;
+    }
 
     if (!ifid_set) {
         return clib_error_return (0, "id not specified");

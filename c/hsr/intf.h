@@ -12,10 +12,10 @@ typedef u64 scion_ifid_t;
 typedef u64 scion_isdas_t;
 
 #define foreach_scion_linkto \
-    _(CORE) \
-    _(PARENT) \
-    _(CHILD) \
-    _(PEER)
+_(CORE) \
+_(PARENT) \
+_(CHILD) \
+_(PEER)
 
 typedef enum {
 #define _(sym) LINK_TO_##sym,
@@ -46,17 +46,26 @@ typedef struct {
     u16 local_port;
 } scion_del_intf_args_t;
 
+/**
+ * This structure is used to represent a SCION interface, used for both external and internal.
+ * Internal interfaces, IPv4 or IPv6, are special and they always have ifid 0 and some fields
+ * are unused as noted below.
+ *
+ * The following fields are in network order:
+ * local, remote, local_port, remote_port, isdas
+ */
+
 typedef struct {
     /* Required for pool_get_aligned */
     CLIB_CACHE_LINE_ALIGN_MARK (cacheline0);
 
     scion_ifid_t ifid;
     ip46_address_t local;
-    ip46_address_t remote;
+    ip46_address_t remote;      /* external interface only */
     u16 local_port;
-    u16 remote_port;
-    scion_linkto_t linkto;
-    scion_isdas_t isdas;
+    u16 remote_port;            /* external interface only */
+    scion_linkto_t linkto;      /* external interface only */
+    scion_isdas_t isdas;        /* external interface only */
 
     /* vnet intfc index */
     u32 sw_if_index;

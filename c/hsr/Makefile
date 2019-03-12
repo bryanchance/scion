@@ -9,13 +9,13 @@
 CC = clang-6.0
 TIDY= clang-tidy-6.0
 CFLAGS ?= -Wall -Werror -O2 -DFORTIFY_SOURCE=2 -fstack-protector-all -fPIC -march=corei7
-VPP_LIBS = -lvnet -lvppinfra -lsvm -lvlib
+VPP_LIBS = -lvnet -lvppinfra -lsvm -lvlib -lcrypto
 LDFLAGS ?= -lpthread $(VPP_LIBS) -Wl,-Bstatic -Wl,-Bdynamic -Wl,--no-undefined
 LIBNAME= scion_hsr.so
 
-SOURCES = scion.c bypass.c intf.c
+SOURCES = scion.c bypass.c intf.c scion_input.c scion_format.c
 OBJS = $(SOURCES:.c=.o)
-INDENT_FILES = $(SOURCES) scion.h intf.h scion_packet.h
+INDENT_FILES = $(SOURCES) scion.h intf.h scion_packet.h scion_error.h scion_extensions.h
 
 # XXX Enable debugging by default during development
 D=1

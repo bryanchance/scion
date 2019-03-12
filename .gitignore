@@ -16,6 +16,7 @@ Thumbs.db
 /gen-cache/
 /gen-certs/
 /traces/
+/c/hsr/vpp.log
 
 # Python generated files #
 #########################
