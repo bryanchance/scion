@@ -78,11 +78,21 @@ func (b *Backend) DeleteExpired(ctx context.Context, now time.Time) (int, error)
 	return ret, rErr
 }
 
-func (b *Backend) Get(ctx context.Context, params *query.Params) ([]*query.Result, error) {
-	var ret []*query.Result
+func (b *Backend) Get(ctx context.Context, params *query.Params) (query.Results, error) {
+	var ret query.Results
 	rErr := b.retry.DoRead(ctx, func(ctx context.Context, db *sql.DB) error {
 		var err error
 		ret, err = postgres.NewFromDB(db).Get(ctx, params)
+		return err
+	})
+	return ret, rErr
+}
+
+func (b *Backend) GetAll(ctx context.Context) (<-chan query.ResultOrErr, error) {
+	var ret <-chan query.ResultOrErr
+	rErr := b.retry.DoRead(ctx, func(ctx context.Context, db *sql.DB) error {
+		var err error
+		ret, err = postgres.NewFromDB(db).GetAll(ctx)
 		return err
 	})
 	return ret, rErr

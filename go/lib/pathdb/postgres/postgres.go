@@ -155,14 +155,14 @@ func (b *Backend) DeleteExpired(ctx context.Context, now time.Time) (int, error)
 	})
 }
 
-func (b *Backend) Get(ctx context.Context, params *query.Params) ([]*query.Result, error) {
+func (b *Backend) Get(ctx context.Context, params *query.Params) (query.Results, error) {
 	stmt, args := buildQuery(params)
 	rows, err := b.db.QueryContext(ctx, stmt, args...)
 	if err != nil {
 		return nil, common.NewBasicError("Error looking up path segment", err, "q", stmt)
 	}
 	defer rows.Close()
-	res := []*query.Result{}
+	var res query.Results
 	prevID := -1
 	var curRes *query.Result
 	for rows.Next() {
@@ -197,6 +197,57 @@ func (b *Backend) Get(ctx context.Context, params *query.Params) ([]*query.Resul
 	}
 	sort.Sort(query.ByLastUpdate(res))
 	return res, nil
+}
+
+func (b *Backend) GetAll(ctx context.Context) (<-chan query.ResultOrErr, error) {
+	stmt, args := buildQuery(nil)
+	rows, err := b.db.QueryContext(ctx, stmt, args...)
+	if err != nil {
+		return nil, common.NewBasicError("Error looking up path segment", err, "q", stmt)
+	}
+	resCh := make(chan query.ResultOrErr)
+	go func() {
+		defer close(resCh)
+		defer rows.Close()
+		prevID := -1
+		var curRes *query.Result
+		for rows.Next() {
+			var segRowID int
+			var rawSeg sql.RawBytes
+			var lastUpdated time.Time
+			hpCfgID := &query.HPCfgID{IA: addr.IA{}}
+			err = rows.Scan(&segRowID, &rawSeg, &lastUpdated,
+				&hpCfgID.IA.I, &hpCfgID.IA.A, &hpCfgID.ID)
+			if err != nil {
+				resCh <- query.ResultOrErr{
+					Err: common.NewBasicError("Error reading DB response", err)}
+				return
+			}
+			// Check if we have a new segment.
+			if segRowID != prevID {
+				if curRes != nil {
+					resCh <- query.ResultOrErr{Result: curRes}
+				}
+				curRes = &query.Result{
+					LastUpdate: lastUpdated,
+				}
+				var err error
+				curRes.Seg, err = seg.NewSegFromRaw(common.RawBytes(rawSeg))
+				if err != nil {
+					resCh <- query.ResultOrErr{
+						Err: common.NewBasicError("Error unmarshalling segment", err)}
+					return
+				}
+			}
+			// Append hpCfgID to result
+			curRes.HpCfgIDs = append(curRes.HpCfgIDs, hpCfgID)
+			prevID = segRowID
+		}
+		if curRes != nil {
+			resCh <- query.ResultOrErr{Result: curRes}
+		}
+	}()
+	return resCh, nil
 }
 
 func (b *Backend) InsertNextQuery(ctx context.Context, dst addr.IA,

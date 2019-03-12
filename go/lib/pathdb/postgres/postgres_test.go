@@ -11,13 +11,14 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 
-	"github.com/scionproto/scion/go/lib/pathdb"
 	"github.com/scionproto/scion/go/lib/pathdb/pathdbtest"
 	"github.com/scionproto/scion/go/lib/xtest"
 )
 
 var (
 	connection string
+
+	sqlSchema string
 )
 
 func checkPostgres(t *testing.T) {
@@ -33,48 +34,34 @@ func init() {
 		xtest.PostgresHost())
 }
 
-func (b *Backend) dropSchema(ctx context.Context) error {
-	_, err := b.db.ExecContext(ctx, "DROP SCHEMA IF EXISTS psdb CASCADE;")
-	return err
+func loadSchema(t *testing.T) {
+	sql, err := ioutil.ReadFile("../../../path_srv/postgres/schema.sql")
+	xtest.FailOnErr(t, err)
+	sqlSchema = string(sql)
 }
 
-func (b *Backend) initSchema(ctx context.Context) error {
-	if err := b.dropSchema(ctx); err != nil {
-		return err
-	}
-	if _, err := b.db.ExecContext(ctx, "CREATE SCHEMA psdb;"); err != nil {
-		return err
-	}
-	sql, err := ioutil.ReadFile("../../../path_srv/postgres/schema.sql")
-	if err != nil {
-		return err
-	}
-	_, err = b.db.ExecContext(ctx, string(sql))
-	return err
+var _ pathdbtest.TestablePathDB = (*TestPathDB)(nil)
+
+type TestPathDB struct {
+	*Backend
+}
+
+func (b *TestPathDB) Prepare(t *testing.T, ctx context.Context) {
+	_, err := b.db.ExecContext(ctx, "DROP SCHEMA IF EXISTS psdb CASCADE;")
+	xtest.FailOnErr(t, err)
+	_, err = b.db.ExecContext(ctx, "CREATE SCHEMA psdb;")
+	xtest.FailOnErr(t, err)
+	_, err = b.db.ExecContext(ctx, sqlSchema)
+	xtest.FailOnErr(t, err)
 }
 
 func TestPathDBSuite(t *testing.T) {
 	checkPostgres(t)
+	loadSchema(t)
+	db, err := New(connection)
+	xtest.FailOnErr(t, err)
+	tdb := &TestPathDB{Backend: db}
 	Convey("PathDBSuite", t, func() {
-		db, err := New(connection)
-		xtest.FailOnErr(t, err)
-		err = db.initSchema(context.Background())
-		xtest.FailOnErr(t, err)
-
-		pathdbtest.TestPathDB(t,
-			func() pathdb.PathDB {
-				_, err = db.db.Exec("DELETE FROM Segments")
-				xtest.FailOnErr(t, err)
-				_, err = db.db.Exec("DELETE FROM NextQuery")
-				xtest.FailOnErr(t, err)
-				return db
-			},
-			func() {
-				_, err = db.db.Exec("DELETE FROM Segments")
-				xtest.FailOnErr(t, err)
-			},
-		)
-		// cleanup
-		db.dropSchema(context.Background())
+		pathdbtest.TestPathDB(t, tdb)
 	})
 }

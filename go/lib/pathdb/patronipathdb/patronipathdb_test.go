@@ -12,7 +12,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 
 	"github.com/scionproto/scion/go/lib/infra/modules/patroni"
-	"github.com/scionproto/scion/go/lib/pathdb"
 	"github.com/scionproto/scion/go/lib/pathdb/pathdbtest"
 	"github.com/scionproto/scion/go/lib/xtest"
 )
@@ -57,22 +56,20 @@ func setupDB(t *testing.T) *Backend {
 	return db
 }
 
-func (b *Backend) dropSchema(ctx context.Context, t *testing.T) {
+var _ pathdbtest.TestablePathDB = (*TestPathDB)(nil)
+
+type TestPathDB struct {
+	*Backend
+}
+
+func (b *TestPathDB) Prepare(t *testing.T, ctx context.Context) {
 	conn := b.retry.Pool.WriteConn()
 	if conn == nil {
 		t.Fatalf("No write connection to drop schema")
 	}
 	_, err := conn.DB().ExecContext(ctx, "DROP SCHEMA IF EXISTS psdb CASCADE;")
 	xtest.FailOnErr(t, err)
-}
-
-func (b *Backend) initSchema(ctx context.Context, t *testing.T) {
-	conn := b.retry.Pool.WriteConn()
-	if conn == nil {
-		t.Fatalf("No write connection to drop schema")
-	}
-	b.dropSchema(ctx, t)
-	_, err := conn.DB().ExecContext(ctx, "CREATE SCHEMA psdb;")
+	_, err = conn.DB().ExecContext(ctx, "CREATE SCHEMA psdb;")
 	xtest.FailOnErr(t, err)
 	_, err = conn.DB().ExecContext(ctx, sqlSchema)
 	xtest.FailOnErr(t, err)
@@ -82,15 +79,8 @@ func TestPathDBSuite(t *testing.T) {
 	checkPatroni(t)
 	loadSchema(t)
 	db := setupDB(t)
+	tdb := &TestPathDB{Backend: db}
 	Convey("PathDBSuite", t, func() {
-		pathdbtest.TestPathDB(t,
-			func() pathdb.PathDB {
-				db.initSchema(context.Background(), t)
-				return db
-			},
-			func() {
-				db.dropSchema(context.Background(), t)
-			},
-		)
+		pathdbtest.TestPathDB(t, tdb)
 	})
 }
