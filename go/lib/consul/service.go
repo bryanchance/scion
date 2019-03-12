@@ -63,9 +63,9 @@ func (s *Service) Register(connPeriod time.Duration, check func() CheckInfo,
 		Address: s.Addr.L3.IP().String(),
 		Port:    int(s.Addr.L4.Port()),
 		Check: &consulapi.AgentServiceCheck{
-			Name:    checkName,
-			CheckID: checkName,
-			TTL:     checkParams.TTL.String(),
+			Name:                           checkName,
+			CheckID:                        checkName,
+			TTL:                            checkParams.TTL.String(),
 			DeregisterCriticalServiceAfter: checkParams.DeregisterCriticalServiceAfter.String(),
 		},
 	}
