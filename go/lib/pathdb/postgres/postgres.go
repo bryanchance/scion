@@ -18,6 +18,7 @@ import (
 	"github.com/scionproto/scion/go/lib/addr"
 	"github.com/scionproto/scion/go/lib/common"
 	"github.com/scionproto/scion/go/lib/ctrl/seg"
+	"github.com/scionproto/scion/go/lib/infra/modules/db"
 	"github.com/scionproto/scion/go/lib/pathdb"
 	"github.com/scionproto/scion/go/lib/pathdb/query"
 	"github.com/scionproto/scion/go/proto"
@@ -27,6 +28,7 @@ var _ pathdb.PathDB = (*Backend)(nil)
 
 // Backend implements that path DB interface for postgres connections.
 type Backend struct {
+	*executor
 	db *sql.DB
 }
 
@@ -38,25 +40,73 @@ func New(connection string) (*Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	b := &Backend{
-		db: db,
-	}
-	return b, err
+	return NewFromDB(db), nil
 }
 
 // NewFromDB creates a new postgres path DB backend from the given db handle.
 // The db handle must be a connection to a postgres database.
 func NewFromDB(db *sql.DB) *Backend {
 	return &Backend{
+		executor: &executor{
+			db: db,
+		},
 		db: db,
 	}
 }
 
-func (b *Backend) Insert(ctx context.Context, segMeta *seg.Meta) (int, error) {
-	return b.InsertWithHPCfgIDs(ctx, segMeta, []*query.HPCfgID{&query.NullHpCfgID})
+func (b *Backend) BeginTransaction(ctx context.Context,
+	opts *sql.TxOptions) (pathdb.Transaction, error) {
+
+	tx, err := b.db.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, common.NewBasicError("Failed to create transaction", err)
+	}
+	return &transaction{
+		executor: &executor{
+			db: tx,
+		},
+		tx: tx,
+	}, nil
 }
 
-func (b *Backend) InsertWithHPCfgIDs(ctx context.Context, segMeta *seg.Meta,
+var _ (pathdb.Transaction) = (*transaction)(nil)
+
+type transaction struct {
+	*executor
+	tx *sql.Tx
+}
+
+func (tx *transaction) Commit() error {
+	return tx.tx.Commit()
+}
+
+func (tx *transaction) Rollback() error {
+	return tx.tx.Rollback()
+}
+
+var _ (pathdb.ReadWrite) = (*executor)(nil)
+
+type executor struct {
+	db db.Sqler
+}
+
+func (e *executor) Insert(ctx context.Context, segMeta *seg.Meta) (int, error) {
+	return e.InsertWithHPCfgIDs(ctx, segMeta, []*query.HPCfgID{&query.NullHpCfgID})
+}
+
+func (e *executor) InsertWithHPCfgIDs(ctx context.Context, segMeta *seg.Meta,
+	hpCfgIDs []*query.HPCfgID) (int, error) {
+
+	var inserted int
+	err := db.DoInTx(ctx, e.db, func(ctx context.Context, tx *sql.Tx) error {
+		var err error
+		inserted, err = insertInternal(ctx, tx, segMeta, hpCfgIDs)
+		return err
+	})
+	return inserted, err
+}
+
+func insertInternal(ctx context.Context, tx *sql.Tx, segMeta *seg.Meta,
 	hpCfgIDs []*query.HPCfgID) (int, error) {
 
 	ps := segMeta.Segment
@@ -74,23 +124,19 @@ func (b *Backend) InsertWithHPCfgIDs(ctx context.Context, segMeta *seg.Meta,
 	}
 	exp := ps.MaxExpiry()
 	info, _ := ps.InfoF()
-	var tx *sql.Tx
-	if tx, err = b.db.BeginTx(ctx, nil); err != nil {
-		return 0, err
-	}
 	// TODO(lukedirtwalker): If possible we should do this also in the query below!
 	existingFullId, err := getFullId(ctx, tx, segID)
 	if err != nil {
 		return 0, err
 	}
 	query := `INSERT INTO Segments (SegID, FullID, LastUpdated, InfoTs, Segment, MaxExpiry,
-		StartIsdID, StartAsID, EndIsdID, EndAsID)
-		SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
-		WHERE NOT EXISTS
-		(SELECT * FROM Segments AS existing WHERE existing.SegID = $1 AND existing.InfoTs > $4)
-		ON CONFLICT (SegID)
-		DO UPDATE SET FullID = $2, LastUpdated = $3, InfoTs = $4, Segment = $5, MaxExpiry = $6
-		RETURNING RowID, xmax = 0`
+			StartIsdID, StartAsID, EndIsdID, EndAsID)
+			SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+			WHERE NOT EXISTS
+			(SELECT * FROM Segments AS existing WHERE existing.SegID = $1 AND existing.InfoTs > $4)
+			ON CONFLICT (SegID)
+			DO UPDATE SET FullID = $2, LastUpdated = $3, InfoTs = $4, Segment = $5, MaxExpiry = $6
+			RETURNING RowID, xmax = 0`
 	var segRowId int64
 	var inserted bool
 	err = tx.QueryRowContext(ctx, query, segID, fullId, time.Now(), info.Timestamp(), packedSeg,
@@ -98,22 +144,18 @@ func (b *Backend) InsertWithHPCfgIDs(ctx context.Context, segMeta *seg.Meta,
 		Scan(&segRowId, &inserted)
 	// If nothing was modified it means there is already a newer version of this segment in the DB.
 	if err == sql.ErrNoRows {
-		tx.Commit()
 		return 0, nil
 	}
 	if err != nil {
-		tx.Rollback()
 		return 0, err
 	}
 	// Insert segType information.
 	if err := insertType(ctx, tx, segRowId, segMeta.Type); err != nil {
-		tx.Rollback()
 		return 0, err
 	}
 	if inserted {
 		// Insert all interfaces.
 		if err = insertInterfaces(ctx, tx, ps.ASEntries, segRowId); err != nil {
-			tx.Rollback()
 			return 0, err
 		}
 	} else if !bytes.Equal(fullId, existingFullId) { // updated only
@@ -121,26 +163,23 @@ func (b *Backend) InsertWithHPCfgIDs(ctx context.Context, segMeta *seg.Meta,
 		// Calculating the actual diffset would be better, but this is way easier to implement.
 		_, err := tx.ExecContext(ctx, `DELETE FROM IntfToSeg WHERE SegRowID = $1`, segRowId)
 		if err != nil {
-			tx.Rollback()
 			return 0, err
 		}
 		if err := insertInterfaces(ctx, tx, ps.ASEntries, segRowId); err != nil {
-			tx.Rollback()
 			return 0, err
 		}
 	}
 	// Insert hpCfgId information.
 	for _, hpCfgId := range hpCfgIDs {
 		if err = insertHPCfgID(ctx, tx, segRowId, hpCfgId); err != nil {
-			tx.Rollback()
 			return 0, err
 		}
 	}
-	return 1, tx.Commit()
+	return 1, nil
 }
 
-func (b *Backend) Delete(ctx context.Context, params *query.Params) (int, error) {
-	return b.deleteInTx(ctx, func(tx *sql.Tx) (sql.Result, error) {
+func (e *executor) Delete(ctx context.Context, params *query.Params) (int, error) {
+	return e.deleteInTx(ctx, func(tx *sql.Tx) (sql.Result, error) {
 		q, args := buildQuery(params)
 		query := fmt.Sprintf(
 			`DELETE FROM Segments WHERE RowId IN(SELECT toDel.RowID FROM (%s) AS toDel)`, q)
@@ -148,16 +187,16 @@ func (b *Backend) Delete(ctx context.Context, params *query.Params) (int, error)
 	})
 }
 
-func (b *Backend) DeleteExpired(ctx context.Context, now time.Time) (int, error) {
-	return b.deleteInTx(ctx, func(tx *sql.Tx) (sql.Result, error) {
+func (e *executor) DeleteExpired(ctx context.Context, now time.Time) (int, error) {
+	return e.deleteInTx(ctx, func(tx *sql.Tx) (sql.Result, error) {
 		delStmt := `DELETE FROM Segments WHERE MaxExpiry < $1`
 		return tx.ExecContext(ctx, delStmt, now)
 	})
 }
 
-func (b *Backend) Get(ctx context.Context, params *query.Params) (query.Results, error) {
+func (e *executor) Get(ctx context.Context, params *query.Params) (query.Results, error) {
 	stmt, args := buildQuery(params)
-	rows, err := b.db.QueryContext(ctx, stmt, args...)
+	rows, err := e.db.QueryContext(ctx, stmt, args...)
 	if err != nil {
 		return nil, common.NewBasicError("Error looking up path segment", err, "q", stmt)
 	}
@@ -199,9 +238,9 @@ func (b *Backend) Get(ctx context.Context, params *query.Params) (query.Results,
 	return res, nil
 }
 
-func (b *Backend) GetAll(ctx context.Context) (<-chan query.ResultOrErr, error) {
+func (e *executor) GetAll(ctx context.Context) (<-chan query.ResultOrErr, error) {
 	stmt, args := buildQuery(nil)
-	rows, err := b.db.QueryContext(ctx, stmt, args...)
+	rows, err := e.db.QueryContext(ctx, stmt, args...)
 	if err != nil {
 		return nil, common.NewBasicError("Error looking up path segment", err, "q", stmt)
 	}
@@ -250,35 +289,32 @@ func (b *Backend) GetAll(ctx context.Context) (<-chan query.ResultOrErr, error) 
 	return resCh, nil
 }
 
-func (b *Backend) InsertNextQuery(ctx context.Context, dst addr.IA,
+func (e *executor) InsertNextQuery(ctx context.Context, dst addr.IA,
 	nextQuery time.Time) (bool, error) {
 
-	tx, err := b.db.BeginTx(ctx, nil)
-	if err != nil {
-		return false, err
-	}
 	query := `INSERT INTO NextQuery (IsdID, AsID, NextQuery)
 		SELECT $1, $2, $3
 		WHERE NOT EXISTS
 			(SELECT * FROM NextQuery AS existing
 			WHERE existing.IsdID = $1 AND existing.AsID = $2 AND existing.NextQuery > $3)
 		ON CONFLICT(IsdID, AsID) DO UPDATE SET NextQuery = $3`
-	r, err := tx.ExecContext(ctx, query, dst.I, dst.A, nextQuery)
+	var r sql.Result
+	err := db.DoInTx(ctx, e.db, func(ctx context.Context, tx *sql.Tx) error {
+		var err error
+		r, err = tx.ExecContext(ctx, query, dst.I, dst.A, nextQuery)
+		return err
+	})
 	if err != nil {
-		tx.Rollback()
 		return false, common.NewBasicError("Failed to execute insert NextQuery stmt", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return false, err
 	}
 	n, err := r.RowsAffected()
 	return n > 0, err
 }
 
-func (b *Backend) GetNextQuery(ctx context.Context, dst addr.IA) (*time.Time, error) {
+func (e *executor) GetNextQuery(ctx context.Context, dst addr.IA) (*time.Time, error) {
 
 	query := `SELECT NextQuery from NextQuery WHERE IsdID = $1 AND AsID = $2`
-	rows, err := b.db.QueryContext(ctx, query, dst.I, dst.A)
+	rows, err := e.db.QueryContext(ctx, query, dst.I, dst.A)
 	if err != nil {
 		return nil, err
 	}
@@ -291,19 +327,16 @@ func (b *Backend) GetNextQuery(ctx context.Context, dst addr.IA) (*time.Time, er
 	return &next, nil
 }
 
-func (b *Backend) deleteInTx(ctx context.Context,
-	delete func(tx *sql.Tx) (sql.Result, error)) (int, error) {
+func (e *executor) deleteInTx(ctx context.Context,
+	delFunc func(tx *sql.Tx) (sql.Result, error)) (int, error) {
 
-	tx, err := b.db.BeginTx(ctx, nil)
+	var res sql.Result
+	err := db.DoInTx(ctx, e.db, func(ctx context.Context, tx *sql.Tx) error {
+		var err error
+		res, err = delFunc(tx)
+		return err
+	})
 	if err != nil {
-		return 0, err
-	}
-	res, err := delete(tx)
-	if err != nil {
-		tx.Rollback()
-		return 0, err
-	}
-	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
 	deleted, _ := res.RowsAffected()
