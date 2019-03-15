@@ -281,11 +281,17 @@ out = t/"""
     def find(tp, field, pattern):
         r = re.compile(pattern)
         res = []
-        for id in sorted(tp.keys()):
-            ent = tp[id]
-            if hasattr(ent, field):
-                if r.match(str(getattr(ent, field))):
-                    res.append(ent)
+        if isinstance(tp, dict):
+            for id in sorted(tp.keys()):
+                ent = tp[id]
+                if hasattr(ent, field):
+                    if r.match(str(getattr(ent, field))):
+                        res.append(ent)
+        if isinstance(tp, list):
+            for ent in tp:
+                if hasattr(ent, field):
+                    if r.match(str(getattr(ent, field))):
+                        res.append(ent)
         return res
 
     pprint(eval(sys.argv[1]), 0)
