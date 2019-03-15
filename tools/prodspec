@@ -1,0 +1,32 @@
+#!/bin/bash
+
+ROOTDIR=$(dirname "$0")/..
+COMMAND=$1
+
+cmd_build() {
+    set -e
+    echo "===> Generating prodspec"
+    $ROOTDIR/bin/prodgen
+    echo "===> Validating prodspec"
+    $ROOTDIR/bin/validate
+    echo "===> Generating topology files"
+    $ROOTDIR/bin/gen_topology
+}
+
+cmd_query() {
+    $ROOTDIR/go/prodspec/schema/query $1
+}
+
+cmd_help() {
+	cat <<-_EOF
+	Usage:
+	    prodspec build
+	    prodspec query <python expression>
+	_EOF
+}
+
+case $COMMAND in
+    build)              cmd_build ;;
+    query)              cmd_query $2 ;;
+    *)                  cmd_help ;;
+esac
