@@ -6,7 +6,11 @@ from tiles import t
 with open("schema.yml", 'r') as f:
     sch = yaml.load(f)
 
-fields = (t/'').vjoin([t/'@{e} map[string]*@{e}' for e in sch])
+###################################################################################################
+# Go schema library -- browsing and creation of the prodspec graph.
+###################################################################################################
+
+fields = (t/'').vjoin([t/'@{e} map[string]*@{e}' for e in sorted(sch.keys())])
 
 out = t/"""
     // This file was generated from schema.yml by schema/generator
@@ -23,10 +27,12 @@ out = t/"""
     }
     """
 
-for e, entity in sch.items():
+for e in sorted(sch.keys()):
+    entity = sch[e]
     fields = t/''
     functs = t/''
-    for f, field in entity.items():
+    for f in sorted(entity.keys()):
+        field = entity[f]
         if field["type"] == "Ref":
             fields |= t/"""
                 @{f} *@{field["refentity"]} `toml:"-"`
@@ -100,9 +106,11 @@ for e, entity in sch.items():
         """
 
 pts = t/''
-for e, entity in sch.items():
+for e in sorted(sch.keys()):
+    entity = sch[e]
     fields = t/''
-    for f, field in entity.items():
+    for f in sorted(entity.keys()):
+        field = entity[f]
         if field["type"] == "Ref":
             fields |= t/'v.REF@{f} = v.@{f}.ID'
         elif field["type"] == "Refs":
@@ -120,9 +128,11 @@ for e, entity in sch.items():
         """
 
 stp = t/''
-for e, entity in sch.items():
+for e in sorted(sch.keys()):
+    entity = sch[e]
     fields = t/''
-    for f, field in entity.items():
+    for f in sorted(entity.keys()):
+        field = entity[f]
         if field["type"] == "Ref":
             fields |= t/'v.@{f} = self.@{f}[v.REF@{f}]'
         elif field["type"] == "Refs":
@@ -154,14 +164,15 @@ with open("schema.go", 'w') as f:
     f.write(str(out))
 
 ###################################################################################################
-# Python schema generator
+# Prodspec query tool (in Python)
 ###################################################################################################
 
 classes = t/''
 for e in sch:
     fields = t/''
     prints = t/''
-    for fname, field in sch[e].items():
+    for fname in sorted(sch[e].keys()):
+        field = sch[e][fname]
         if field["type"] == "Ref":
             fields |= t/'@{fname} = None'
             prints |= t/"""
@@ -198,7 +209,8 @@ for e in sch:
     out |= t%'' |  t/"""
         global @{e}
         @{e} = {}
-        for id, obj in root["@{e}"].items():
+        for id in sorted(root["@{e}"].keys()):
+            obj = root["@{e}"][id]
             c = @{e}Class()
             c.ID = id
             for k, v in obj.items():
@@ -206,9 +218,11 @@ for e in sch:
             @{e}[id] = c
         """
 
-for ename, fields in sch.items():
+for ename in sorted(sch.keys()):
+    fields = sch[ename]
     flds = t/''
-    for fname, field in fields.items():
+    for fname in sorted(fields.keys()):
+        field = fields[fname]
         if field["type"] == 'Ref':
             flds |= t/"""
                v.@{fname} = @{field["refentity"]}[v.@{fname}]
@@ -250,9 +264,9 @@ out = t/"""
            obj.print(level)
        elif isinstance(obj, dict):
            iprint(level, "{")
-           for k, v in obj.items():
+           for k in sorted(obj.keys()):
                iprint(level, k + ":")
-               pprint(v, level + 1)
+               pprint(obj[k], level + 1)
            iprint(level, "}")
        elif isinstance(obj, list):
            iprint(level, "[")
