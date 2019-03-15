@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from collections import namedtuple
+import re
 import sys
 import toml
 
@@ -9,129 +10,6 @@ def iprint(level, s):
 
 class ProdspecEntity:
     pass
-
-class SiteClass(ProdspecEntity):
-    ID = None
-    Host = []
-    Organization = None
-
-    def print(self, level):
-        iprint(level, "ID = %s" % self.ID)
-        iprint(level, "Host = [")
-        for ent in self.Host:
-            iprint(level + 1, ent.ID)
-        iprint(level, "]")
-        if self.Organization is not None:
-            iprint(level, "Organization = %s" % self.Organization.ID)
-
-class SIGClass(ProdspecEntity):
-    ID = None
-    AS = None
-    Name = None
-
-    def print(self, level):
-        iprint(level, "ID = %s" % self.ID)
-        if self.AS is not None:
-            iprint(level, "AS = %s" % self.AS.ID)
-        if self.Name is not None:
-            iprint(level, "Name = %s" % self.Name)
-
-class BSClass(ProdspecEntity):
-    ID = None
-    AS = None
-    Name = None
-
-    def print(self, level):
-        iprint(level, "ID = %s" % self.ID)
-        if self.AS is not None:
-            iprint(level, "AS = %s" % self.AS.ID)
-        if self.Name is not None:
-            iprint(level, "Name = %s" % self.Name)
-
-class CSClass(ProdspecEntity):
-    ID = None
-    AS = None
-    Name = None
-
-    def print(self, level):
-        iprint(level, "ID = %s" % self.ID)
-        if self.AS is not None:
-            iprint(level, "AS = %s" % self.AS.ID)
-        if self.Name is not None:
-            iprint(level, "Name = %s" % self.Name)
-
-class OrganizationClass(ProdspecEntity):
-    ID = None
-    AS = []
-    Site = []
-
-    def print(self, level):
-        iprint(level, "ID = %s" % self.ID)
-        iprint(level, "AS = [")
-        for ent in self.AS:
-            iprint(level + 1, ent.ID)
-        iprint(level, "]")
-        iprint(level, "Site = [")
-        for ent in self.Site:
-            iprint(level + 1, ent.ID)
-        iprint(level, "]")
-
-class ASClass(ProdspecEntity):
-    ID = None
-    BR = []
-    BS = []
-    CS = []
-    Core = None
-    ISD = []
-    MTU = None
-    Organization = None
-    PS = []
-    SIG = []
-
-    def print(self, level):
-        iprint(level, "ID = %s" % self.ID)
-        iprint(level, "BR = [")
-        for ent in self.BR:
-            iprint(level + 1, ent.ID)
-        iprint(level, "]")
-        iprint(level, "BS = [")
-        for ent in self.BS:
-            iprint(level + 1, ent.ID)
-        iprint(level, "]")
-        iprint(level, "CS = [")
-        for ent in self.CS:
-            iprint(level + 1, ent.ID)
-        iprint(level, "]")
-        if self.Core is not None:
-            iprint(level, "Core = %s" % self.Core)
-        iprint(level, "ISD = [")
-        for ent in self.ISD:
-            iprint(level + 1, ent.ID)
-        iprint(level, "]")
-        if self.MTU is not None:
-            iprint(level, "MTU = %s" % self.MTU)
-        if self.Organization is not None:
-            iprint(level, "Organization = %s" % self.Organization.ID)
-        iprint(level, "PS = [")
-        for ent in self.PS:
-            iprint(level + 1, ent.ID)
-        iprint(level, "]")
-        iprint(level, "SIG = [")
-        for ent in self.SIG:
-            iprint(level + 1, ent.ID)
-        iprint(level, "]")
-
-class PSClass(ProdspecEntity):
-    ID = None
-    AS = None
-    Name = None
-
-    def print(self, level):
-        iprint(level, "ID = %s" % self.ID)
-        if self.AS is not None:
-            iprint(level, "AS = %s" % self.AS.ID)
-        if self.Name is not None:
-            iprint(level, "Name = %s" % self.Name)
 
 class HostClass(ProdspecEntity):
     ID = None
@@ -156,21 +34,19 @@ class HostClass(ProdspecEntity):
         if self.Site is not None:
             iprint(level, "Site = %s" % self.Site.ID)
 
-class ISDClass(ProdspecEntity):
+class BRClass(ProdspecEntity):
     ID = None
-    AS = []
+    AS = None
     Name = None
 
     def print(self, level):
         iprint(level, "ID = %s" % self.ID)
-        iprint(level, "AS = [")
-        for ent in self.AS:
-            iprint(level + 1, ent.ID)
-        iprint(level, "]")
+        if self.AS is not None:
+            iprint(level, "AS = %s" % self.AS.ID)
         if self.Name is not None:
             iprint(level, "Name = %s" % self.Name)
 
-class BRClass(ProdspecEntity):
+class SIGClass(ProdspecEntity):
     ID = None
     AS = None
     Name = None
@@ -236,80 +112,135 @@ class InterfaceClass(ProdspecEntity):
         if self.SerialNumber is not None:
             iprint(level, "SerialNumber = %s" % self.SerialNumber)
 
+class ASClass(ProdspecEntity):
+    ID = None
+    BR = []
+    BS = []
+    CS = []
+    Core = None
+    ISD = []
+    MTU = None
+    Organization = None
+    PS = []
+    SIG = []
+
+    def print(self, level):
+        iprint(level, "ID = %s" % self.ID)
+        iprint(level, "BR = [")
+        for ent in self.BR:
+            iprint(level + 1, ent.ID)
+        iprint(level, "]")
+        iprint(level, "BS = [")
+        for ent in self.BS:
+            iprint(level + 1, ent.ID)
+        iprint(level, "]")
+        iprint(level, "CS = [")
+        for ent in self.CS:
+            iprint(level + 1, ent.ID)
+        iprint(level, "]")
+        if self.Core is not None:
+            iprint(level, "Core = %s" % self.Core)
+        iprint(level, "ISD = [")
+        for ent in self.ISD:
+            iprint(level + 1, ent.ID)
+        iprint(level, "]")
+        if self.MTU is not None:
+            iprint(level, "MTU = %s" % self.MTU)
+        if self.Organization is not None:
+            iprint(level, "Organization = %s" % self.Organization.ID)
+        iprint(level, "PS = [")
+        for ent in self.PS:
+            iprint(level + 1, ent.ID)
+        iprint(level, "]")
+        iprint(level, "SIG = [")
+        for ent in self.SIG:
+            iprint(level + 1, ent.ID)
+        iprint(level, "]")
+
+class SiteClass(ProdspecEntity):
+    ID = None
+    Host = []
+    Organization = None
+
+    def print(self, level):
+        iprint(level, "ID = %s" % self.ID)
+        iprint(level, "Host = [")
+        for ent in self.Host:
+            iprint(level + 1, ent.ID)
+        iprint(level, "]")
+        if self.Organization is not None:
+            iprint(level, "Organization = %s" % self.Organization.ID)
+
+class ISDClass(ProdspecEntity):
+    ID = None
+    AS = []
+    Name = None
+
+    def print(self, level):
+        iprint(level, "ID = %s" % self.ID)
+        iprint(level, "AS = [")
+        for ent in self.AS:
+            iprint(level + 1, ent.ID)
+        iprint(level, "]")
+        if self.Name is not None:
+            iprint(level, "Name = %s" % self.Name)
+
+class OrganizationClass(ProdspecEntity):
+    ID = None
+    AS = []
+    Site = []
+
+    def print(self, level):
+        iprint(level, "ID = %s" % self.ID)
+        iprint(level, "AS = [")
+        for ent in self.AS:
+            iprint(level + 1, ent.ID)
+        iprint(level, "]")
+        iprint(level, "Site = [")
+        for ent in self.Site:
+            iprint(level + 1, ent.ID)
+        iprint(level, "]")
+
+class BSClass(ProdspecEntity):
+    ID = None
+    AS = None
+    Name = None
+
+    def print(self, level):
+        iprint(level, "ID = %s" % self.ID)
+        if self.AS is not None:
+            iprint(level, "AS = %s" % self.AS.ID)
+        if self.Name is not None:
+            iprint(level, "Name = %s" % self.Name)
+
+class PSClass(ProdspecEntity):
+    ID = None
+    AS = None
+    Name = None
+
+    def print(self, level):
+        iprint(level, "ID = %s" % self.ID)
+        if self.AS is not None:
+            iprint(level, "AS = %s" % self.AS.ID)
+        if self.Name is not None:
+            iprint(level, "Name = %s" % self.Name)
+
+class CSClass(ProdspecEntity):
+    ID = None
+    AS = None
+    Name = None
+
+    def print(self, level):
+        iprint(level, "ID = %s" % self.ID)
+        if self.AS is not None:
+            iprint(level, "AS = %s" % self.AS.ID)
+        if self.Name is not None:
+            iprint(level, "Name = %s" % self.Name)
+
 def Load(filename):
     with open(filename, "r") as f:
         content = f.read()
     root =  toml.loads(content)
-
-    global Site
-    Site = {}
-    for id in sorted(root["Site"].keys()):
-        obj = root["Site"][id]
-        c = SiteClass()
-        c.ID = id
-        for k, v in obj.items():
-            setattr(c, k, v)
-        Site[id] = c
-
-    global SIG
-    SIG = {}
-    for id in sorted(root["SIG"].keys()):
-        obj = root["SIG"][id]
-        c = SIGClass()
-        c.ID = id
-        for k, v in obj.items():
-            setattr(c, k, v)
-        SIG[id] = c
-
-    global BS
-    BS = {}
-    for id in sorted(root["BS"].keys()):
-        obj = root["BS"][id]
-        c = BSClass()
-        c.ID = id
-        for k, v in obj.items():
-            setattr(c, k, v)
-        BS[id] = c
-
-    global CS
-    CS = {}
-    for id in sorted(root["CS"].keys()):
-        obj = root["CS"][id]
-        c = CSClass()
-        c.ID = id
-        for k, v in obj.items():
-            setattr(c, k, v)
-        CS[id] = c
-
-    global Organization
-    Organization = {}
-    for id in sorted(root["Organization"].keys()):
-        obj = root["Organization"][id]
-        c = OrganizationClass()
-        c.ID = id
-        for k, v in obj.items():
-            setattr(c, k, v)
-        Organization[id] = c
-
-    global AS
-    AS = {}
-    for id in sorted(root["AS"].keys()):
-        obj = root["AS"][id]
-        c = ASClass()
-        c.ID = id
-        for k, v in obj.items():
-            setattr(c, k, v)
-        AS[id] = c
-
-    global PS
-    PS = {}
-    for id in sorted(root["PS"].keys()):
-        obj = root["PS"][id]
-        c = PSClass()
-        c.ID = id
-        for k, v in obj.items():
-            setattr(c, k, v)
-        PS[id] = c
 
     global Host
     Host = {}
@@ -321,16 +252,6 @@ def Load(filename):
             setattr(c, k, v)
         Host[id] = c
 
-    global ISD
-    ISD = {}
-    for id in sorted(root["ISD"].keys()):
-        obj = root["ISD"][id]
-        c = ISDClass()
-        c.ID = id
-        for k, v in obj.items():
-            setattr(c, k, v)
-        ISD[id] = c
-
     global BR
     BR = {}
     for id in sorted(root["BR"].keys()):
@@ -341,6 +262,16 @@ def Load(filename):
             setattr(c, k, v)
         BR[id] = c
 
+    global SIG
+    SIG = {}
+    for id in sorted(root["SIG"].keys()):
+        obj = root["SIG"][id]
+        c = SIGClass()
+        c.ID = id
+        for k, v in obj.items():
+            setattr(c, k, v)
+        SIG[id] = c
+
     global Interface
     Interface = {}
     for id in sorted(root["Interface"].keys()):
@@ -350,6 +281,76 @@ def Load(filename):
         for k, v in obj.items():
             setattr(c, k, v)
         Interface[id] = c
+
+    global AS
+    AS = {}
+    for id in sorted(root["AS"].keys()):
+        obj = root["AS"][id]
+        c = ASClass()
+        c.ID = id
+        for k, v in obj.items():
+            setattr(c, k, v)
+        AS[id] = c
+
+    global Site
+    Site = {}
+    for id in sorted(root["Site"].keys()):
+        obj = root["Site"][id]
+        c = SiteClass()
+        c.ID = id
+        for k, v in obj.items():
+            setattr(c, k, v)
+        Site[id] = c
+
+    global ISD
+    ISD = {}
+    for id in sorted(root["ISD"].keys()):
+        obj = root["ISD"][id]
+        c = ISDClass()
+        c.ID = id
+        for k, v in obj.items():
+            setattr(c, k, v)
+        ISD[id] = c
+
+    global Organization
+    Organization = {}
+    for id in sorted(root["Organization"].keys()):
+        obj = root["Organization"][id]
+        c = OrganizationClass()
+        c.ID = id
+        for k, v in obj.items():
+            setattr(c, k, v)
+        Organization[id] = c
+
+    global BS
+    BS = {}
+    for id in sorted(root["BS"].keys()):
+        obj = root["BS"][id]
+        c = BSClass()
+        c.ID = id
+        for k, v in obj.items():
+            setattr(c, k, v)
+        BS[id] = c
+
+    global PS
+    PS = {}
+    for id in sorted(root["PS"].keys()):
+        obj = root["PS"][id]
+        c = PSClass()
+        c.ID = id
+        for k, v in obj.items():
+            setattr(c, k, v)
+        PS[id] = c
+
+    global CS
+    CS = {}
+    for id in sorted(root["CS"].keys()):
+        obj = root["CS"][id]
+        c = CSClass()
+        c.ID = id
+        for k, v in obj.items():
+            setattr(c, k, v)
+        CS[id] = c
 
     for _, v in AS.items():
         for i in range(len(v.BR)):
@@ -423,5 +424,15 @@ def pprint(obj, level):
        iprint(level, "]")
    else:
        iprint(level, obj)
+
+def find(tp, field, pattern):
+    r = re.compile(pattern)
+    res = []
+    for id in sorted(tp.keys()):
+        ent = tp[id]
+        if hasattr(ent, field):
+            if r.match(str(getattr(ent, field))):
+                res.append(ent)
+    return res
 
 pprint(eval(sys.argv[1]), 0)

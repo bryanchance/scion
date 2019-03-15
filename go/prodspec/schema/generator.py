@@ -241,6 +241,7 @@ out = t/"""
     #!/usr/bin/env python3
 
     from collections import namedtuple
+    import re
     import sys
     import toml
 
@@ -276,6 +277,16 @@ out = t/"""
            iprint(level, "]")
        else:
            iprint(level, obj)
+
+    def find(tp, field, pattern):
+        r = re.compile(pattern)
+        res = []
+        for id in sorted(tp.keys()):
+            ent = tp[id]
+            if hasattr(ent, field):
+                if r.match(str(getattr(ent, field))):
+                    res.append(ent)
+        return res
 
     pprint(eval(sys.argv[1]), 0)
 

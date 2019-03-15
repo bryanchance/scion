@@ -14,7 +14,7 @@ cmd_build() {
 }
 
 cmd_query() {
-    $ROOTDIR/go/prodspec/schema/query $1
+    $ROOTDIR/go/prodspec/schema/query "$1"
 }
 
 cmd_help() {
@@ -27,6 +27,6 @@ cmd_help() {
 
 case $COMMAND in
     build)              cmd_build ;;
-    query)              cmd_query $2 ;;
+    query)              cmd_query "$2" ;;
     *)                  cmd_help ;;
 esac
