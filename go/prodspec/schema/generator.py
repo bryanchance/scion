@@ -281,5 +281,5 @@ out = t/"""
 
     """
 
-with open("../../../bin/query", 'w') as f:
+with open("query", 'w') as f:
     f.write(str(out))
